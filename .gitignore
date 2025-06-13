@@ -34,3 +34,7 @@ go.work
 # OS specific files
 .DS_Store
 Thumbs.db
+
+# Ebook files
+*.epub
+*.fb2
