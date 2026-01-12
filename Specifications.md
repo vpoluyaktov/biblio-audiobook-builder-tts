@@ -265,7 +265,7 @@ Flags:
 |---------|----------|-------|
 | Audio Normalization | Low | Consistent volume levels |
 | Noise Reduction | Low | Clean up TTS artifacts |
-| Cloud TTS (Google) | Low | Needs API integration |
+| Cloud TTS (Google) | ✅ Done | Standard, WaveNet, Neural2, Studio voices |
 | Cloud TTS (Azure) | Low | Needs API integration |
 | Job Persistence | Low | Database storage |
 
