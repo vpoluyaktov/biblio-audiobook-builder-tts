@@ -327,28 +327,79 @@ class App {
         formData.append('file', this.selectedFile);
 
         this.previewBtn.disabled = true;
-        this.previewBtn.innerHTML = '<span class="spinner">⏳</span> Loading...';
+        this.uploadBtn.disabled = true;
+        
+        // Stage 1: Uploading
+        this.previewBtn.innerHTML = '<span class="spinner">⏳</span> Uploading file...';
 
         try {
-            const response = await fetch('/api/preview', {
-                method: 'POST',
-                body: formData
+            // Use XMLHttpRequest for upload progress
+            const preview = await this.uploadWithProgress(formData, (stage, progress) => {
+                if (stage === 'uploading') {
+                    this.previewBtn.innerHTML = `<span class="spinner">⏳</span> Uploading... ${progress}%`;
+                } else if (stage === 'parsing') {
+                    this.previewBtn.innerHTML = '<span class="spinner">⏳</span> Parsing book...';
+                }
             });
 
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Preview failed');
-            }
-
-            const preview = await response.json();
             this.currentPreview = preview;
             this.showPreview(preview);
         } catch (e) {
             this.showToast('Preview failed: ' + e.message, 'error');
         } finally {
             this.previewBtn.disabled = false;
+            this.uploadBtn.disabled = !this.selectedFile;
             this.previewBtn.innerHTML = '👁️ Preview Book';
         }
+    }
+
+    // Upload file with progress tracking
+    uploadWithProgress(formData, onProgress) {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            
+            // Track upload progress
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    onProgress('uploading', percent);
+                }
+            });
+
+            // When upload completes, server starts parsing
+            xhr.upload.addEventListener('load', () => {
+                onProgress('parsing', 100);
+            });
+
+            xhr.addEventListener('load', () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        resolve(response);
+                    } catch (e) {
+                        reject(new Error('Invalid response from server'));
+                    }
+                } else {
+                    try {
+                        const error = JSON.parse(xhr.responseText);
+                        reject(new Error(error.error || 'Preview failed'));
+                    } catch (e) {
+                        reject(new Error('Preview failed: ' + xhr.statusText));
+                    }
+                }
+            });
+
+            xhr.addEventListener('error', () => {
+                reject(new Error('Network error'));
+            });
+
+            xhr.addEventListener('abort', () => {
+                reject(new Error('Upload cancelled'));
+            });
+
+            xhr.open('POST', '/api/preview');
+            xhr.send(formData);
+        });
     }
 
     showPreview(preview) {
@@ -428,26 +479,71 @@ class App {
         formData.append('pitch', this.pitchInput.value);
 
         this.uploadBtn.disabled = true;
-        this.uploadBtn.innerHTML = '<span class="spinner">⏳</span> Uploading...';
+        this.previewBtn.disabled = true;
 
         try {
-            const response = await fetch('/api/upload', {
-                method: 'POST',
-                body: formData
+            // Use XMLHttpRequest for upload progress
+            await this.uploadFileWithProgress(formData, (stage, progress) => {
+                if (stage === 'uploading') {
+                    this.uploadBtn.innerHTML = `<span class="spinner">⏳</span> Uploading... ${progress}%`;
+                } else if (stage === 'processing') {
+                    this.uploadBtn.innerHTML = '<span class="spinner">⏳</span> Processing...';
+                }
             });
 
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Upload failed');
-            }
-
+            this.showToast('Conversion job started!', 'success');
             this.clearSelectedFile();
         } catch (e) {
             this.showToast('Upload failed: ' + e.message, 'error');
         } finally {
             this.uploadBtn.disabled = !this.selectedFile;
+            this.previewBtn.disabled = !this.selectedFile;
             this.uploadBtn.innerHTML = '📤 Start Conversion';
         }
+    }
+
+    // Upload file for conversion with progress tracking
+    uploadFileWithProgress(formData, onProgress) {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            
+            // Track upload progress
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    onProgress('uploading', percent);
+                }
+            });
+
+            // When upload completes, server starts processing
+            xhr.upload.addEventListener('load', () => {
+                onProgress('processing', 100);
+            });
+
+            xhr.addEventListener('load', () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve();
+                } else {
+                    try {
+                        const error = JSON.parse(xhr.responseText);
+                        reject(new Error(error.error || 'Upload failed'));
+                    } catch (e) {
+                        reject(new Error('Upload failed: ' + xhr.statusText));
+                    }
+                }
+            });
+
+            xhr.addEventListener('error', () => {
+                reject(new Error('Network error'));
+            });
+
+            xhr.addEventListener('abort', () => {
+                reject(new Error('Upload cancelled'));
+            });
+
+            xhr.open('POST', '/api/upload');
+            xhr.send(formData);
+        });
     }
 
     // Jobs management
