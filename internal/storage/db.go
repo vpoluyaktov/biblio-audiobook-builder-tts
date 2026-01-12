@@ -47,6 +47,7 @@ type Config struct {
 	CloudAPIKey       string `json:"cloud_api_key"`
 	GoogleTTSEndpoint string `json:"google_tts_endpoint"`
 	AzureTTSEndpoint  string `json:"azure_tts_endpoint"`
+	GoogleAPIKey      string `json:"google_api_key"`
 
 	// Audiobookshelf integration
 	AudiobookshelfURL      string `json:"audiobookshelf_url"`
@@ -253,6 +254,9 @@ func (db *DB) GetAllConfig() (*Config, error) {
 	}
 	if v, ok := configMap["azure_tts_endpoint"]; ok {
 		cfg.AzureTTSEndpoint = v
+	}
+	if v, ok := configMap["google_api_key"]; ok {
+		cfg.GoogleAPIKey = v
 	}
 	if v, ok := configMap["audiobookshelf_url"]; ok {
 		cfg.AudiobookshelfURL = v
@@ -555,6 +559,7 @@ func (c *Config) ToAppConfig() map[string]interface{} {
 		"cloud_api_key":             c.CloudAPIKey,
 		"google_tts_endpoint":       c.GoogleTTSEndpoint,
 		"azure_tts_endpoint":        c.AzureTTSEndpoint,
+		"google_api_key":            c.GoogleAPIKey,
 		"audiobookshelf_url":        c.AudiobookshelfURL,
 		"audiobookshelf_user":       c.AudiobookshelfUser,
 		"audiobookshelf_password":   c.AudiobookshelfPassword,
