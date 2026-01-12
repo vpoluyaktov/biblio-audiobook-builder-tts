@@ -241,6 +241,7 @@ Flags:
 | Log Level Flag | ✅ Done | Configurable verbosity |
 | Book Preview | ✅ Done | Metadata, chapters, cover, cost estimate before conversion |
 | Cover Image Extraction | ✅ Done | From EPUB/FB2 metadata |
+| Server TUI | ✅ Done | Terminal dashboard showing server status, providers, jobs |
 
 ### In Progress 🔄
 
@@ -252,7 +253,6 @@ Flags:
 
 | Feature | Priority | Notes |
 |---------|----------|-------|
-| Server TUI | High | Terminal dashboard showing server status, providers, jobs |
 | M4B Output | High | Proper audiobook format with chapters |
 | Chapter Markers | High | FFMETADATA format for M4B |
 | Cover Image Embedding | High | In M4B output |

@@ -16,7 +16,10 @@ import (
 	"abb_tts/internal/config"
 	"abb_tts/internal/server"
 	"abb_tts/internal/tts"
+	"abb_tts/internal/tui"
 	"abb_tts/internal/utils"
+
+	"golang.org/x/term"
 )
 
 // LogLevel represents logging verbosity
@@ -63,6 +66,8 @@ func main() {
 		fmt.Fprintf(flag.CommandLine.Output(), "        Kill any existing process on the port before starting\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "  --log-level string\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "        Log level: DEBUG, INFO, WARN, ERROR (default \"INFO\")\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "  --headless\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "        Run without TUI (headless mode)\n")
 	}
 
 	// Parse command line flags
@@ -72,6 +77,7 @@ func main() {
 	noBrowser := flag.Bool("no-browser", false, "Don't automatically open browser")
 	restart := flag.Bool("restart", false, "Kill any existing process on the port before starting")
 	logLevel := flag.String("log-level", "INFO", "Log level: DEBUG, INFO, WARN, ERROR")
+	headless := flag.Bool("headless", false, "Run without TUI (headless mode)")
 	flag.Parse()
 
 	// Set log level
@@ -158,12 +164,29 @@ func main() {
 	}
 
 	url := fmt.Sprintf("http://localhost:%s", cfg.ServerPort)
-	fmt.Printf("🎧 Audiobook Builder TTS Server running at %s\n", url)
-	fmt.Println("Press Ctrl+C to stop")
 
 	// Open browser if enabled
 	if cfg.OpenBrowser {
 		go openBrowser(url)
+	}
+
+	// Determine if we should run TUI
+	// Run TUI if: not headless, and running in a terminal
+	runTUI := !*headless && term.IsTerminal(int(os.Stdin.Fd()))
+
+	if runTUI {
+		// Run TUI - it will handle shutdown
+		go func() {
+			if err := tui.RunTUI(url, srv.GetStore(), ttsService, srv.GetHub()); err != nil {
+				log.Printf("TUI error: %v", err)
+			}
+			// TUI exited, trigger shutdown
+			cancel()
+		}()
+	} else {
+		// Headless mode
+		fmt.Printf("🎧 Audiobook Builder TTS Server running at %s\n", url)
+		fmt.Println("Press Ctrl+C to stop")
 	}
 
 	// Wait for shutdown signal or server error
