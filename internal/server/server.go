@@ -1,0 +1,453 @@
+package server
+
+import (
+	"context"
+	"embed"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"time"
+
+	"abb_tts/internal/config"
+	"abb_tts/internal/tts"
+)
+
+//go:embed assets/*
+var assetsFS embed.FS
+
+//go:embed templates/*
+var templatesFS embed.FS
+
+// Server represents the HTTP server for abb_tts
+type Server struct {
+	addr       string
+	cfg        *config.Config
+	store      *JobStore
+	hub        *Hub
+	worker     *Worker
+	ttsService tts.Service
+	httpServer *http.Server
+}
+
+// New creates a new server instance
+func New(addr string, cfg *config.Config, ttsService tts.Service) *Server {
+	store := NewJobStore()
+	hub := NewHub()
+	worker := NewWorker(store, hub, ttsService, cfg)
+
+	return &Server{
+		addr:       addr,
+		cfg:        cfg,
+		store:      store,
+		hub:        hub,
+		worker:     worker,
+		ttsService: ttsService,
+	}
+}
+
+// Start starts the HTTP server
+func (s *Server) Start() error {
+	// Start WebSocket hub
+	go s.hub.Run()
+
+	// Start job worker
+	s.worker.Start()
+
+	// Setup routes
+	mux := http.NewServeMux()
+
+	// Static assets
+	mux.Handle("/assets/", http.FileServer(http.FS(assetsFS)))
+
+	// API endpoints
+	mux.HandleFunc("/api/jobs", s.handleJobs)
+	mux.HandleFunc("/api/jobs/", s.handleJob)
+	mux.HandleFunc("/api/upload", s.handleUpload)
+	mux.HandleFunc("/api/providers", s.handleProviders)
+	mux.HandleFunc("/api/voices", s.handleVoices)
+	mux.HandleFunc("/api/config", s.handleConfig)
+	mux.HandleFunc("/api/ws", func(w http.ResponseWriter, r *http.Request) {
+		ServeWS(s.hub, w, r)
+	})
+
+	// Serve main page
+	mux.HandleFunc("/", s.handleIndex)
+
+	s.httpServer = &http.Server{
+		Addr:    s.addr,
+		Handler: mux,
+	}
+
+	log.Printf("Server starting on %s", s.addr)
+	return s.httpServer.ListenAndServe()
+}
+
+// Stop gracefully stops the server
+func (s *Server) Stop(ctx context.Context) error {
+	s.worker.Stop()
+	return s.httpServer.Shutdown(ctx)
+}
+
+// handleIndex serves the main page
+func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+
+	data, err := templatesFS.ReadFile("templates/index.html")
+	if err != nil {
+		http.Error(w, "Error loading page", http.StatusInternalServerError)
+		log.Printf("Template error: %v", err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(data)
+}
+
+// handleJobs handles GET (list) and POST (create via JSON) for jobs
+func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		s.listJobs(w, r)
+	case http.MethodOptions:
+		s.handleCORS(w)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleJob handles operations on a specific job
+func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
+	// Extract job ID from path: /api/jobs/{id} or /api/jobs/{id}/download
+	path := r.URL.Path
+	prefix := "/api/jobs/"
+	if len(path) <= len(prefix) {
+		http.Error(w, "Job ID required", http.StatusBadRequest)
+		return
+	}
+
+	remaining := path[len(prefix):]
+	var jobID string
+	var action string
+
+	if idx := indexOf(remaining, "/"); idx != -1 {
+		jobID = remaining[:idx]
+		action = remaining[idx+1:]
+	} else {
+		jobID = remaining
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		if action == "download" {
+			s.downloadJob(w, r, jobID)
+		} else {
+			s.getJob(w, r, jobID)
+		}
+	case http.MethodDelete:
+		s.deleteJob(w, r, jobID)
+	case http.MethodOptions:
+		s.handleCORS(w)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// listJobs returns all jobs
+func (s *Server) listJobs(w http.ResponseWriter, r *http.Request) {
+	jobs := s.store.List()
+	s.jsonResponse(w, http.StatusOK, jobs)
+}
+
+// getJob returns a specific job
+func (s *Server) getJob(w http.ResponseWriter, r *http.Request, id string) {
+	job, exists := s.store.Get(id)
+	if !exists {
+		s.jsonError(w, http.StatusNotFound, "Job not found")
+		return
+	}
+	s.jsonResponse(w, http.StatusOK, job.Clone())
+}
+
+// deleteJob cancels/deletes a job
+func (s *Server) deleteJob(w http.ResponseWriter, r *http.Request, id string) {
+	job, exists := s.store.Get(id)
+	if !exists {
+		s.jsonError(w, http.StatusNotFound, "Job not found")
+		return
+	}
+
+	// If job is pending or in progress, mark as cancelled
+	if job.Status == JobStatusPending || job.Status == JobStatusParsing || job.Status == JobStatusConverting {
+		job.SetStatus(JobStatusCancelled)
+		s.hub.Broadcast(WSMessage{
+			Type:    WSTypeJobDeleted,
+			Payload: map[string]string{"id": id},
+		})
+	}
+
+	// Remove from store
+	s.store.Delete(id)
+
+	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+// downloadJob serves the completed audiobook files
+func (s *Server) downloadJob(w http.ResponseWriter, r *http.Request, id string) {
+	job, exists := s.store.Get(id)
+	if !exists {
+		s.jsonError(w, http.StatusNotFound, "Job not found")
+		return
+	}
+
+	if job.Status != JobStatusCompleted {
+		s.jsonError(w, http.StatusBadRequest, "Job not completed")
+		return
+	}
+
+	if job.OutputPath == "" {
+		s.jsonError(w, http.StatusNotFound, "Output not available")
+		return
+	}
+
+	// For now, serve the directory listing as JSON
+	// In a full implementation, you might want to create a ZIP file
+	files, err := os.ReadDir(job.OutputPath)
+	if err != nil {
+		s.jsonError(w, http.StatusInternalServerError, "Failed to read output directory")
+		return
+	}
+
+	fileList := make([]map[string]interface{}, 0)
+	for _, f := range files {
+		if !f.IsDir() {
+			info, _ := f.Info()
+			fileList = append(fileList, map[string]interface{}{
+				"name": f.Name(),
+				"size": info.Size(),
+			})
+		}
+	}
+
+	s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"job_id":      id,
+		"output_path": job.OutputPath,
+		"files":       fileList,
+	})
+}
+
+// handleUpload handles file upload and job creation
+func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.handleCORS(w)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse multipart form (max 100MB)
+	if err := r.ParseMultipartForm(100 << 20); err != nil {
+		s.jsonError(w, http.StatusBadRequest, fmt.Sprintf("Failed to parse form: %v", err))
+		return
+	}
+
+	// Get the file
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		s.jsonError(w, http.StatusBadRequest, "No file provided")
+		return
+	}
+	defer file.Close()
+
+	// Validate file extension
+	ext := filepath.Ext(header.Filename)
+	if ext != ".epub" && ext != ".fb2" {
+		s.jsonError(w, http.StatusBadRequest, "Unsupported file format. Only .epub and .fb2 are supported")
+		return
+	}
+
+	// Get TTS settings from form
+	provider := r.FormValue("provider")
+	if provider == "" {
+		provider = s.cfg.DefaultProvider
+	}
+
+	voice := r.FormValue("voice")
+	if voice == "" {
+		voice = s.cfg.DefaultVoice
+	}
+
+	speed := parseFloat(r.FormValue("speed"), s.cfg.DefaultSpeed)
+	pitch := parseFloat(r.FormValue("pitch"), s.cfg.DefaultPitch)
+
+	// Save file to temp directory
+	tempDir := s.cfg.TempDir
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		s.jsonError(w, http.StatusInternalServerError, "Failed to create temp directory")
+		return
+	}
+
+	tempPath := filepath.Join(tempDir, fmt.Sprintf("%d_%s", time.Now().UnixNano(), header.Filename))
+	tempFile, err := os.Create(tempPath)
+	if err != nil {
+		s.jsonError(w, http.StatusInternalServerError, "Failed to save uploaded file")
+		return
+	}
+	defer tempFile.Close()
+
+	if _, err := io.Copy(tempFile, file); err != nil {
+		s.jsonError(w, http.StatusInternalServerError, "Failed to save uploaded file")
+		return
+	}
+
+	// Create job
+	job := NewJob(header.Filename, tempPath, provider, voice, speed, pitch)
+	s.store.Add(job)
+
+	// Broadcast job creation
+	s.hub.Broadcast(WSMessage{
+		Type:    WSTypeJobCreated,
+		Payload: job.Clone(),
+	})
+
+	log.Printf("Created job %s for file %s", job.ID, header.Filename)
+
+	s.jsonResponse(w, http.StatusCreated, job.Clone())
+}
+
+// handleProviders returns available TTS providers
+func (s *Server) handleProviders(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.handleCORS(w)
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	providers := s.ttsService.GetAvailableProviders()
+	s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"providers": providers,
+		"default":   s.cfg.DefaultProvider,
+	})
+}
+
+// handleVoices returns available voices for a provider
+func (s *Server) handleVoices(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.handleCORS(w)
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	voices := s.ttsService.GetAvailableVoices()
+
+	// Optionally filter by provider
+	provider := r.URL.Query().Get("provider")
+	if provider != "" {
+		filtered := make([]tts.Voice, 0)
+		for _, v := range voices {
+			if v.Provider == provider {
+				filtered = append(filtered, v)
+			}
+		}
+		voices = filtered
+	}
+
+	s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"voices":  voices,
+		"default": s.cfg.DefaultVoice,
+	})
+}
+
+// handleConfig returns current configuration (non-sensitive)
+func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.handleCORS(w)
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"default_provider": s.cfg.DefaultProvider,
+		"default_voice":    s.cfg.DefaultVoice,
+		"default_speed":    s.cfg.DefaultSpeed,
+		"default_pitch":    s.cfg.DefaultPitch,
+		"bit_rate_kbs":     s.cfg.BitRateKbs,
+		"sample_rate_hz":   s.cfg.SampleRateHz,
+	})
+}
+
+// Helper functions
+
+func (s *Server) handleCORS(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) jsonResponse(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(data)
+}
+
+func (s *Server) jsonError(w http.ResponseWriter, status int, message string) {
+	s.jsonResponse(w, status, map[string]string{"error": message})
+}
+
+func indexOf(s string, substr string) int {
+	for i := 0; i < len(s); i++ {
+		if s[i:i+1] == substr {
+			return i
+		}
+	}
+	return -1
+}
+
+func parseFloat(s string, defaultVal float64) float64 {
+	if s == "" {
+		return defaultVal
+	}
+	var f float64
+	if _, err := fmt.Sscanf(s, "%f", &f); err != nil {
+		return defaultVal
+	}
+	return f
+}
+
+// GetHub returns the WebSocket hub
+func (s *Server) GetHub() *Hub {
+	return s.hub
+}
+
+// GetStore returns the job store
+func (s *Server) GetStore() *JobStore {
+	return s.store
+}
+
+// GetAddr returns the server address
+func (s *Server) GetAddr() string {
+	return s.addr
+}

@@ -7,17 +7,22 @@ import (
 // Config holds all configuration for the application
 type Config struct {
 	// Basic settings
-	LogFile          string `mapstructure:"log_file"`
-	OutputDir        string `mapstructure:"output_dir"`
+	LogFile         string `mapstructure:"log_file"`
+	OutputDir       string `mapstructure:"output_dir"`
 	TempDir         string `mapstructure:"temp_dir"`
 	DefaultVoice    string `mapstructure:"default_voice"`
 	DefaultProvider string `mapstructure:"default_provider"`
 
+	// Server settings
+	ServerPort  string `mapstructure:"server_port"`
+	ServerHost  string `mapstructure:"server_host"`
+	OpenBrowser bool   `mapstructure:"open_browser"`
+
 	// TTS settings
-	BitRateKbs     int     `mapstructure:"bit_rate_kbs"`
-	SampleRateHz   int     `mapstructure:"sample_rate_hz"`
-	DefaultSpeed   float64 `mapstructure:"default_speed"`
-	DefaultPitch   float64 `mapstructure:"default_pitch"`
+	BitRateKbs   int     `mapstructure:"bit_rate_kbs"`
+	SampleRateHz int     `mapstructure:"sample_rate_hz"`
+	DefaultSpeed float64 `mapstructure:"default_speed"`
+	DefaultPitch float64 `mapstructure:"default_pitch"`
 
 	// Cloud provider settings
 	CloudAPIKey       string `mapstructure:"cloud_api_key"`
@@ -28,7 +33,7 @@ type Config struct {
 	AudiobookshelfURL      string `mapstructure:"audiobookshelf_url"`
 	AudiobookshelfUser     string `mapstructure:"audiobookshelf_user"`
 	AudiobookshelfPassword string `mapstructure:"audiobookshelf_password"`
-	AudiobookshelfLibrary string `mapstructure:"audiobookshelf_library"`
+	AudiobookshelfLibrary  string `mapstructure:"audiobookshelf_library"`
 }
 
 // Load reads configuration from file and environment variables
@@ -41,6 +46,11 @@ func Load(configFile string) (*Config, error) {
 	viper.SetDefault("temp_dir", "./temp")
 	viper.SetDefault("default_voice", "en-US")
 	viper.SetDefault("default_provider", "espeak")
+
+	// Server settings
+	viper.SetDefault("server_port", "8080")
+	viper.SetDefault("server_host", "0.0.0.0")
+	viper.SetDefault("open_browser", true)
 
 	// TTS settings
 	viper.SetDefault("bit_rate_kbs", 128)

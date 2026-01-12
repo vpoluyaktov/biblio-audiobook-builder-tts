@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/vpoluyaktov/abb_tts/internal/dto"
-	"github.com/vpoluyaktov/abb_tts/internal/monitoring"
-	"github.com/vpoluyaktov/abb_tts/internal/mq"
-	"github.com/vpoluyaktov/abb_tts/internal/tts"
+	"abb_tts/internal/dto"
+	"abb_tts/internal/monitoring"
+	"abb_tts/internal/mq"
+	"abb_tts/internal/tts"
 )
 
 type TTSController struct {

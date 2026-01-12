@@ -2,10 +2,10 @@ package ui
 
 import (
 	"github.com/vpoluyaktov/tview"
-	"github.com/vpoluyaktov/abb_tts/internal/dto"
-	"github.com/vpoluyaktov/abb_tts/internal/mq"
-	"github.com/vpoluyaktov/abb_tts/internal/parser"
-	"github.com/vpoluyaktov/abb_tts/internal/tts"
+	"abb_tts/internal/dto"
+	"abb_tts/internal/mq"
+	"abb_tts/internal/parser"
+	"abb_tts/internal/tts"
 )
 
 type TUI struct {

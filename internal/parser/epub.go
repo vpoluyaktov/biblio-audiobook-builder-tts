@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -36,7 +37,7 @@ type epubContainer struct {
 }
 
 type epubPackage struct {
-	XMLName xml.Name `xml:"package"`
+	XMLName  xml.Name `xml:"package"`
 	Metadata struct {
 		Title       string   `xml:"title"`
 		Creator     string   `xml:"creator"`
@@ -98,9 +99,10 @@ func (p *epubParser) ParseEpub(r io.Reader) (*Book, error) {
 		desc = strings.Join(pkg.Metadata.Subjects, ", ")
 	}
 	book := &Book{
-		Title:    pkg.Metadata.Title,
-		Author:   pkg.Metadata.Creator,
-		Chapters: make([]Chapter, 0),
+		Title:       pkg.Metadata.Title,
+		Author:      pkg.Metadata.Creator,
+		Description: desc,
+		Chapters:    make([]Chapter, 0),
 		Metadata: map[string]string{
 			"description": desc,
 		},
@@ -108,6 +110,24 @@ func (p *epubParser) ParseEpub(r io.Reader) (*Book, error) {
 
 	// Find TOC (NCX or XHTML nav)
 	baseDir := filepath.Dir(container.RootFile.FullPath)
+
+	// Extract cover image
+	coverHref := extractCoverHref(pkg, baseDir)
+	if coverHref != "" {
+		coverFile, err := findFile(zipReader, coverHref)
+		if err == nil {
+			coverData, err := ioutil.ReadAll(coverFile)
+			if err == nil {
+				book.CoverImage = coverData
+				book.CoverImageName = filepath.Base(coverHref)
+				if strings.HasSuffix(strings.ToLower(coverHref), ".png") {
+					book.CoverImageType = "image/png"
+				} else {
+					book.CoverImageType = "image/jpeg"
+				}
+			}
+		}
+	}
 	var tocPath, tocType string
 	for _, item := range pkg.Manifest.Items {
 		if item.MediaType == "application/x-dtbncx+xml" {
@@ -153,7 +173,6 @@ func (p *epubParser) ParseEpub(r io.Reader) (*Book, error) {
 		}
 	}
 
-
 	return book, nil
 }
 
@@ -165,7 +184,7 @@ type tocChapter struct {
 
 func parseNCXChapters(ncx []byte) ([]tocChapter, error) {
 	type navPoint struct {
-		XMLName xml.Name `xml:"navPoint"`
+		XMLName  xml.Name `xml:"navPoint"`
 		NavLabel struct {
 			Text string `xml:"text"`
 		} `xml:"navLabel"`
@@ -175,8 +194,8 @@ func parseNCXChapters(ncx []byte) ([]tocChapter, error) {
 		NavPoints []navPoint `xml:"navPoint"`
 	}
 	type ncxRoot struct {
-		XMLName  xml.Name   `xml:"ncx"`
-		NavMap   struct {
+		XMLName xml.Name `xml:"ncx"`
+		NavMap  struct {
 			NavPoints []navPoint `xml:"navPoint"`
 		} `xml:"navMap"`
 	}
@@ -204,8 +223,8 @@ func parseNCXChapters(ncx []byte) ([]tocChapter, error) {
 func parseNavChapters(nav []byte) ([]tocChapter, error) {
 	type navA struct {
 		XMLName xml.Name `xml:"a"`
-		Href   string   `xml:"href,attr"`
-		Text   string   `xml:",chardata"`
+		Href    string   `xml:"href,attr"`
+		Text    string   `xml:",chardata"`
 	}
 	type navLi struct {
 		XMLName xml.Name `xml:"li"`
@@ -252,11 +271,45 @@ func readEPUBChapterContent(zr *zip.Reader, baseDir, href string) string {
 	if err != nil {
 		return ""
 	}
-	bytes, err := ioutil.ReadAll(f)
+	contentBytes, err := ioutil.ReadAll(f)
 	if err != nil {
 		return ""
 	}
-	return string(bytes) // TODO: extract only anchor section if present
+
+	html := string(contentBytes)
+
+	// If there's an anchor, try to extract just that section
+	if len(parts) > 1 && parts[1] != "" {
+		anchor := parts[1]
+		html = extractAnchorSection(html, anchor)
+	}
+
+	// Convert HTML to plain text
+	return htmlToText(html)
+}
+
+// extractAnchorSection extracts content starting from an anchor ID
+// Based on Python fetch_chapters_text logic
+func extractAnchorSection(html, anchor string) string {
+	// Find the element with this ID
+	idPattern := fmt.Sprintf(`id="%s"`, anchor)
+	idPos := strings.Index(html, idPattern)
+	if idPos == -1 {
+		// Try with single quotes
+		idPattern = fmt.Sprintf(`id='%s'`, anchor)
+		idPos = strings.Index(html, idPattern)
+	}
+	if idPos == -1 {
+		return html // anchor not found, return full content
+	}
+
+	// Find the start of the tag containing this ID
+	tagStart := strings.LastIndex(html[:idPos], "<")
+	if tagStart == -1 {
+		return html[idPos:]
+	}
+
+	return html[tagStart:]
 }
 
 func findFile(zr *zip.Reader, name string) (io.Reader, error) {
@@ -274,4 +327,101 @@ func parseXML(r io.Reader, v interface{}) error {
 		return err
 	}
 	return xml.Unmarshal(content, v)
+}
+
+// extractCoverHref finds the cover image href from the EPUB package
+// Based on Python EBook_audiobook_creator logic
+func extractCoverHref(pkg epubPackage, baseDir string) string {
+	// Look for cover meta tag
+	// In the Python version: <meta name="cover" content="cover-id"/>
+	// Then find the item with that id in manifest
+
+	// Build a map of manifest items by ID
+	itemsByID := make(map[string]struct {
+		Href      string
+		MediaType string
+	})
+	for _, item := range pkg.Manifest.Items {
+		itemsByID[item.ID] = struct {
+			Href      string
+			MediaType string
+		}{item.Href, item.MediaType}
+	}
+
+	// Look for items that might be cover images
+	for _, item := range pkg.Manifest.Items {
+		id := strings.ToLower(item.ID)
+		href := strings.ToLower(item.Href)
+		if (strings.Contains(id, "cover") || strings.Contains(href, "cover")) &&
+			(item.MediaType == "image/jpeg" || item.MediaType == "image/png" ||
+				item.MediaType == "image/jpg") {
+			return filepath.Join(baseDir, item.Href)
+		}
+	}
+
+	return ""
+}
+
+// htmlToText converts HTML content to plain text
+// Based on Python html2text library behavior
+func htmlToText(html string) string {
+	// Remove script and style tags with content
+	reScript := regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
+	html = reScript.ReplaceAllString(html, "")
+	reStyle := regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`)
+	html = reStyle.ReplaceAllString(html, "")
+
+	// Replace common block elements with newlines
+	reBlock := regexp.MustCompile(`(?i)</(p|div|br|h[1-6]|li|tr)>`)
+	html = reBlock.ReplaceAllString(html, "\n")
+	reBr := regexp.MustCompile(`(?i)<br\s*/?>`)
+	html = reBr.ReplaceAllString(html, "\n")
+
+	// Remove all remaining HTML tags
+	reTags := regexp.MustCompile(`<[^>]+>`)
+	text := reTags.ReplaceAllString(html, "")
+
+	// Decode common HTML entities
+	text = strings.ReplaceAll(text, "&nbsp;", " ")
+	text = strings.ReplaceAll(text, "&amp;", "&")
+	text = strings.ReplaceAll(text, "&lt;", "<")
+	text = strings.ReplaceAll(text, "&gt;", ">")
+	text = strings.ReplaceAll(text, "&quot;", "\"")
+	text = strings.ReplaceAll(text, "&#39;", "'")
+	text = strings.ReplaceAll(text, "\u00A0", " ")
+
+	// Clean up whitespace
+	reSpaces := regexp.MustCompile(`[ \t]+`)
+	text = reSpaces.ReplaceAllString(text, " ")
+	reNewlines := regexp.MustCompile(`\n{3,}`)
+	text = reNewlines.ReplaceAllString(text, "\n\n")
+
+	// Add period at end of paragraphs if missing
+	text = addPeriodToText(text)
+
+	return strings.TrimSpace(text)
+}
+
+// addPeriodToText adds periods at the end of paragraphs that don't have punctuation
+// Based on Python add_period function
+func addPeriodToText(text string) string {
+	lines := strings.Split(text, "\n")
+	var result []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			result = append(result, "")
+			continue
+		}
+		lastChar := line[len(line)-1]
+		if lastChar != '.' && lastChar != '?' && lastChar != '!' &&
+			lastChar != ':' && lastChar != '"' && lastChar != '"' {
+			// Check for ellipsis
+			if !strings.HasSuffix(line, "...") {
+				line = line + "."
+			}
+		}
+		result = append(result, line)
+	}
+	return strings.Join(result, "\n")
 }

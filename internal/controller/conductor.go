@@ -3,7 +3,7 @@ package controller
 import (
 	"time"
 
-	"github.com/vpoluyaktov/abb_tts/internal/mq"
+	"abb_tts/internal/mq"
 )
 
 type controller interface {

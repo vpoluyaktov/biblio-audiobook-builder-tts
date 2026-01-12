@@ -7,6 +7,11 @@ temp_dir: "./temp"
 default_voice: "en-US"
 default_provider: "espeak"
 
+# Server settings
+server_port: "8080"
+server_host: "0.0.0.0"
+open_browser: true
+
 # TTS settings
 bit_rate_kbs: 128
 sample_rate_hz: 44100

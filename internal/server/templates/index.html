@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audiobook Builder TTS</title>
+    <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>
+                <span class="icon">🎧</span>
+                Audiobook Builder TTS
+            </h1>
+            <div class="connection-status">
+                <span class="status-dot" id="status-dot"></span>
+                <span id="status-text">Connecting...</span>
+            </div>
+        </header>
+
+        <!-- Upload Section -->
+        <section class="upload-section">
+            <h2>📤 Upload Book</h2>
+            <div class="upload-form">
+                <div class="drop-zone" id="drop-zone">
+                    <span class="icon">📁</span>
+                    <p>Drag and drop your ebook here</p>
+                    <p>or click to browse</p>
+                    <p class="formats">Supported formats: .epub, .fb2</p>
+                    <input type="file" id="file-input" accept=".epub,.fb2">
+                </div>
+
+                <div class="selected-file" id="selected-file">
+                    <span class="file-icon">📖</span>
+                    <div class="file-info">
+                        <div class="file-name" id="file-name"></div>
+                        <div class="file-size" id="file-size"></div>
+                    </div>
+                    <button class="remove-file" id="remove-file" title="Remove file">×</button>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="provider">TTS Provider</label>
+                        <select id="provider">
+                            <option value="">Loading...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="voice">Voice</label>
+                        <select id="voice">
+                            <option value="">Select provider first</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="speed">Speed</label>
+                        <input type="range" id="speed" min="0.5" max="2.0" step="0.1" value="1.0">
+                        <span class="range-value" id="speed-value">1.0x</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="pitch">Pitch</label>
+                        <input type="range" id="pitch" min="0.5" max="2.0" step="0.1" value="1.0">
+                        <span class="range-value" id="pitch-value">1.0x</span>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" id="upload-btn" disabled>
+                    📤 Start Conversion
+                </button>
+            </div>
+        </section>
+
+        <!-- Jobs Section -->
+        <section class="jobs-section">
+            <div class="jobs-header">
+                <h2>📋 Conversion Jobs</h2>
+                <span class="jobs-count" id="jobs-count">0 jobs</span>
+            </div>
+            <div class="jobs-list" id="jobs-list">
+                <div class="empty-state">
+                    <span class="icon">📚</span>
+                    <p>No conversion jobs yet</p>
+                    <p>Upload a book to get started</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="/assets/app.js"></script>
+</body>
+</html>

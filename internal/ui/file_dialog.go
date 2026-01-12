@@ -9,13 +9,15 @@ import (
 )
 
 type FileDialog struct {
-	app       *tview.Application
-	pages     *tview.Pages
-	grid      *tview.Grid
-	list      *tview.List
-	path      string
-	onSelect  func(path string)
-	onCancel  func()
+	app          *tview.Application
+	pages        *tview.Pages
+	grid         *tview.Grid
+	dirList      *tview.List
+	fileList     *tview.List
+	pathText     *tview.TextView
+	path         string
+	onSelect     func(path string)
+	onCancel     func()
 }
 
 func NewFileDialog(app *tview.Application, pages *tview.Pages, path string, onSelect func(path string), onCancel func()) *FileDialog {
@@ -33,12 +35,28 @@ func NewFileDialog(app *tview.Application, pages *tview.Pages, path string, onSe
 	d.grid.SetTitle(" Select eBook File ")
 	d.grid.SetTitleAlign(tview.AlignLeft)
 
+	// Create path display
+	d.pathText = tview.NewTextView()
+	d.pathText.SetDynamicColors(true)
+	d.pathText.SetText("[yellow]Current directory: " + d.path)
+
+	// Create directory list
+	d.dirList = tview.NewList()
+	d.dirList.ShowSecondaryText(false)
+	d.dirList.SetMainTextColor(valuesColor)
+	d.dirList.SetSelectedTextColor(black)
+	d.dirList.SetSelectedBackgroundColor(yellow)
+	d.dirList.SetTitle(" Directories ")
+	d.dirList.SetBorder(true)
+
 	// Create file list
-	d.list = tview.NewList()
-	d.list.ShowSecondaryText(false)
-	d.list.SetMainTextColor(valuesColor)
-	d.list.SetSelectedTextColor(black)
-	d.list.SetSelectedBackgroundColor(yellow)
+	d.fileList = tview.NewList()
+	d.fileList.ShowSecondaryText(false)
+	d.fileList.SetMainTextColor(valuesColor)
+	d.fileList.SetSelectedTextColor(black)
+	d.fileList.SetSelectedBackgroundColor(yellow)
+	d.fileList.SetTitle(" eBook Files ")
+	d.fileList.SetBorder(true)
 
 	// Add navigation buttons
 	buttonBar := tview.NewFlex()
@@ -48,20 +66,25 @@ func NewFileDialog(app *tview.Application, pages *tview.Pages, path string, onSe
 	selectButton.SetBackgroundColor(footerBgColor)
 	selectButton.SetLabelColor(footerFgColor)
 	selectButton.SetSelectedFunc(func() {
-		if item := d.list.GetCurrentItem(); item >= 0 {
-			text, _ := d.list.GetItemText(item)
-			if text == ".." {
-				d.path = filepath.Dir(d.path)
-			} else {
-				path := filepath.Join(d.path, text)
-				if info, err := os.Stat(path); err == nil && !info.IsDir() {
-					d.pages.RemovePage("file_dialog")
-					d.onSelect(path)
-					return
+		// Check if a directory is selected
+		if d.app.GetFocus() == d.dirList && d.dirList.GetItemCount() > 0 {
+			if item := d.dirList.GetCurrentItem(); item >= 0 {
+				text, _ := d.dirList.GetItemText(item)
+				if text == ".." {
+					d.path = filepath.Dir(d.path)
+				} else {
+					d.path = filepath.Join(d.path, text)
 				}
-				d.path = path
+				d.updateList()
 			}
-			d.updateList()
+		} else if d.app.GetFocus() == d.fileList && d.fileList.GetItemCount() > 0 {
+			// Check if a file is selected
+			if item := d.fileList.GetCurrentItem(); item >= 0 {
+				text, _ := d.fileList.GetItemText(item)
+				path := filepath.Join(d.path, text)
+				d.pages.RemovePage("file_dialog")
+				d.onSelect(path)
+			}
 		}
 	})
 
@@ -81,10 +104,40 @@ func NewFileDialog(app *tview.Application, pages *tview.Pages, path string, onSe
 	buttonBar.AddItem(cancelButton, 8, 0, true)
 	buttonBar.AddItem(nil, 0, 1, false)
 
+	// Set up directory navigation on selection
+	d.dirList.SetSelectedFunc(func(index int, mainText string, secondaryText string, shortcut rune) {
+		if mainText == ".." {
+			d.path = filepath.Dir(d.path)
+		} else {
+			d.path = filepath.Join(d.path, mainText)
+		}
+		d.updateList()
+	})
+
+	// Set up file selection
+	d.fileList.SetSelectedFunc(func(index int, mainText string, secondaryText string, shortcut rune) {
+		path := filepath.Join(d.path, mainText)
+		d.pages.RemovePage("file_dialog")
+		d.onSelect(path)
+	})
+
+	// Create content layout
+	content := tview.NewFlex()
+	content.SetDirection(tview.FlexRow)
+	content.AddItem(d.pathText, 1, 0, false)
+	
+	// Create lists layout
+	lists := tview.NewFlex()
+	lists.SetDirection(tview.FlexColumn)
+	lists.AddItem(d.dirList, 0, 1, true)  // Start with focus on directories
+	lists.AddItem(d.fileList, 0, 1, false)
+	
+	content.AddItem(lists, 0, 1, true)
+
 	// Layout
 	d.grid.SetRows(-1, 1)
 	d.grid.SetColumns(0)
-	d.grid.AddItem(d.list, 0, 0, 1, 1, 0, 0, true)
+	d.grid.AddItem(content, 0, 0, 1, 1, 0, 0, true)
 	d.grid.AddItem(buttonBar, 1, 0, 1, 1, 0, 0, false)
 
 	// Update list
@@ -94,10 +147,15 @@ func NewFileDialog(app *tview.Application, pages *tview.Pages, path string, onSe
 }
 
 func (d *FileDialog) updateList() {
-	d.list.Clear()
+	// Update path display
+	d.pathText.SetText("[yellow]Current directory: " + d.path)
 
-	// Add parent directory
-	d.list.AddItem("..", "", 0, nil)
+	// Clear both lists
+	d.dirList.Clear()
+	d.fileList.Clear()
+
+	// Add parent directory to directory list
+	d.dirList.AddItem("..", "", 0, nil)
 
 	// Read directory contents
 	entries, err := os.ReadDir(d.path)
@@ -105,26 +163,33 @@ func (d *FileDialog) updateList() {
 		return
 	}
 
-	// Add directories first
+	// Add directories to directory list
 	for _, entry := range entries {
 		name := entry.Name()
 		if strings.HasPrefix(name, ".") {
 			continue
 		}
 		if entry.IsDir() {
-			d.list.AddItem(name, "", 0, nil)
+			d.dirList.AddItem(name, "", 0, nil)
 		}
 	}
 
-	// Add files
+	// Add ebook files to file list
 	for _, entry := range entries {
 		name := entry.Name()
 		if strings.HasPrefix(name, ".") {
 			continue
 		}
 		if !entry.IsDir() && isEBook(name) {
-			d.list.AddItem(name, "", 0, nil)
+			d.fileList.AddItem(name, "", 0, nil)
 		}
+	}
+
+	// Set focus to directory list if it has items, otherwise to file list
+	if d.dirList.GetItemCount() > 0 {
+		d.app.SetFocus(d.dirList)
+	} else if d.fileList.GetItemCount() > 0 {
+		d.app.SetFocus(d.fileList)
 	}
 }
 

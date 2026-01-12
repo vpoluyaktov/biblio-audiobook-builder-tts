@@ -4,14 +4,16 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/vpoluyaktov/abb_tts/internal/config"
+	"abb_tts/internal/config"
 )
 
 // Service interface defines methods for text-to-speech conversion
 type Service interface {
 	ConvertToSpeech(text string, options *ConversionOptions) (io.Reader, error)
+	ConvertToSpeechWithProgress(text string, options *ConversionOptions, progressCb ProgressCallback) (io.Reader, error)
 	GetAvailableVoices() []Voice
 	GetAvailableProviders() []string
+	GetAdapter(providerName string) (*Adapter, error)
 }
 
 // ConversionOptions contains settings for TTS conversion
@@ -65,13 +67,34 @@ func NewService(cfg *config.Config) Service {
 }
 
 // ConvertToSpeech converts text to speech using specified options
+// This uses the adapter for automatic chunking
 func (s *service) ConvertToSpeech(text string, options *ConversionOptions) (io.Reader, error) {
-	provider, exists := s.providers[options.Provider]
-	if !exists {
-		return nil, fmt.Errorf("provider not found: %s", options.Provider)
+	adapter, err := s.GetAdapter(options.Provider)
+	if err != nil {
+		return nil, err
 	}
 
-	return provider.ConvertToSpeech(text, options.Voice, options)
+	return adapter.ConvertToSpeech(text, options.Voice, options, nil)
+}
+
+// ConvertToSpeechWithProgress converts text to speech with progress callback
+func (s *service) ConvertToSpeechWithProgress(text string, options *ConversionOptions, progressCb ProgressCallback) (io.Reader, error) {
+	adapter, err := s.GetAdapter(options.Provider)
+	if err != nil {
+		return nil, err
+	}
+
+	return adapter.ConvertToSpeech(text, options.Voice, options, progressCb)
+}
+
+// GetAdapter returns a TTS adapter for the specified provider
+func (s *service) GetAdapter(providerName string) (*Adapter, error) {
+	provider, exists := s.providers[providerName]
+	if !exists {
+		return nil, fmt.Errorf("provider not found: %s", providerName)
+	}
+
+	return NewAdapter(provider, DefaultChunkerConfig()), nil
 }
 
 // GetAvailableVoices returns a list of available TTS voices

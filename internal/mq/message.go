@@ -3,7 +3,7 @@ package mq
 import (
 	"time"
 
-	"github.com/vpoluyaktov/abb_tts/internal/dto"
+	"abb_tts/internal/dto"
 )
 
 const (
