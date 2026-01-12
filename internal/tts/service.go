@@ -14,6 +14,7 @@ type Service interface {
 	GetAvailableVoices() []Voice
 	GetAvailableProviders() []string
 	GetAdapter(providerName string) (*Adapter, error)
+	ReloadProviders()
 }
 
 // ConversionOptions contains settings for TTS conversion
@@ -115,4 +116,24 @@ func (s *service) GetAvailableProviders() []string {
 		providers = append(providers, name)
 	}
 	return providers
+}
+
+// ReloadProviders reinitializes providers based on current config
+func (s *service) ReloadProviders() {
+	s.providers = make(map[string]Provider)
+
+	// Initialize local providers
+	s.providers["espeak"] = NewLocalProvider("espeak")
+
+	// Initialize Google Cloud TTS if API key is configured
+	if s.cfg.GoogleAPIKey != "" {
+		s.providers["google"] = NewGoogleProvider(s.cfg.GoogleAPIKey)
+	}
+
+	// Initialize other cloud providers if configured (legacy support)
+	if s.cfg.CloudAPIKey != "" {
+		if s.cfg.AzureTTSEndpoint != "" {
+			s.providers["azure"] = NewCloudProvider("azure", s.cfg.CloudAPIKey, s.cfg.AzureTTSEndpoint)
+		}
+	}
 }

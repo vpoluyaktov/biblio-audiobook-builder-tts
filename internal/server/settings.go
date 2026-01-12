@@ -171,6 +171,9 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Reload TTS providers to pick up any API key changes
+	s.ttsService.ReloadProviders()
+
 	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "saved"})
 }
 
