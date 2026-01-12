@@ -19,10 +19,13 @@ type Config struct {
 	OpenBrowser bool   `mapstructure:"open_browser"`
 
 	// TTS settings
-	BitRateKbs   int     `mapstructure:"bit_rate_kbs"`
-	SampleRateHz int     `mapstructure:"sample_rate_hz"`
-	DefaultSpeed float64 `mapstructure:"default_speed"`
-	DefaultPitch float64 `mapstructure:"default_pitch"`
+	BitRateKbs              int     `mapstructure:"bit_rate_kbs"`
+	SampleRateHz            int     `mapstructure:"sample_rate_hz"`
+	DefaultSpeed            float64 `mapstructure:"default_speed"`
+	DefaultPitch            float64 `mapstructure:"default_pitch"`
+	ChapterGapSeconds       int     `mapstructure:"chapter_gap_seconds"`       // Silence between chapters
+	PronunciationDictFile   string  `mapstructure:"pronunciation_dict_file"`   // Path to pronunciation dictionary
+	UseDefaultPronunciation bool    `mapstructure:"use_default_pronunciation"` // Use built-in pronunciation rules
 
 	// Cloud provider settings
 	CloudAPIKey       string `mapstructure:"cloud_api_key"`
@@ -57,6 +60,9 @@ func Load(configFile string) (*Config, error) {
 	viper.SetDefault("sample_rate_hz", 44100)
 	viper.SetDefault("default_speed", 1.0)
 	viper.SetDefault("default_pitch", 1.0)
+	viper.SetDefault("chapter_gap_seconds", 2)          // 2 seconds silence between chapters
+	viper.SetDefault("pronunciation_dict_file", "")     // Custom pronunciation dictionary
+	viper.SetDefault("use_default_pronunciation", true) // Use built-in pronunciation rules
 
 	// Cloud provider settings
 	viper.SetDefault("cloud_api_key", "")

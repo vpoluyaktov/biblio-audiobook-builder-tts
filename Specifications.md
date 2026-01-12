@@ -247,6 +247,8 @@ Flags:
 | M4B Builder | ✅ Done | Chapter markers, metadata, cover embedding |
 | Worker M4B Integration | ✅ Done | M4B building integrated into worker pipeline |
 | Audiobookshelf Integration | ✅ Done | Auto-upload completed books when configured |
+| Gap Between Chapters | ✅ Done | Configurable silence padding (chapter_gap_seconds) |
+| Pronunciation Dictionary | ✅ Done | Regex-based text fixes with default rules |
 
 ### In Progress 🔄
 
@@ -258,8 +260,6 @@ Flags:
 
 | Feature | Priority | Notes |
 |---------|----------|-------|
-| Gap Between Chapters | Medium | Silence padding |
-| Pronunciation Dictionary | Medium | Regex-based text fixes |
 | Multi-Part Audiobooks | Medium | Split large books (>2GB) |
 | Audio Normalization | Low | Consistent volume levels |
 | Noise Reduction | Low | Clean up TTS artifacts |

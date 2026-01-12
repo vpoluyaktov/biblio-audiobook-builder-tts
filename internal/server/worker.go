@@ -19,25 +19,48 @@ import (
 
 // Worker processes conversion jobs from the queue
 type Worker struct {
-	store      *JobStore
-	hub        *Hub
-	ttsService tts.Service
-	cfg        *config.Config
-	ctx        context.Context
-	cancel     context.CancelFunc
-	wg         sync.WaitGroup
+	store         *JobStore
+	hub           *Hub
+	ttsService    tts.Service
+	cfg           *config.Config
+	pronunciation *tts.PronunciationDictionary
+	ctx           context.Context
+	cancel        context.CancelFunc
+	wg            sync.WaitGroup
 }
 
 // NewWorker creates a new job worker
 func NewWorker(store *JobStore, hub *Hub, ttsService tts.Service, cfg *config.Config) *Worker {
 	ctx, cancel := context.WithCancel(context.Background())
+
+	// Initialize pronunciation dictionary
+	pronunciation := tts.NewPronunciationDictionary()
+
+	// Load default rules if enabled
+	if cfg.UseDefaultPronunciation {
+		for _, rule := range tts.GetDefaultRules() {
+			pronunciation.AddRule(rule.Pattern, rule.Replacement)
+		}
+		log.Printf("Loaded %d default pronunciation rules", pronunciation.RuleCount())
+	}
+
+	// Load custom dictionary if specified
+	if cfg.PronunciationDictFile != "" {
+		if err := pronunciation.LoadFromFile(cfg.PronunciationDictFile); err != nil {
+			log.Printf("Warning: Failed to load pronunciation dictionary: %v", err)
+		} else {
+			log.Printf("Loaded pronunciation dictionary from %s", cfg.PronunciationDictFile)
+		}
+	}
+
 	return &Worker{
-		store:      store,
-		hub:        hub,
-		ttsService: ttsService,
-		cfg:        cfg,
-		ctx:        ctx,
-		cancel:     cancel,
+		store:         store,
+		hub:           hub,
+		ttsService:    ttsService,
+		cfg:           cfg,
+		pronunciation: pronunciation,
+		ctx:           ctx,
+		cancel:        cancel,
 	}
 }
 
@@ -180,8 +203,14 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 		job.SetProgress(progress, chapter.Title, i+1)
 		w.broadcastJobProgress(job)
 
+		// Apply pronunciation rules to chapter content
+		content := chapter.Content
+		if w.pronunciation != nil && w.pronunciation.RuleCount() > 0 {
+			content = w.pronunciation.Apply(content)
+		}
+
 		// Convert chapter
-		reader, err := w.ttsService.ConvertToSpeech(chapter.Content, &tts.ConversionOptions{
+		reader, err := w.ttsService.ConvertToSpeech(content, &tts.ConversionOptions{
 			Voice:    job.Voice,
 			Provider: job.Provider,
 			Speed:    job.Speed,
@@ -236,15 +265,17 @@ func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (s
 	}
 
 	// Prepare M4B options
+	gapDuration := time.Duration(w.cfg.ChapterGapSeconds) * time.Second
 	options := audio.M4BOptions{
-		Title:       book.Title,
-		Author:      book.Author,
-		Album:       book.Title,
-		Genre:       "Audiobook",
-		Description: book.Description,
-		Chapters:    chapters,
-		BitRate:     "128k",
-		SampleRate:  44100,
+		Title:           book.Title,
+		Author:          book.Author,
+		Album:           book.Title,
+		Genre:           "Audiobook",
+		Description:     book.Description,
+		Chapters:        chapters,
+		BitRate:         fmt.Sprintf("%dk", w.cfg.BitRateKbs),
+		SampleRate:      w.cfg.SampleRateHz,
+		GapBetweenChaps: gapDuration,
 	}
 
 	// Add cover image if available

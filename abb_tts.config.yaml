@@ -17,6 +17,9 @@ bit_rate_kbs: 128
 sample_rate_hz: 44100
 default_speed: 1.0
 default_pitch: 1.0
+chapter_gap_seconds: 2  # Seconds of silence between chapters (0 to disable)
+pronunciation_dict_file: ""  # Path to custom pronunciation dictionary (optional)
+use_default_pronunciation: true  # Use built-in pronunciation rules (Mr. -> Mister, etc.)
 
 # Cloud provider settings
 cloud_api_key: ""
