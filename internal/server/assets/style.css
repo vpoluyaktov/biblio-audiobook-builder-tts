@@ -350,7 +350,8 @@ h1 .icon {
 }
 
 .job-status.parsing,
-.job-status.converting {
+.job-status.converting,
+.job-status.building {
     background: rgba(59, 130, 246, 0.2);
     color: var(--accent);
 }

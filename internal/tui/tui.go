@@ -374,6 +374,8 @@ func getStatusIcon(status server.JobStatus) string {
 		return "📖"
 	case server.JobStatusConverting:
 		return "🔄"
+	case server.JobStatusBuilding:
+		return "📦"
 	case server.JobStatusCompleted:
 		return "✅"
 	case server.JobStatusFailed:

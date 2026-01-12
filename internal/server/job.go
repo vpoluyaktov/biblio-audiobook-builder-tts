@@ -4,8 +4,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"abb_tts/internal/parser"
+
+	"github.com/google/uuid"
 )
 
 // JobStatus represents the current state of a conversion job
@@ -15,6 +16,7 @@ const (
 	JobStatusPending    JobStatus = "pending"
 	JobStatusParsing    JobStatus = "parsing"
 	JobStatusConverting JobStatus = "converting"
+	JobStatusBuilding   JobStatus = "building" // Building M4B file
 	JobStatusCompleted  JobStatus = "completed"
 	JobStatusFailed     JobStatus = "failed"
 	JobStatusCancelled  JobStatus = "cancelled"
@@ -42,7 +44,9 @@ type Job struct {
 	BookAuthor string `json:"book_author"`
 
 	// Output
-	OutputPath string `json:"output_path,omitempty"`
+	OutputPath   string   `json:"output_path,omitempty"`
+	M4BFile      string   `json:"m4b_file,omitempty"`
+	ChapterFiles []string `json:"-"` // Internal list of chapter audio files
 
 	// Timestamps
 	CreatedAt   time.Time  `json:"created_at"`

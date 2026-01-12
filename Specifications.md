@@ -250,7 +250,7 @@ Flags:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Audio Concatenation | 🔄 Partial | WAV concatenation works, needs MP3 |
+| Worker M4B Integration | 🔄 In Progress | M4B building integrated into worker pipeline |
 
 ### Not Started ❌
 

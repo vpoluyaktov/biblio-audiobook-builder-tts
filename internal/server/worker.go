@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"abb_tts/internal/audio"
 	"abb_tts/internal/config"
 	"abb_tts/internal/parser"
 	"abb_tts/internal/tts"
@@ -96,20 +97,35 @@ func (w *Worker) processJob(job *Job) {
 	job.SetStatus(JobStatusConverting)
 	w.broadcastJobUpdate(job)
 
-	outputPath, err := w.convertBook(job, book)
+	outputDir, chapterFiles, err := w.convertBook(job, book)
 	if err != nil {
 		job.SetError(fmt.Sprintf("Conversion failed: %v", err))
 		w.broadcastJobFailed(job)
 		return
 	}
 
+	job.SetOutputPath(outputDir)
+	job.ChapterFiles = chapterFiles
+
+	// Build M4B file
+	job.SetStatus(JobStatusBuilding)
+	w.broadcastJobUpdate(job)
+
+	m4bFile, err := w.buildM4B(job, book, chapterFiles)
+	if err != nil {
+		log.Printf("Warning: M4B build failed: %v (chapter files still available)", err)
+		// Don't fail the job, chapter files are still available
+	} else {
+		job.M4BFile = m4bFile
+		log.Printf("M4B file created: %s", m4bFile)
+	}
+
 	// Mark as completed
-	job.SetOutputPath(outputPath)
 	job.SetStatus(JobStatusCompleted)
 	job.SetProgress(1.0, "", len(book.Chapters))
 	w.broadcastJobCompleted(job)
 
-	log.Printf("Job %s completed: %s", job.ID, outputPath)
+	log.Printf("Job %s completed: %s", job.ID, outputDir)
 }
 
 // parseBook parses the ebook file
@@ -127,20 +143,21 @@ func (w *Worker) parseBook(filePath string) (*parser.Book, error) {
 }
 
 // convertBook converts the book to audio files
-func (w *Worker) convertBook(job *Job, book *parser.Book) (string, error) {
+func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, error) {
 	// Create output directory
 	outputDir := filepath.Join(w.cfg.OutputDir, sanitizeFileName(book.Title))
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create output directory: %v", err)
+		return "", nil, fmt.Errorf("failed to create output directory: %v", err)
 	}
 
 	totalChapters := len(book.Chapters)
+	chapterFiles := make([]string, 0, totalChapters)
 
 	for i, chapter := range book.Chapters {
 		// Check for cancellation
 		select {
 		case <-w.ctx.Done():
-			return "", fmt.Errorf("conversion cancelled")
+			return "", nil, fmt.Errorf("conversion cancelled")
 		default:
 		}
 
@@ -161,8 +178,8 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, error) {
 			continue // Skip failed chapters but continue with others
 		}
 
-		// Save audio file
-		chapterFileName := fmt.Sprintf("%02d_%s.mp3", i+1, sanitizeFileName(chapter.Title))
+		// Save audio file (use .wav for intermediate files, will be converted to AAC for M4B)
+		chapterFileName := fmt.Sprintf("%02d_%s.wav", i+1, sanitizeFileName(chapter.Title))
 		outputPath := filepath.Join(outputDir, chapterFileName)
 
 		outputFile, err := os.Create(outputPath)
@@ -178,10 +195,66 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, error) {
 		}
 		outputFile.Close()
 
+		chapterFiles = append(chapterFiles, outputPath)
 		log.Printf("Converted chapter %d/%d: %s", i+1, totalChapters, chapter.Title)
 	}
 
-	return outputDir, nil
+	return outputDir, chapterFiles, nil
+}
+
+// buildM4B creates an M4B audiobook file from chapter audio files
+func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (string, error) {
+	if len(chapterFiles) == 0 {
+		return "", fmt.Errorf("no chapter files to build M4B from")
+	}
+
+	// Check if ffmpeg is available
+	if err := audio.CheckFFmpegAvailable(); err != nil {
+		return "", fmt.Errorf("ffmpeg not available: %v", err)
+	}
+
+	// Prepare chapter metadata
+	chapters := make([]audio.Chapter, len(book.Chapters))
+	for i, ch := range book.Chapters {
+		chapters[i] = audio.Chapter{
+			Title: ch.Title,
+		}
+	}
+
+	// Prepare M4B options
+	options := audio.M4BOptions{
+		Title:       book.Title,
+		Author:      book.Author,
+		Album:       book.Title,
+		Genre:       "Audiobook",
+		Description: book.Description,
+		Chapters:    chapters,
+		BitRate:     "128k",
+		SampleRate:  44100,
+	}
+
+	// Add cover image if available
+	if len(book.CoverImage) > 0 {
+		options.CoverImage = book.CoverImage
+		options.CoverImageType = book.CoverImageType
+	}
+
+	// Create M4B builder
+	builder, err := audio.NewM4BBuilder(options)
+	if err != nil {
+		return "", fmt.Errorf("failed to create M4B builder: %v", err)
+	}
+	defer builder.Cleanup()
+
+	// Build M4B file
+	m4bFileName := sanitizeFileName(book.Author+" - "+book.Title) + ".m4b"
+	m4bPath := filepath.Join(job.OutputPath, m4bFileName)
+
+	if err := builder.BuildFromFiles(chapterFiles, m4bPath); err != nil {
+		return "", fmt.Errorf("failed to build M4B: %v", err)
+	}
+
+	return m4bPath, nil
 }
 
 // sanitizeFileName removes or replaces characters that are invalid in file names
