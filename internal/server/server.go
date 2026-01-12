@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"abb_tts/internal/config"
@@ -166,7 +167,9 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		if action == "download" {
-			s.downloadJob(w, r, jobID)
+			s.downloadJobZip(w, r, jobID)
+		} else if action == "files" {
+			s.listJobFiles(w, r, jobID)
 		} else {
 			s.getJob(w, r, jobID)
 		}
@@ -218,8 +221,8 @@ func (s *Server) deleteJob(w http.ResponseWriter, r *http.Request, id string) {
 	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
-// downloadJob serves the completed audiobook files
-func (s *Server) downloadJob(w http.ResponseWriter, r *http.Request, id string) {
+// downloadJobZip serves the M4B audiobook file for download
+func (s *Server) downloadJobZip(w http.ResponseWriter, r *http.Request, id string) {
 	job, exists := s.store.Get(id)
 	if !exists {
 		s.jsonError(w, http.StatusNotFound, "Job not found")
@@ -236,8 +239,50 @@ func (s *Server) downloadJob(w http.ResponseWriter, r *http.Request, id string) 
 		return
 	}
 
-	// For now, serve the directory listing as JSON
-	// In a full implementation, you might want to create a ZIP file
+	// Find the M4B file in the output directory
+	files, err := os.ReadDir(job.OutputPath)
+	if err != nil {
+		s.jsonError(w, http.StatusInternalServerError, "Failed to read output directory")
+		return
+	}
+
+	var m4bFile string
+	for _, f := range files {
+		if !f.IsDir() && strings.HasSuffix(strings.ToLower(f.Name()), ".m4b") {
+			m4bFile = filepath.Join(job.OutputPath, f.Name())
+			break
+		}
+	}
+
+	if m4bFile == "" {
+		s.jsonError(w, http.StatusNotFound, "M4B file not found")
+		return
+	}
+
+	// Serve the file for download
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filepath.Base(m4bFile)))
+	w.Header().Set("Content-Type", "audio/mp4")
+	http.ServeFile(w, r, m4bFile)
+}
+
+// listJobFiles returns a list of files in the job output directory
+func (s *Server) listJobFiles(w http.ResponseWriter, r *http.Request, id string) {
+	job, exists := s.store.Get(id)
+	if !exists {
+		s.jsonError(w, http.StatusNotFound, "Job not found")
+		return
+	}
+
+	if job.Status != JobStatusCompleted {
+		s.jsonError(w, http.StatusBadRequest, "Job not completed")
+		return
+	}
+
+	if job.OutputPath == "" {
+		s.jsonError(w, http.StatusNotFound, "Output not available")
+		return
+	}
+
 	files, err := os.ReadDir(job.OutputPath)
 	if err != nil {
 		s.jsonError(w, http.StatusInternalServerError, "Failed to read output directory")

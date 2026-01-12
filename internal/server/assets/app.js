@@ -736,18 +736,20 @@ class App {
 
     async downloadJob(id) {
         try {
-            const response = await fetch(`/api/jobs/${id}/download`);
-            const data = await response.json();
-
-            if (data.error) {
-                throw new Error(data.error);
-            }
-
-            // Show download info
-            const files = data.files.map(f => `${f.name} (${this.formatFileSize(f.size)})`).join('\n');
-            alert(`Output files available at:\n${data.output_path}\n\nFiles:\n${files}`);
+            // Trigger file download by navigating to the download URL
+            const downloadUrl = `/api/jobs/${id}/download`;
+            
+            // Create a temporary link and click it to trigger download
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = ''; // Let the server set the filename
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            this.showToast('Download started!', 'success');
         } catch (e) {
-            this.showToast('Failed to get download info: ' + e.message, 'error');
+            this.showToast('Failed to download: ' + e.message, 'error');
         }
     }
 
