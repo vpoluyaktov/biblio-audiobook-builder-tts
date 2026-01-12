@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"abb_tts/internal/config"
+	"abb_tts/internal/parser"
 	"abb_tts/internal/tts"
 )
 
@@ -24,28 +26,31 @@ var templatesFS embed.FS
 
 // Server represents the HTTP server for abb_tts
 type Server struct {
-	addr       string
-	cfg        *config.Config
-	store      *JobStore
-	hub        *Hub
-	worker     *Worker
-	ttsService tts.Service
-	httpServer *http.Server
+	addr         string
+	cfg          *config.Config
+	store        *JobStore
+	previewStore *PreviewStore
+	hub          *Hub
+	worker       *Worker
+	ttsService   tts.Service
+	httpServer   *http.Server
 }
 
 // New creates a new server instance
 func New(addr string, cfg *config.Config, ttsService tts.Service) *Server {
 	store := NewJobStore()
+	previewStore := NewPreviewStore(30 * time.Minute) // 30 min TTL for previews
 	hub := NewHub()
 	worker := NewWorker(store, hub, ttsService, cfg)
 
 	return &Server{
-		addr:       addr,
-		cfg:        cfg,
-		store:      store,
-		hub:        hub,
-		worker:     worker,
-		ttsService: ttsService,
+		addr:         addr,
+		cfg:          cfg,
+		store:        store,
+		previewStore: previewStore,
+		hub:          hub,
+		worker:       worker,
+		ttsService:   ttsService,
 	}
 }
 
@@ -67,6 +72,8 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/jobs", s.handleJobs)
 	mux.HandleFunc("/api/jobs/", s.handleJob)
 	mux.HandleFunc("/api/upload", s.handleUpload)
+	mux.HandleFunc("/api/preview", s.handlePreview)
+	mux.HandleFunc("/api/preview/", s.handlePreviewByID)
 	mux.HandleFunc("/api/providers", s.handleProviders)
 	mux.HandleFunc("/api/voices", s.handleVoices)
 	mux.HandleFunc("/api/config", s.handleConfig)
@@ -437,6 +444,123 @@ func parseFloat(s string, defaultVal float64) float64 {
 	return f
 }
 
+// handlePreview handles book preview creation (POST /api/preview)
+func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.handleCORS(w)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse multipart form (max 100MB)
+	if err := r.ParseMultipartForm(100 << 20); err != nil {
+		s.jsonError(w, http.StatusBadRequest, fmt.Sprintf("Failed to parse form: %v", err))
+		return
+	}
+
+	// Get the file
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		s.jsonError(w, http.StatusBadRequest, "No file provided")
+		return
+	}
+	defer file.Close()
+
+	// Validate file extension
+	ext := filepath.Ext(header.Filename)
+	if ext != ".epub" && ext != ".fb2" {
+		s.jsonError(w, http.StatusBadRequest, "Unsupported file format. Only .epub and .fb2 are supported")
+		return
+	}
+
+	// Read file content
+	content, err := io.ReadAll(file)
+	if err != nil {
+		s.jsonError(w, http.StatusInternalServerError, "Failed to read file")
+		return
+	}
+
+	// Parse the book
+	var book *parser.Book
+	if ext == ".epub" {
+		p := parser.NewEpubParser()
+		book, err = p.ParseEpub(bytes.NewReader(content))
+	} else {
+		p := parser.NewFB2Parser()
+		book, err = p.ParseFB2(bytes.NewReader(content))
+	}
+
+	if err != nil {
+		s.jsonError(w, http.StatusBadRequest, fmt.Sprintf("Failed to parse book: %v", err))
+		return
+	}
+
+	// Create preview
+	preview := s.previewStore.CreatePreview(book, header.Filename)
+
+	log.Printf("Created preview %s for %s (%d chapters, %d words)",
+		preview.ID, preview.BookTitle, preview.TotalChapters, preview.TotalWords)
+
+	s.jsonResponse(w, http.StatusOK, preview)
+}
+
+// handlePreviewByID handles preview retrieval and cover image (GET /api/preview/{id}, GET /api/preview/{id}/cover)
+func (s *Server) handlePreviewByID(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.handleCORS(w)
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse path: /api/preview/{id} or /api/preview/{id}/cover
+	path := r.URL.Path
+	path = path[len("/api/preview/"):]
+
+	// Check if this is a cover request
+	if len(path) > 6 && path[len(path)-6:] == "/cover" {
+		id := path[:len(path)-6]
+		s.servePreviewCover(w, r, id)
+		return
+	}
+
+	// Get preview by ID
+	id := path
+	preview, exists := s.previewStore.GetPreview(id)
+	if !exists {
+		s.jsonError(w, http.StatusNotFound, "Preview not found")
+		return
+	}
+
+	s.jsonResponse(w, http.StatusOK, preview)
+}
+
+// servePreviewCover serves the cover image for a preview
+func (s *Server) servePreviewCover(w http.ResponseWriter, r *http.Request, id string) {
+	cover, exists := s.previewStore.GetCover(id)
+	if !exists {
+		http.Error(w, "Cover not found", http.StatusNotFound)
+		return
+	}
+
+	// Detect content type
+	contentType := "image/jpeg"
+	if len(cover) > 8 && cover[0] == 0x89 && cover[1] == 0x50 {
+		contentType = "image/png"
+	}
+
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Cache-Control", "max-age=3600")
+	w.Write(cover)
+}
+
 // GetHub returns the WebSocket hub
 func (s *Server) GetHub() *Hub {
 	return s.hub
@@ -445,6 +569,11 @@ func (s *Server) GetHub() *Hub {
 // GetStore returns the job store
 func (s *Server) GetStore() *JobStore {
 	return s.store
+}
+
+// GetPreviewStore returns the preview store
+func (s *Server) GetPreviewStore() *PreviewStore {
+	return s.previewStore
 }
 
 // GetAddr returns the server address

@@ -68,9 +68,63 @@
                     </div>
                 </div>
 
+                <button class="btn btn-secondary" id="preview-btn" disabled>
+                    👁️ Preview Book
+                </button>
                 <button class="btn btn-primary" id="upload-btn" disabled>
                     📤 Start Conversion
                 </button>
+            </div>
+        </section>
+
+        <!-- Preview Section (hidden by default) -->
+        <section class="preview-section" id="preview-section" style="display: none;">
+            <div class="preview-header">
+                <h2>📖 Book Preview</h2>
+                <button class="btn btn-small" id="close-preview">✕ Close</button>
+            </div>
+            <div class="preview-content">
+                <div class="preview-main">
+                    <div class="preview-cover" id="preview-cover">
+                        <span class="no-cover">No Cover</span>
+                    </div>
+                    <div class="preview-info">
+                        <h3 id="preview-title">-</h3>
+                        <p class="preview-author" id="preview-author">-</p>
+                        <p class="preview-description" id="preview-description">-</p>
+                    </div>
+                </div>
+                <div class="preview-stats">
+                    <div class="stat">
+                        <span class="stat-value" id="preview-chapters">-</span>
+                        <span class="stat-label">Chapters</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value" id="preview-words">-</span>
+                        <span class="stat-label">Words</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value" id="preview-duration">-</span>
+                        <span class="stat-label">Est. Duration</span>
+                    </div>
+                </div>
+                <div class="preview-costs">
+                    <h4>💰 Conversion Cost Estimates</h4>
+                    <div class="cost-grid" id="preview-costs">
+                        <!-- Costs will be populated by JS -->
+                    </div>
+                </div>
+                <div class="preview-chapters">
+                    <h4>📑 Chapters</h4>
+                    <div class="chapter-list" id="preview-chapter-list">
+                        <!-- Chapters will be populated by JS -->
+                    </div>
+                </div>
+                <div class="preview-actions">
+                    <button class="btn btn-primary" id="confirm-convert">
+                        ✅ Confirm & Start Conversion
+                    </button>
+                </div>
             </div>
         </section>
 

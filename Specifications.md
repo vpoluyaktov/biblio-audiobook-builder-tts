@@ -239,6 +239,8 @@ Flags:
 | Web Frontend | ✅ Done | Modern dark theme UI |
 | Restart Flag | ✅ Done | Port-based process detection |
 | Log Level Flag | ✅ Done | Configurable verbosity |
+| Book Preview | ✅ Done | Metadata, chapters, cover, cost estimate before conversion |
+| Cover Image Extraction | ✅ Done | From EPUB/FB2 metadata |
 
 ### In Progress 🔄
 
@@ -250,11 +252,9 @@ Flags:
 
 | Feature | Priority | Notes |
 |---------|----------|-------|
-| Book Preview | High | Metadata, chapters, cover, cost estimate before conversion |
 | Server TUI | High | Terminal dashboard showing server status, providers, jobs |
 | M4B Output | High | Proper audiobook format with chapters |
 | Chapter Markers | High | FFMETADATA format for M4B |
-| Cover Image Extraction | High | From EPUB/FB2 metadata |
 | Cover Image Embedding | High | In M4B output |
 | Audio Re-encoding | High | Consistent bitrate/sample rate |
 | Gap Between Chapters | Medium | Silence padding |

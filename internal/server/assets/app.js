@@ -7,6 +7,7 @@ class App {
         this.providers = [];
         this.voices = [];
         this.selectedFile = null;
+        this.currentPreview = null;
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 10;
         this.reconnectDelay = 1000;
@@ -37,7 +38,22 @@ class App {
         this.speedValue = document.getElementById('speed-value');
         this.pitchInput = document.getElementById('pitch');
         this.pitchValue = document.getElementById('pitch-value');
+        this.previewBtn = document.getElementById('preview-btn');
         this.uploadBtn = document.getElementById('upload-btn');
+
+        // Preview section elements
+        this.previewSection = document.getElementById('preview-section');
+        this.closePreviewBtn = document.getElementById('close-preview');
+        this.previewCover = document.getElementById('preview-cover');
+        this.previewTitle = document.getElementById('preview-title');
+        this.previewAuthor = document.getElementById('preview-author');
+        this.previewDescription = document.getElementById('preview-description');
+        this.previewChapters = document.getElementById('preview-chapters');
+        this.previewWords = document.getElementById('preview-words');
+        this.previewDuration = document.getElementById('preview-duration');
+        this.previewCosts = document.getElementById('preview-costs');
+        this.previewChapterList = document.getElementById('preview-chapter-list');
+        this.confirmConvertBtn = document.getElementById('confirm-convert');
 
         // Jobs list
         this.jobsList = document.getElementById('jobs-list');
@@ -71,8 +87,13 @@ class App {
             this.pitchValue.textContent = this.pitchInput.value + 'x';
         });
 
-        // Upload button
+        // Preview and Upload buttons
+        this.previewBtn.addEventListener('click', () => this.previewFile());
         this.uploadBtn.addEventListener('click', () => this.uploadFile());
+
+        // Preview section events
+        this.closePreviewBtn.addEventListener('click', () => this.closePreview());
+        this.confirmConvertBtn.addEventListener('click', () => this.confirmConvert());
     }
 
     // WebSocket connection
@@ -255,14 +276,109 @@ class App {
         this.fileNameEl.textContent = file.name;
         this.fileSizeEl.textContent = this.formatFileSize(file.size);
         this.selectedFileEl.classList.add('visible');
+        this.previewBtn.disabled = false;
         this.uploadBtn.disabled = false;
     }
 
     clearSelectedFile() {
         this.selectedFile = null;
+        this.currentPreview = null;
         this.fileInput.value = '';
         this.selectedFileEl.classList.remove('visible');
+        this.previewBtn.disabled = true;
         this.uploadBtn.disabled = true;
+        this.closePreview();
+    }
+
+    // Preview functionality
+    async previewFile() {
+        if (!this.selectedFile) return;
+
+        const formData = new FormData();
+        formData.append('file', this.selectedFile);
+
+        this.previewBtn.disabled = true;
+        this.previewBtn.innerHTML = '<span class="spinner">⏳</span> Loading...';
+
+        try {
+            const response = await fetch('/api/preview', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Preview failed');
+            }
+
+            const preview = await response.json();
+            this.currentPreview = preview;
+            this.showPreview(preview);
+        } catch (e) {
+            this.showToast('Preview failed: ' + e.message, 'error');
+        } finally {
+            this.previewBtn.disabled = false;
+            this.previewBtn.innerHTML = '👁️ Preview Book';
+        }
+    }
+
+    showPreview(preview) {
+        // Set cover image
+        if (preview.cover_image_url) {
+            this.previewCover.innerHTML = `<img src="${preview.cover_image_url}" alt="Cover">`;
+        } else {
+            this.previewCover.innerHTML = '<span class="no-cover">No Cover</span>';
+        }
+
+        // Set metadata
+        this.previewTitle.textContent = preview.book_title || 'Unknown Title';
+        this.previewAuthor.textContent = preview.book_author || 'Unknown Author';
+        this.previewDescription.textContent = preview.description || 'No description available';
+
+        // Set stats
+        this.previewChapters.textContent = preview.total_chapters;
+        this.previewWords.textContent = this.formatNumber(preview.total_words);
+        this.previewDuration.textContent = preview.estimated_duration_formatted;
+
+        // Set cost estimates
+        this.previewCosts.innerHTML = Object.entries(preview.cost_estimates)
+            .sort((a, b) => a[1].cost - b[1].cost)
+            .map(([provider, cost]) => `
+                <div class="cost-item">
+                    <span class="cost-provider">${provider}</span>
+                    <span class="cost-value ${cost.cost > 0 ? 'paid' : ''}">
+                        ${cost.cost === 0 ? 'Free' : '$' + cost.cost.toFixed(2)}
+                    </span>
+                </div>
+            `).join('');
+
+        // Set chapter list
+        this.previewChapterList.innerHTML = preview.chapters.map((ch, i) => `
+            <div class="chapter-item">
+                <span class="chapter-title">${i + 1}. ${this.escapeHtml(ch.title)}</span>
+                <span class="chapter-words">${this.formatNumber(ch.word_count)} words</span>
+            </div>
+        `).join('');
+
+        // Show preview section
+        this.previewSection.style.display = 'block';
+        this.previewSection.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    closePreview() {
+        this.previewSection.style.display = 'none';
+    }
+
+    async confirmConvert() {
+        if (!this.selectedFile) return;
+        this.closePreview();
+        await this.uploadFile();
+    }
+
+    formatNumber(num) {
+        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+        if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+        return num.toString();
     }
 
     formatFileSize(bytes) {
