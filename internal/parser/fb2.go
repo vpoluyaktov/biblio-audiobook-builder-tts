@@ -11,6 +11,27 @@ import (
 	"strings"
 )
 
+// Pre-compiled regex patterns for FB2 parsing (performance optimization)
+var (
+	reFB2Xmlns      = regexp.MustCompile(`xmlns[^=]*="[^"]*"`)
+	reFB2NSOpen     = regexp.MustCompile(`<[a-zA-Z]+:`)
+	reFB2NSClose    = regexp.MustCompile(`</[a-zA-Z]+:`)
+	reFB2Section    = regexp.MustCompile(`(?is)<section[^>]*>.*?</section>`)
+	reFB2Table      = regexp.MustCompile(`(?i)<table[^>]*>.*?</table>`)
+	reFB2Image      = regexp.MustCompile(`(?i)<image[^>]*/?>`)
+	reFB2EmptyLine  = regexp.MustCompile(`(?i)<empty-line\s*/?>`)
+	reFB2Link       = regexp.MustCompile(`(?is)<a[^>]*>.*?</a>`)
+	reFB2PClose     = regexp.MustCompile(`(?i)</p>`)
+	reFB2POpen      = regexp.MustCompile(`(?i)<p[^>]*>`)
+	reFB2TitleClose = regexp.MustCompile(`(?i)</title>`)
+	reFB2TitleOpen  = regexp.MustCompile(`(?i)<title[^>]*>`)
+	reFB2SubClose   = regexp.MustCompile(`(?i)</subtitle>`)
+	reFB2SubOpen    = regexp.MustCompile(`(?i)<subtitle[^>]*>`)
+	reFB2Tags       = regexp.MustCompile(`<[^>]+>`)
+	reFB2Spaces     = regexp.MustCompile(`[ \t]+`)
+	reFB2Newlines   = regexp.MustCompile(`\n{3,}`)
+)
+
 type fb2Parser struct {
 	TOCMaxDepth int
 	ParseNotes  bool
@@ -84,13 +105,13 @@ func (p *fb2Parser) ParseFB2(r io.Reader) (*Book, error) {
 		return nil, fmt.Errorf("failed to read FB2 content: %v", err)
 	}
 
-	// Strip namespace prefixes for easier parsing
+	// Strip namespace prefixes for easier parsing (using pre-compiled patterns)
 	contentStr := string(content)
-	contentStr = regexp.MustCompile(`xmlns[^=]*="[^"]*"`).ReplaceAllString(contentStr, "")
-	contentStr = regexp.MustCompile(`<[a-zA-Z]+:`).ReplaceAllStringFunc(contentStr, func(s string) string {
+	contentStr = reFB2Xmlns.ReplaceAllString(contentStr, "")
+	contentStr = reFB2NSOpen.ReplaceAllStringFunc(contentStr, func(s string) string {
 		return "<"
 	})
-	contentStr = regexp.MustCompile(`</[a-zA-Z]+:`).ReplaceAllStringFunc(contentStr, func(s string) string {
+	contentStr = reFB2NSClose.ReplaceAllStringFunc(contentStr, func(s string) string {
 		return "</"
 	})
 
@@ -185,40 +206,40 @@ func (p *fb2Parser) addFB2Sections(book *Book, sections []fb2Section, depth int)
 
 // fb2TreeToText converts FB2 XML content to plain text
 // Based on Python tree_to_text function
+// Uses pre-compiled regex patterns for performance
 func fb2TreeToText(xmlContent string) string {
 	if xmlContent == "" {
 		return ""
 	}
 
 	// Remove nested section tags (we process them separately)
-	reSection := regexp.MustCompile(`(?is)<section[^>]*>.*?</section>`)
-	text := reSection.ReplaceAllString(xmlContent, "")
+	text := reFB2Section.ReplaceAllString(xmlContent, "")
 
 	// Handle special elements
-	text = regexp.MustCompile(`(?i)<table[^>]*>.*?</table>`).ReplaceAllString(text, "\nTable omitted.\n")
-	text = regexp.MustCompile(`(?i)<image[^>]*/?>`).ReplaceAllString(text, "\nIllustration.\n")
-	text = regexp.MustCompile(`(?i)<empty-line\s*/?>`).ReplaceAllString(text, "\n\n")
+	text = reFB2Table.ReplaceAllString(text, "\nTable omitted.\n")
+	text = reFB2Image.ReplaceAllString(text, "\nIllustration.\n")
+	text = reFB2EmptyLine.ReplaceAllString(text, "\n\n")
 
 	// Skip footnotes and links
-	text = regexp.MustCompile(`(?is)<a[^>]*>.*?</a>`).ReplaceAllString(text, "")
+	text = reFB2Link.ReplaceAllString(text, "")
 
 	// Handle paragraphs
-	text = regexp.MustCompile(`(?i)</p>`).ReplaceAllString(text, "\n\n")
-	text = regexp.MustCompile(`(?i)<p[^>]*>`).ReplaceAllString(text, "    ")
+	text = reFB2PClose.ReplaceAllString(text, "\n\n")
+	text = reFB2POpen.ReplaceAllString(text, "    ")
 
 	// Handle titles
-	text = regexp.MustCompile(`(?i)</title>`).ReplaceAllString(text, "\n\n")
-	text = regexp.MustCompile(`(?i)<title[^>]*>`).ReplaceAllString(text, "\n\n")
-	text = regexp.MustCompile(`(?i)</subtitle>`).ReplaceAllString(text, "\n\n")
-	text = regexp.MustCompile(`(?i)<subtitle[^>]*>`).ReplaceAllString(text, "\n\n")
+	text = reFB2TitleClose.ReplaceAllString(text, "\n\n")
+	text = reFB2TitleOpen.ReplaceAllString(text, "\n\n")
+	text = reFB2SubClose.ReplaceAllString(text, "\n\n")
+	text = reFB2SubOpen.ReplaceAllString(text, "\n\n")
 
 	// Remove remaining XML tags
-	text = regexp.MustCompile(`<[^>]+>`).ReplaceAllString(text, "")
+	text = reFB2Tags.ReplaceAllString(text, "")
 
 	// Clean up whitespace
 	text = strings.ReplaceAll(text, "\u00A0", " ")
-	text = regexp.MustCompile(`[ \t]+`).ReplaceAllString(text, " ")
-	text = regexp.MustCompile(`\n{3,}`).ReplaceAllString(text, "\n\n")
+	text = reFB2Spaces.ReplaceAllString(text, " ")
+	text = reFB2Newlines.ReplaceAllString(text, "\n\n")
 
 	// Add periods to paragraphs
 	text = addPeriodToText(text)

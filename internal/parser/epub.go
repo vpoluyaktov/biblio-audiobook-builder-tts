@@ -13,6 +13,17 @@ import (
 	"strings"
 )
 
+// Pre-compiled regex patterns for HTML to text conversion (performance optimization)
+var (
+	reScript   = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
+	reStyle    = regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`)
+	reBlock    = regexp.MustCompile(`(?i)</(p|div|br|h[1-6]|li|tr)>`)
+	reBr       = regexp.MustCompile(`(?i)<br\s*/?>`)
+	reTags     = regexp.MustCompile(`<[^>]+>`)
+	reSpaces   = regexp.MustCompile(`[ \t]+`)
+	reNewlines = regexp.MustCompile(`\n{3,}`)
+)
+
 type epubParser struct{}
 
 func NewEpubParser() *epubParser {
@@ -364,21 +375,17 @@ func extractCoverHref(pkg epubPackage, baseDir string) string {
 
 // htmlToText converts HTML content to plain text
 // Based on Python html2text library behavior
+// Uses pre-compiled regex patterns for performance
 func htmlToText(html string) string {
 	// Remove script and style tags with content
-	reScript := regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
 	html = reScript.ReplaceAllString(html, "")
-	reStyle := regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`)
 	html = reStyle.ReplaceAllString(html, "")
 
 	// Replace common block elements with newlines
-	reBlock := regexp.MustCompile(`(?i)</(p|div|br|h[1-6]|li|tr)>`)
 	html = reBlock.ReplaceAllString(html, "\n")
-	reBr := regexp.MustCompile(`(?i)<br\s*/?>`)
 	html = reBr.ReplaceAllString(html, "\n")
 
 	// Remove all remaining HTML tags
-	reTags := regexp.MustCompile(`<[^>]+>`)
 	text := reTags.ReplaceAllString(html, "")
 
 	// Decode common HTML entities
@@ -391,9 +398,7 @@ func htmlToText(html string) string {
 	text = strings.ReplaceAll(text, "\u00A0", " ")
 
 	// Clean up whitespace
-	reSpaces := regexp.MustCompile(`[ \t]+`)
 	text = reSpaces.ReplaceAllString(text, " ")
-	reNewlines := regexp.MustCompile(`\n{3,}`)
 	text = reNewlines.ReplaceAllString(text, "\n\n")
 
 	// Add period at end of paragraphs if missing

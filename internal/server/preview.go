@@ -89,20 +89,22 @@ func (ps *PreviewStore) CreatePreview(book *parser.Book, fileName string) *Previ
 	id := uuid.New().String()
 	now := time.Now()
 
-	// Build chapter previews
+	// Build chapter previews and calculate totals in a single pass
 	chapters := make([]ChapterPreview, len(book.Chapters))
+	totalWords := 0
+	totalChars := 0
 	for i, ch := range book.Chapters {
-		wordCount := len(splitWords(ch.Content))
+		wordCount := countWords(ch.Content)
+		charCount := len(ch.Content)
 		chapters[i] = ChapterPreview{
 			Title:     ch.Title,
 			WordCount: wordCount,
-			CharCount: len(ch.Content),
+			CharCount: charCount,
 			TOCDepth:  ch.TOCDepth,
 		}
+		totalWords += wordCount
+		totalChars += charCount
 	}
-
-	totalWords := book.GetTotalWords()
-	totalChars := book.GetTotalCharacters()
 	durationMinutes := totalWords / wordsPerMinute
 	if durationMinutes == 0 && totalWords > 0 {
 		durationMinutes = 1
@@ -204,6 +206,26 @@ func formatDuration(minutes int) string {
 		return fmt.Sprintf("%dh", hours)
 	}
 	return fmt.Sprintf("%dh %dm", hours, mins)
+}
+
+// countWords counts words in text efficiently without allocating a slice
+func countWords(text string) int {
+	count := 0
+	inWord := false
+	for _, r := range text {
+		if r == ' ' || r == '\n' || r == '\t' || r == '\r' {
+			if inWord {
+				count++
+				inWord = false
+			}
+		} else {
+			inWord = true
+		}
+	}
+	if inWord {
+		count++
+	}
+	return count
 }
 
 // splitWords splits text into words (simple implementation)
