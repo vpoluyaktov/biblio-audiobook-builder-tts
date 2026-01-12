@@ -16,7 +16,8 @@ const (
 	JobStatusPending    JobStatus = "pending"
 	JobStatusParsing    JobStatus = "parsing"
 	JobStatusConverting JobStatus = "converting"
-	JobStatusBuilding   JobStatus = "building" // Building M4B file
+	JobStatusBuilding   JobStatus = "building"  // Building M4B file
+	JobStatusUploading  JobStatus = "uploading" // Uploading to Audiobookshelf
 	JobStatusCompleted  JobStatus = "completed"
 	JobStatusFailed     JobStatus = "failed"
 	JobStatusCancelled  JobStatus = "cancelled"

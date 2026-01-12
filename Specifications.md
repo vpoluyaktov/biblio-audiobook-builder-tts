@@ -245,28 +245,27 @@ Flags:
 | FFmpeg/FFProbe Wrappers | ✅ Done | Ported from abb_ia for audio processing |
 | Audiobookshelf Client | ✅ Done | Ported from abb_ia for server integration |
 | M4B Builder | ✅ Done | Chapter markers, metadata, cover embedding |
+| Worker M4B Integration | ✅ Done | M4B building integrated into worker pipeline |
+| Audiobookshelf Integration | ✅ Done | Auto-upload completed books when configured |
 
 ### In Progress 🔄
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Worker M4B Integration | 🔄 In Progress | M4B building integrated into worker pipeline |
+| - | - | No features currently in progress |
 
 ### Not Started ❌
 
 | Feature | Priority | Notes |
 |---------|----------|-------|
-| Audio Re-encoding | High | Consistent bitrate/sample rate |
 | Gap Between Chapters | Medium | Silence padding |
 | Pronunciation Dictionary | Medium | Regex-based text fixes |
 | Multi-Part Audiobooks | Medium | Split large books (>2GB) |
-| Book Metadata Tagging | Medium | Title, author, genre in M4B |
 | Audio Normalization | Low | Consistent volume levels |
 | Noise Reduction | Low | Clean up TTS artifacts |
 | Cloud TTS (Google) | Low | Needs API integration |
 | Cloud TTS (Azure) | Low | Needs API integration |
 | Job Persistence | Low | Database storage |
-| Audiobookshelf Integration | Low | Auto-upload completed books |
 
 ---
 

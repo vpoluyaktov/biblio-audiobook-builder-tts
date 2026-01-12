@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"abb_tts/internal/audio"
+	"abb_tts/internal/audiobookshelf"
 	"abb_tts/internal/config"
 	"abb_tts/internal/parser"
 	"abb_tts/internal/tts"
@@ -118,6 +119,19 @@ func (w *Worker) processJob(job *Job) {
 	} else {
 		job.M4BFile = m4bFile
 		log.Printf("M4B file created: %s", m4bFile)
+
+		// Upload to Audiobookshelf if configured
+		if w.cfg.AudiobookshelfURL != "" && m4bFile != "" {
+			job.SetStatus(JobStatusUploading)
+			w.broadcastJobUpdate(job)
+
+			if err := w.uploadToAudiobookshelf(job, book); err != nil {
+				log.Printf("Warning: Audiobookshelf upload failed: %v", err)
+				// Don't fail the job, M4B file is still available locally
+			} else {
+				log.Printf("Uploaded to Audiobookshelf: %s", book.Title)
+			}
+		}
 	}
 
 	// Mark as completed
@@ -255,6 +269,72 @@ func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (s
 	}
 
 	return m4bPath, nil
+}
+
+// uploadToAudiobookshelf uploads the M4B file to Audiobookshelf server
+func (w *Worker) uploadToAudiobookshelf(job *Job, book *parser.Book) error {
+	if w.cfg.AudiobookshelfURL == "" {
+		return fmt.Errorf("audiobookshelf URL not configured")
+	}
+
+	if job.M4BFile == "" {
+		return fmt.Errorf("no M4B file to upload")
+	}
+
+	// Create client and login
+	client := audiobookshelf.NewClient(w.cfg.AudiobookshelfURL)
+	if err := client.Login(w.cfg.AudiobookshelfUser, w.cfg.AudiobookshelfPassword); err != nil {
+		return fmt.Errorf("failed to login to Audiobookshelf: %v", err)
+	}
+
+	// Get libraries
+	libraries, err := client.GetLibraries()
+	if err != nil {
+		return fmt.Errorf("failed to get libraries: %v", err)
+	}
+
+	// Find target library
+	libraryID, err := client.GetLibraryID(libraries, w.cfg.AudiobookshelfLibrary)
+	if err != nil {
+		return fmt.Errorf("failed to find library '%s': %v", w.cfg.AudiobookshelfLibrary, err)
+	}
+
+	// Get folders for the library
+	folders, err := client.GetFolders(libraries, w.cfg.AudiobookshelfLibrary)
+	if err != nil {
+		return fmt.Errorf("failed to get folders: %v", err)
+	}
+
+	if len(folders) == 0 {
+		return fmt.Errorf("no folders found in library '%s'", w.cfg.AudiobookshelfLibrary)
+	}
+
+	// Use first folder
+	folderID := folders[0].ID
+
+	// Prepare audiobook for upload
+	ab := &audiobookshelf.Audiobook{
+		Title:  book.Title,
+		Author: book.Author,
+		Files:  []string{job.M4BFile},
+	}
+
+	// Upload with progress callback
+	progressCallback := func(fileID int, fileName string, size int64, pos int64, percent int) {
+		log.Printf("Upload progress: %s - %d%%", fileName, percent)
+	}
+
+	if err := client.UploadBook(ab, libraryID, folderID, progressCallback); err != nil {
+		return fmt.Errorf("failed to upload: %v", err)
+	}
+
+	// Trigger library scan
+	if err := client.ScanLibrary(libraryID); err != nil {
+		log.Printf("Warning: Failed to trigger library scan: %v", err)
+		// Don't fail, upload was successful
+	}
+
+	return nil
 }
 
 // sanitizeFileName removes or replaces characters that are invalid in file names

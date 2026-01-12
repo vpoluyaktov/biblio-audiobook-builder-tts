@@ -484,6 +484,8 @@ class App {
             progressText = 'Parsing book...';
         } else if (job.status === 'building') {
             progressText = 'Building M4B audiobook...';
+        } else if (job.status === 'uploading') {
+            progressText = 'Uploading to Audiobookshelf...';
         } else if (job.status === 'pending') {
             progressText = 'Waiting in queue...';
         } else if (job.status === 'completed') {
@@ -504,12 +506,12 @@ class App {
                 </span>
             </div>
             
-            ${job.status === 'converting' || job.status === 'parsing' || job.status === 'building' ? `
+            ${job.status === 'converting' || job.status === 'parsing' || job.status === 'building' || job.status === 'uploading' ? `
             <div class="job-progress">
                 <div class="progress-bar">
-                    <div class="progress-fill" style="width: ${job.status === 'building' ? 100 : progress}%"></div>
+                    <div class="progress-fill" style="width: ${(job.status === 'building' || job.status === 'uploading') ? 100 : progress}%"></div>
                 </div>
-                <div class="progress-text">${progressText}${job.status !== 'building' ? ` (${progress}%)` : ''}</div>
+                <div class="progress-text">${progressText}${(job.status !== 'building' && job.status !== 'uploading') ? ` (${progress}%)` : ''}</div>
             </div>
             ` : ''}
             
@@ -557,6 +559,7 @@ class App {
             case 'parsing': return '📖';
             case 'converting': return '🔄';
             case 'building': return '📦';
+            case 'uploading': return '☁️';
             case 'completed': return '✅';
             case 'failed': return '❌';
             case 'cancelled': return '🚫';

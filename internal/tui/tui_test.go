@@ -39,6 +39,7 @@ func TestGetStatusIcon(t *testing.T) {
 		{server.JobStatusParsing, "📖"},
 		{server.JobStatusConverting, "🔄"},
 		{server.JobStatusBuilding, "📦"},
+		{server.JobStatusUploading, "☁️"},
 		{server.JobStatusCompleted, "✅"},
 		{server.JobStatusFailed, "❌"},
 		{server.JobStatusCancelled, "🚫"},
