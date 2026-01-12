@@ -181,8 +181,13 @@ func (w *Worker) parseBook(filePath string) (*parser.Book, error) {
 
 // convertBook converts the book to audio files
 func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, error) {
-	// Create output directory
+	// Create output directory (use absolute path)
 	outputDir := filepath.Join(w.cfg.OutputDir, sanitizeFileName(book.Title))
+	absOutputDir, err := filepath.Abs(outputDir)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to get absolute path: %v", err)
+	}
+	outputDir = absOutputDir
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return "", nil, fmt.Errorf("failed to create output directory: %v", err)
 	}
