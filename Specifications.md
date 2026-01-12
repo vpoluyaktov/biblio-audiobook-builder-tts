@@ -242,6 +242,9 @@ Flags:
 | Book Preview | ✅ Done | Metadata, chapters, cover, cost estimate before conversion |
 | Cover Image Extraction | ✅ Done | From EPUB/FB2 metadata |
 | Server TUI | ✅ Done | Terminal dashboard showing server status, providers, jobs |
+| FFmpeg/FFProbe Wrappers | ✅ Done | Ported from abb_ia for audio processing |
+| Audiobookshelf Client | ✅ Done | Ported from abb_ia for server integration |
+| M4B Builder | ✅ Done | Chapter markers, metadata, cover embedding |
 
 ### In Progress 🔄
 
@@ -253,9 +256,6 @@ Flags:
 
 | Feature | Priority | Notes |
 |---------|----------|-------|
-| M4B Output | High | Proper audiobook format with chapters |
-| Chapter Markers | High | FFMETADATA format for M4B |
-| Cover Image Embedding | High | In M4B output |
 | Audio Re-encoding | High | Consistent bitrate/sample rate |
 | Gap Between Chapters | Medium | Silence padding |
 | Pronunciation Dictionary | Medium | Regex-based text fixes |

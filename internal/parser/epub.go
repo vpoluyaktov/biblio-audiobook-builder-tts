@@ -413,9 +413,12 @@ func addPeriodToText(text string) string {
 			result = append(result, "")
 			continue
 		}
-		lastChar := line[len(line)-1]
-		if lastChar != '.' && lastChar != '?' && lastChar != '!' &&
-			lastChar != ':' && lastChar != '"' && lastChar != '"' {
+		// Get last rune to handle multi-byte characters
+		runes := []rune(line)
+		lastRune := runes[len(runes)-1]
+		// Check for sentence-ending punctuation (including curly quotes U+201C and U+201D)
+		if lastRune != '.' && lastRune != '?' && lastRune != '!' &&
+			lastRune != ':' && lastRune != '"' && lastRune != 0x201C && lastRune != 0x201D {
 			// Check for ellipsis
 			if !strings.HasSuffix(line, "...") {
 				line = line + "."
