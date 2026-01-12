@@ -249,6 +249,7 @@ Flags:
 | Audiobookshelf Integration | ✅ Done | Auto-upload completed books when configured |
 | Gap Between Chapters | ✅ Done | Configurable silence padding (chapter_gap_seconds) |
 | Pronunciation Dictionary | ✅ Done | Regex-based text fixes with default rules |
+| Multi-Part Audiobooks | ✅ Done | Split large books based on max_file_size_mb |
 
 ### In Progress 🔄
 
@@ -260,7 +261,6 @@ Flags:
 
 | Feature | Priority | Notes |
 |---------|----------|-------|
-| Multi-Part Audiobooks | Medium | Split large books (>2GB) |
 | Audio Normalization | Low | Consistent volume levels |
 | Noise Reduction | Low | Clean up TTS artifacts |
 | Cloud TTS (Google) | Low | Needs API integration |

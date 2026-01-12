@@ -26,6 +26,7 @@ type Config struct {
 	ChapterGapSeconds       int     `mapstructure:"chapter_gap_seconds"`       // Silence between chapters
 	PronunciationDictFile   string  `mapstructure:"pronunciation_dict_file"`   // Path to pronunciation dictionary
 	UseDefaultPronunciation bool    `mapstructure:"use_default_pronunciation"` // Use built-in pronunciation rules
+	MaxFileSizeMB           int     `mapstructure:"max_file_size_mb"`          // Max M4B file size before splitting
 
 	// Cloud provider settings
 	CloudAPIKey       string `mapstructure:"cloud_api_key"`
@@ -63,6 +64,7 @@ func Load(configFile string) (*Config, error) {
 	viper.SetDefault("chapter_gap_seconds", 2)          // 2 seconds silence between chapters
 	viper.SetDefault("pronunciation_dict_file", "")     // Custom pronunciation dictionary
 	viper.SetDefault("use_default_pronunciation", true) // Use built-in pronunciation rules
+	viper.SetDefault("max_file_size_mb", 2000)          // 2GB max file size before splitting
 
 	// Cloud provider settings
 	viper.SetDefault("cloud_api_key", "")

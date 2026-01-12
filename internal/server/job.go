@@ -46,8 +46,9 @@ type Job struct {
 
 	// Output
 	OutputPath   string   `json:"output_path,omitempty"`
-	M4BFile      string   `json:"m4b_file,omitempty"`
-	ChapterFiles []string `json:"-"` // Internal list of chapter audio files
+	M4BFile      string   `json:"m4b_file,omitempty"`  // Primary M4B file (or first part)
+	M4BFiles     []string `json:"m4b_files,omitempty"` // All M4B files (for multi-part)
+	ChapterFiles []string `json:"-"`                   // Internal list of chapter audio files
 
 	// Timestamps
 	CreatedAt   time.Time  `json:"created_at"`

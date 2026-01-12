@@ -245,7 +245,8 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 	return outputDir, chapterFiles, nil
 }
 
-// buildM4B creates an M4B audiobook file from chapter audio files
+// buildM4B creates M4B audiobook file(s) from chapter audio files
+// Returns the primary M4B file path and updates job.M4BFiles with all parts
 func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (string, error) {
 	if len(chapterFiles) == 0 {
 		return "", fmt.Errorf("no chapter files to build M4B from")
@@ -256,12 +257,20 @@ func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (s
 		return "", fmt.Errorf("ffmpeg not available: %v", err)
 	}
 
-	// Prepare chapter metadata
-	chapters := make([]audio.Chapter, len(book.Chapters))
+	// Prepare chapter titles
+	chapterTitles := make([]string, len(book.Chapters))
 	for i, ch := range book.Chapters {
-		chapters[i] = audio.Chapter{
-			Title: ch.Title,
-		}
+		chapterTitles[i] = ch.Title
+	}
+
+	// Split into parts if needed
+	parts, err := audio.SplitIntoParts(chapterFiles, chapterTitles, w.cfg.MaxFileSizeMB)
+	if err != nil {
+		return "", fmt.Errorf("failed to split into parts: %v", err)
+	}
+
+	if len(parts) > 1 {
+		log.Printf("Book will be split into %d parts", len(parts))
 	}
 
 	// Prepare M4B options
@@ -272,7 +281,6 @@ func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (s
 		Album:           book.Title,
 		Genre:           "Audiobook",
 		Description:     book.Description,
-		Chapters:        chapters,
 		BitRate:         fmt.Sprintf("%dk", w.cfg.BitRateKbs),
 		SampleRate:      w.cfg.SampleRateHz,
 		GapBetweenChaps: gapDuration,
@@ -284,32 +292,36 @@ func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (s
 		options.CoverImageType = book.CoverImageType
 	}
 
-	// Create M4B builder
-	builder, err := audio.NewM4BBuilder(options)
+	// Build M4B file(s)
+	baseFileName := sanitizeFileName(book.Author + " - " + book.Title)
+	m4bFiles, err := audio.BuildMultiPartM4B(parts, job.OutputPath, baseFileName, options)
 	if err != nil {
-		return "", fmt.Errorf("failed to create M4B builder: %v", err)
-	}
-	defer builder.Cleanup()
-
-	// Build M4B file
-	m4bFileName := sanitizeFileName(book.Author+" - "+book.Title) + ".m4b"
-	m4bPath := filepath.Join(job.OutputPath, m4bFileName)
-
-	if err := builder.BuildFromFiles(chapterFiles, m4bPath); err != nil {
 		return "", fmt.Errorf("failed to build M4B: %v", err)
 	}
 
-	return m4bPath, nil
+	// Store all M4B files in job
+	job.M4BFiles = m4bFiles
+
+	// Return primary file (first part or single file)
+	if len(m4bFiles) > 0 {
+		return m4bFiles[0], nil
+	}
+	return "", fmt.Errorf("no M4B files created")
 }
 
-// uploadToAudiobookshelf uploads the M4B file to Audiobookshelf server
+// uploadToAudiobookshelf uploads the M4B file(s) to Audiobookshelf server
 func (w *Worker) uploadToAudiobookshelf(job *Job, book *parser.Book) error {
 	if w.cfg.AudiobookshelfURL == "" {
 		return fmt.Errorf("audiobookshelf URL not configured")
 	}
 
-	if job.M4BFile == "" {
-		return fmt.Errorf("no M4B file to upload")
+	// Use M4BFiles if available (multi-part), otherwise fall back to single M4BFile
+	filesToUpload := job.M4BFiles
+	if len(filesToUpload) == 0 && job.M4BFile != "" {
+		filesToUpload = []string{job.M4BFile}
+	}
+	if len(filesToUpload) == 0 {
+		return fmt.Errorf("no M4B files to upload")
 	}
 
 	// Create client and login
@@ -347,7 +359,7 @@ func (w *Worker) uploadToAudiobookshelf(job *Job, book *parser.Book) error {
 	ab := &audiobookshelf.Audiobook{
 		Title:  book.Title,
 		Author: book.Author,
-		Files:  []string{job.M4BFile},
+		Files:  filesToUpload,
 	}
 
 	// Upload with progress callback
