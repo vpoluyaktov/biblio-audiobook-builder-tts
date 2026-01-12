@@ -163,6 +163,7 @@
                 <button class="tab-btn active" data-tab="general">General</button>
                 <button class="tab-btn" data-tab="tts">TTS Settings</button>
                 <button class="tab-btn" data-tab="output">Output</button>
+                <button class="tab-btn" data-tab="cloud">Cloud TTS</button>
                 <button class="tab-btn" data-tab="audiobookshelf">Audiobookshelf</button>
             </div>
             <div class="settings-body">
@@ -285,6 +286,32 @@
                             <label for="cfg-max-file-size">Max File Size (MB)</label>
                             <input type="number" id="cfg-max-file-size" min="100" max="4000" value="2000">
                             <small>Books larger than this will be split into multiple parts</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cloud TTS Tab -->
+                <div class="tab-content" id="tab-cloud">
+                    <div class="settings-section">
+                        <h3>☁️ Google Cloud TTS</h3>
+                        <p class="section-description">
+                            Configure Google Cloud Text-to-Speech API for high-quality voices.
+                            Get your API key from the <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</a>.
+                        </p>
+                        <div class="form-group">
+                            <label for="cfg-google-api-key">Google Cloud API Key</label>
+                            <input type="password" id="cfg-google-api-key" placeholder="AIza...">
+                            <small>Enable the Cloud Text-to-Speech API in your Google Cloud project</small>
+                        </div>
+                        <div class="settings-section">
+                            <h4>💰 Pricing (per 1 million characters)</h4>
+                            <ul class="pricing-list">
+                                <li><strong>Standard voices:</strong> $4.00</li>
+                                <li><strong>WaveNet voices:</strong> $16.00</li>
+                                <li><strong>Neural2 voices:</strong> $16.00</li>
+                                <li><strong>Studio voices:</strong> $160.00</li>
+                            </ul>
+                            <small>First 1M characters/month free for Standard, 1M for WaveNet/Neural2</small>
                         </div>
                     </div>
                 </div>

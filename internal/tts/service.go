@@ -48,11 +48,13 @@ func NewService(cfg *config.Config) Service {
 	// Initialize local providers
 	s.providers["espeak"] = NewLocalProvider("espeak")
 
-	// Initialize cloud providers if configured
+	// Initialize Google Cloud TTS if API key is configured
+	if cfg.GoogleAPIKey != "" {
+		s.providers["google"] = NewGoogleProvider(cfg.GoogleAPIKey)
+	}
+
+	// Initialize other cloud providers if configured (legacy support)
 	if cfg.CloudAPIKey != "" {
-		if cfg.GoogleTTSEndpoint != "" {
-			s.providers["google"] = NewCloudProvider("google", cfg.CloudAPIKey, cfg.GoogleTTSEndpoint)
-		}
 		if cfg.AzureTTSEndpoint != "" {
 			s.providers["azure"] = NewCloudProvider("azure", cfg.CloudAPIKey, cfg.AzureTTSEndpoint)
 		}

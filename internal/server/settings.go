@@ -33,6 +33,9 @@ type SettingsRequest struct {
 	ChapterGapSeconds int `json:"chapter_gap_seconds"`
 	MaxFileSizeMB     int `json:"max_file_size_mb"`
 
+	// Cloud TTS
+	GoogleAPIKey string `json:"google_api_key"`
+
 	// Audiobookshelf
 	AudiobookshelfURL      string `json:"audiobookshelf_url"`
 	AudiobookshelfUser     string `json:"audiobookshelf_user"`
@@ -82,6 +85,9 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 		ChapterGapSeconds: s.cfg.ChapterGapSeconds,
 		MaxFileSizeMB:     s.cfg.MaxFileSizeMB,
 
+		// Cloud TTS
+		GoogleAPIKey: s.cfg.GoogleAPIKey,
+
 		// Audiobookshelf
 		AudiobookshelfURL:      s.cfg.AudiobookshelfURL,
 		AudiobookshelfUser:     s.cfg.AudiobookshelfUser,
@@ -123,6 +129,9 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 	s.cfg.ChapterGapSeconds = req.ChapterGapSeconds
 	s.cfg.MaxFileSizeMB = req.MaxFileSizeMB
 
+	// Cloud TTS
+	s.cfg.GoogleAPIKey = req.GoogleAPIKey
+
 	// Audiobookshelf
 	s.cfg.AudiobookshelfURL = req.AudiobookshelfURL
 	s.cfg.AudiobookshelfUser = req.AudiobookshelfUser
@@ -152,6 +161,7 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 			"audiobookshelf_user":       req.AudiobookshelfUser,
 			"audiobookshelf_password":   req.AudiobookshelfPassword,
 			"audiobookshelf_library":    req.AudiobookshelfLibrary,
+			"google_api_key":            req.GoogleAPIKey,
 		}
 
 		for key, value := range configs {

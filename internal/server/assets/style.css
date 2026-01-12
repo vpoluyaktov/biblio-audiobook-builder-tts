@@ -970,6 +970,22 @@ h1 .icon {
     color: var(--error);
 }
 
+/* Pricing list */
+.pricing-list {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0;
+}
+
+.pricing-list li {
+    padding: 0.25rem 0;
+    color: var(--text-secondary);
+}
+
+.pricing-list li strong {
+    color: var(--text-primary);
+}
+
 /* Spinner animation */
 .spinner {
     display: inline-block;

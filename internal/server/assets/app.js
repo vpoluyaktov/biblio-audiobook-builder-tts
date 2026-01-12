@@ -815,6 +815,9 @@ class App {
         document.getElementById('cfg-chapter-gap').value = s.chapter_gap_seconds || 2;
         document.getElementById('cfg-max-file-size').value = s.max_file_size_mb || 2000;
         
+        // Cloud TTS tab
+        document.getElementById('cfg-google-api-key').value = s.google_api_key || '';
+        
         // Audiobookshelf tab
         document.getElementById('cfg-abs-url').value = s.audiobookshelf_url || '';
         document.getElementById('cfg-abs-user').value = s.audiobookshelf_user || 'admin';
@@ -845,6 +848,9 @@ class App {
             sample_rate_hz: parseInt(document.getElementById('cfg-sample-rate').value),
             chapter_gap_seconds: parseInt(document.getElementById('cfg-chapter-gap').value),
             max_file_size_mb: parseInt(document.getElementById('cfg-max-file-size').value),
+            
+            // Cloud TTS
+            google_api_key: document.getElementById('cfg-google-api-key').value,
             
             // Audiobookshelf
             audiobookshelf_url: document.getElementById('cfg-abs-url').value,

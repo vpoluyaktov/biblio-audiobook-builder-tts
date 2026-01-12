@@ -35,6 +35,7 @@ type Config struct {
 	CloudAPIKey       string `mapstructure:"cloud_api_key"`
 	GoogleTTSEndpoint string `mapstructure:"google_tts_endpoint"`
 	AzureTTSEndpoint  string `mapstructure:"azure_tts_endpoint"`
+	GoogleAPIKey      string `mapstructure:"google_api_key"` // Google Cloud TTS API key
 
 	// Audiobookshelf integration
 	AudiobookshelfURL      string `mapstructure:"audiobookshelf_url"`
@@ -73,6 +74,7 @@ func Load(configFile string) (*Config, error) {
 	viper.SetDefault("cloud_api_key", "")
 	viper.SetDefault("google_tts_endpoint", "")
 	viper.SetDefault("azure_tts_endpoint", "")
+	viper.SetDefault("google_api_key", "")
 
 	// Audiobookshelf settings
 	viper.SetDefault("audiobookshelf_url", "")
@@ -162,6 +164,9 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 	}
 	if v, ok := dbConfig["azure_tts_endpoint"].(string); ok {
 		cfg.AzureTTSEndpoint = v
+	}
+	if v, ok := dbConfig["google_api_key"].(string); ok {
+		cfg.GoogleAPIKey = v
 	}
 	if v, ok := dbConfig["audiobookshelf_url"].(string); ok {
 		cfg.AudiobookshelfURL = v
