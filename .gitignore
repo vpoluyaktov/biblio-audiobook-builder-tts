@@ -38,3 +38,9 @@ Thumbs.db
 # Ebook files
 *.epub
 *.fb2
+
+# SQLite database
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

@@ -15,6 +15,7 @@ import (
 
 	"abb_tts/internal/config"
 	"abb_tts/internal/server"
+	"abb_tts/internal/storage"
 	"abb_tts/internal/tts"
 	"abb_tts/internal/tui"
 	"abb_tts/internal/utils"
@@ -54,8 +55,8 @@ func main() {
 	// Customize usage
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage of abb_tts:\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "  --config string\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "        Path to configuration file (default \"abb_tts.config.yaml\")\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "  --db string\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "        Path to SQLite database file (default \"abb_tts.db\")\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "  --port string\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "        Port to run the server on (overrides config)\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "  --host string\n")
@@ -71,7 +72,7 @@ func main() {
 	}
 
 	// Parse command line flags
-	configFile := flag.String("config", "abb_tts.config.yaml", "Path to configuration file")
+	dbPath := flag.String("db", config.DefaultDBPath, "Path to SQLite database file")
 	port := flag.String("port", "", "Port to run the server on (overrides config)")
 	host := flag.String("host", "", "Host to bind the server to (overrides config)")
 	noBrowser := flag.Bool("no-browser", false, "Don't automatically open browser")
@@ -83,11 +84,26 @@ func main() {
 	// Set log level
 	currentLogLevel = parseLogLevel(*logLevel)
 
-	// Load configuration
-	cfg, err := config.Load(*configFile)
+	// Initialize database
+	db, err := storage.NewDB(*dbPath)
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		log.Fatalf("Failed to open database: %v", err)
 	}
+	defer db.Close()
+
+	// Initialize database with defaults if empty
+	if err := db.InitializeDefaults(); err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Load configuration from database
+	dbConfig, err := db.GetAllConfig()
+	if err != nil {
+		log.Fatalf("Failed to load configuration from database: %v", err)
+	}
+
+	// Convert to app config
+	cfg := config.LoadFromDB(dbConfig.ToAppConfig())
 	config.SetInstance(cfg)
 
 	// Override config with command line flags
@@ -145,6 +161,7 @@ func main() {
 	// Create and start server
 	addr := fmt.Sprintf("%s:%s", cfg.ServerHost, cfg.ServerPort)
 	srv := server.New(addr, cfg, ttsService)
+	srv.SetDB(db) // Enable config persistence to database
 
 	// Start server in goroutine
 	errChan := make(chan error, 1)

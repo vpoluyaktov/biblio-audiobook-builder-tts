@@ -522,17 +522,42 @@ func (db *DB) CleanupOldJobs(olderThan time.Duration) (int64, error) {
 
 // InitializeDefaults initializes the database with default configuration if empty
 func (db *DB) InitializeDefaults() error {
-	cfg, err := db.GetAllConfig()
-	if err != nil {
-		return err
-	}
-
 	// Check if config is empty (all defaults)
 	existingValue, _ := db.GetConfig("server_port")
 	if existingValue == "" {
 		log.Println("Initializing database with default configuration")
+		cfg := DefaultConfig()
 		return db.SaveAllConfig(cfg)
 	}
 
 	return nil
+}
+
+// ToAppConfig converts storage.Config to the application config format
+func (c *Config) ToAppConfig() map[string]interface{} {
+	return map[string]interface{}{
+		"log_file":                  c.LogFile,
+		"output_dir":                c.OutputDir,
+		"temp_dir":                  c.TempDir,
+		"default_voice":             c.DefaultVoice,
+		"default_provider":          c.DefaultProvider,
+		"server_port":               c.ServerPort,
+		"server_host":               c.ServerHost,
+		"open_browser":              c.OpenBrowser,
+		"bit_rate_kbs":              c.BitRateKbs,
+		"sample_rate_hz":            c.SampleRateHz,
+		"default_speed":             c.DefaultSpeed,
+		"default_pitch":             c.DefaultPitch,
+		"chapter_gap_seconds":       c.ChapterGapSeconds,
+		"pronunciation_dict_file":   c.PronunciationDictFile,
+		"use_default_pronunciation": c.UseDefaultPronunciation,
+		"max_file_size_mb":          c.MaxFileSizeMB,
+		"cloud_api_key":             c.CloudAPIKey,
+		"google_tts_endpoint":       c.GoogleTTSEndpoint,
+		"azure_tts_endpoint":        c.AzureTTSEndpoint,
+		"audiobookshelf_url":        c.AudiobookshelfURL,
+		"audiobookshelf_user":       c.AudiobookshelfUser,
+		"audiobookshelf_password":   c.AudiobookshelfPassword,
+		"audiobookshelf_library":    c.AudiobookshelfLibrary,
+	}
 }

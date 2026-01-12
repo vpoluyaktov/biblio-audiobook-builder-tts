@@ -4,6 +4,9 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Default database path
+const DefaultDBPath = "abb_tts.db"
+
 // Config holds all configuration for the application
 type Config struct {
 	// Basic settings
@@ -97,4 +100,81 @@ func Load(configFile string) (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+// LoadFromDB loads configuration from a storage.Config struct
+func LoadFromDB(dbConfig map[string]interface{}) *Config {
+	cfg := &Config{}
+
+	if v, ok := dbConfig["log_file"].(string); ok {
+		cfg.LogFile = v
+	}
+	if v, ok := dbConfig["output_dir"].(string); ok {
+		cfg.OutputDir = v
+	}
+	if v, ok := dbConfig["temp_dir"].(string); ok {
+		cfg.TempDir = v
+	}
+	if v, ok := dbConfig["default_voice"].(string); ok {
+		cfg.DefaultVoice = v
+	}
+	if v, ok := dbConfig["default_provider"].(string); ok {
+		cfg.DefaultProvider = v
+	}
+	if v, ok := dbConfig["server_port"].(string); ok {
+		cfg.ServerPort = v
+	}
+	if v, ok := dbConfig["server_host"].(string); ok {
+		cfg.ServerHost = v
+	}
+	if v, ok := dbConfig["open_browser"].(bool); ok {
+		cfg.OpenBrowser = v
+	}
+	if v, ok := dbConfig["bit_rate_kbs"].(int); ok {
+		cfg.BitRateKbs = v
+	}
+	if v, ok := dbConfig["sample_rate_hz"].(int); ok {
+		cfg.SampleRateHz = v
+	}
+	if v, ok := dbConfig["default_speed"].(float64); ok {
+		cfg.DefaultSpeed = v
+	}
+	if v, ok := dbConfig["default_pitch"].(float64); ok {
+		cfg.DefaultPitch = v
+	}
+	if v, ok := dbConfig["chapter_gap_seconds"].(int); ok {
+		cfg.ChapterGapSeconds = v
+	}
+	if v, ok := dbConfig["pronunciation_dict_file"].(string); ok {
+		cfg.PronunciationDictFile = v
+	}
+	if v, ok := dbConfig["use_default_pronunciation"].(bool); ok {
+		cfg.UseDefaultPronunciation = v
+	}
+	if v, ok := dbConfig["max_file_size_mb"].(int); ok {
+		cfg.MaxFileSizeMB = v
+	}
+	if v, ok := dbConfig["cloud_api_key"].(string); ok {
+		cfg.CloudAPIKey = v
+	}
+	if v, ok := dbConfig["google_tts_endpoint"].(string); ok {
+		cfg.GoogleTTSEndpoint = v
+	}
+	if v, ok := dbConfig["azure_tts_endpoint"].(string); ok {
+		cfg.AzureTTSEndpoint = v
+	}
+	if v, ok := dbConfig["audiobookshelf_url"].(string); ok {
+		cfg.AudiobookshelfURL = v
+	}
+	if v, ok := dbConfig["audiobookshelf_user"].(string); ok {
+		cfg.AudiobookshelfUser = v
+	}
+	if v, ok := dbConfig["audiobookshelf_password"].(string); ok {
+		cfg.AudiobookshelfPassword = v
+	}
+	if v, ok := dbConfig["audiobookshelf_library"].(string); ok {
+		cfg.AudiobookshelfLibrary = v
+	}
+
+	return cfg
 }

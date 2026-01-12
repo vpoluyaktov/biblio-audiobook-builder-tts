@@ -28,12 +28,18 @@ var templatesFS embed.FS
 type Server struct {
 	addr         string
 	cfg          *config.Config
+	db           ConfigDB
 	store        *JobStore
 	previewStore *PreviewStore
 	hub          *Hub
 	worker       *Worker
 	ttsService   tts.Service
 	httpServer   *http.Server
+}
+
+// ConfigDB defines the database operations needed for config persistence
+type ConfigDB interface {
+	SetConfig(key, value string) error
 }
 
 // New creates a new server instance
@@ -52,6 +58,11 @@ func New(addr string, cfg *config.Config, ttsService tts.Service) *Server {
 		worker:       worker,
 		ttsService:   ttsService,
 	}
+}
+
+// SetDB sets the database for config persistence
+func (s *Server) SetDB(db ConfigDB) {
+	s.db = db
 }
 
 // Start starts the HTTP server

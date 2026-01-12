@@ -2,6 +2,8 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 
 	"abb_tts/internal/audiobookshelf"
@@ -127,7 +129,37 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 	s.cfg.AudiobookshelfPassword = req.AudiobookshelfPassword
 	s.cfg.AudiobookshelfLibrary = req.AudiobookshelfLibrary
 
-	// TODO: Persist to database when storage is integrated
+	// Persist to database if available
+	if s.db != nil {
+		configs := map[string]string{
+			"log_file":                  req.LogFile,
+			"output_dir":                req.OutputDir,
+			"temp_dir":                  req.TempDir,
+			"default_voice":             req.DefaultVoice,
+			"default_provider":          req.DefaultProvider,
+			"server_port":               req.ServerPort,
+			"server_host":               req.ServerHost,
+			"open_browser":              fmt.Sprintf("%t", req.OpenBrowser),
+			"bit_rate_kbs":              fmt.Sprintf("%d", req.BitRateKbs),
+			"sample_rate_hz":            fmt.Sprintf("%d", req.SampleRateHz),
+			"default_speed":             fmt.Sprintf("%.2f", req.DefaultSpeed),
+			"default_pitch":             fmt.Sprintf("%.2f", req.DefaultPitch),
+			"chapter_gap_seconds":       fmt.Sprintf("%d", req.ChapterGapSeconds),
+			"pronunciation_dict_file":   req.PronunciationDictFile,
+			"use_default_pronunciation": fmt.Sprintf("%t", req.UseDefaultPronunciation),
+			"max_file_size_mb":          fmt.Sprintf("%d", req.MaxFileSizeMB),
+			"audiobookshelf_url":        req.AudiobookshelfURL,
+			"audiobookshelf_user":       req.AudiobookshelfUser,
+			"audiobookshelf_password":   req.AudiobookshelfPassword,
+			"audiobookshelf_library":    req.AudiobookshelfLibrary,
+		}
+
+		for key, value := range configs {
+			if err := s.db.SetConfig(key, value); err != nil {
+				log.Printf("Warning: Failed to save config %s: %v", key, err)
+			}
+		}
+	}
 
 	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "saved"})
 }
