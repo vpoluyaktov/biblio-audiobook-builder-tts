@@ -23,7 +23,9 @@ cloud_api_key: ""
 google_tts_endpoint: ""
 azure_tts_endpoint: ""
 
-# Audiobookshelf integration
+# Audiobookshelf integration (optional)
+# When configured, completed M4B files are automatically uploaded
+# Example: audiobookshelf_url: "http://localhost:13378"
 audiobookshelf_url: ""
 audiobookshelf_user: "admin"
 audiobookshelf_password: ""
