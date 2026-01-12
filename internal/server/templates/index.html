@@ -13,9 +13,14 @@
                 <span class="icon">🎧</span>
                 Audiobook Builder TTS
             </h1>
-            <div class="connection-status">
-                <span class="status-dot" id="status-dot"></span>
-                <span id="status-text">Connecting...</span>
+            <div class="header-actions">
+                <button class="btn btn-icon" id="settings-btn" title="Settings">
+                    ⚙️
+                </button>
+                <div class="connection-status">
+                    <span class="status-dot" id="status-dot"></span>
+                    <span id="status-text">Connecting...</span>
+                </div>
             </div>
         </header>
 
@@ -145,6 +150,186 @@
     </div>
 
     <div class="toast-container" id="toast-container"></div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="settings-modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-content settings-modal">
+            <div class="modal-header">
+                <h2>⚙️ Settings</h2>
+                <button class="modal-close" id="settings-close">×</button>
+            </div>
+            <div class="settings-tabs">
+                <button class="tab-btn active" data-tab="general">General</button>
+                <button class="tab-btn" data-tab="tts">TTS Settings</button>
+                <button class="tab-btn" data-tab="output">Output</button>
+                <button class="tab-btn" data-tab="audiobookshelf">Audiobookshelf</button>
+            </div>
+            <div class="settings-body">
+                <!-- General Tab -->
+                <div class="tab-content active" id="tab-general">
+                    <div class="settings-section">
+                        <h3>🖥️ Server Settings</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="cfg-server-host">Server Host</label>
+                                <input type="text" id="cfg-server-host" placeholder="0.0.0.0">
+                            </div>
+                            <div class="form-group">
+                                <label for="cfg-server-port">Server Port</label>
+                                <input type="text" id="cfg-server-port" placeholder="8080">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="cfg-open-browser">
+                                Open browser on startup
+                            </label>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h3>📁 Directories</h3>
+                        <div class="form-group">
+                            <label for="cfg-output-dir">Output Directory</label>
+                            <input type="text" id="cfg-output-dir" placeholder="./output">
+                        </div>
+                        <div class="form-group">
+                            <label for="cfg-temp-dir">Temp Directory</label>
+                            <input type="text" id="cfg-temp-dir" placeholder="./temp">
+                        </div>
+                        <div class="form-group">
+                            <label for="cfg-log-file">Log File</label>
+                            <input type="text" id="cfg-log-file" placeholder="abb_tts.log">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TTS Settings Tab -->
+                <div class="tab-content" id="tab-tts">
+                    <div class="settings-section">
+                        <h3>🎤 Default TTS Settings</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="cfg-default-provider">Default Provider</label>
+                                <select id="cfg-default-provider">
+                                    <option value="espeak">eSpeak</option>
+                                    <option value="piper">Piper</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="cfg-default-voice">Default Voice</label>
+                                <input type="text" id="cfg-default-voice" placeholder="en-US">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="cfg-default-speed">Default Speed</label>
+                                <input type="number" id="cfg-default-speed" min="0.5" max="2.0" step="0.1" value="1.0">
+                            </div>
+                            <div class="form-group">
+                                <label for="cfg-default-pitch">Default Pitch</label>
+                                <input type="number" id="cfg-default-pitch" min="0.5" max="2.0" step="0.1" value="1.0">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h3>📖 Pronunciation</h3>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="cfg-use-default-pronunciation" checked>
+                                Use default pronunciation rules (Mr. → Mister, etc.)
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label for="cfg-pronunciation-dict">Custom Pronunciation Dictionary</label>
+                            <input type="text" id="cfg-pronunciation-dict" placeholder="Path to dictionary file (optional)">
+                            <small>Format: pattern → replacement (one per line)</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Output Tab -->
+                <div class="tab-content" id="tab-output">
+                    <div class="settings-section">
+                        <h3>🎵 Audio Settings</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="cfg-bit-rate">Bit Rate (kbps)</label>
+                                <select id="cfg-bit-rate">
+                                    <option value="64">64 kbps</option>
+                                    <option value="96">96 kbps</option>
+                                    <option value="128" selected>128 kbps</option>
+                                    <option value="192">192 kbps</option>
+                                    <option value="256">256 kbps</option>
+                                    <option value="320">320 kbps</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="cfg-sample-rate">Sample Rate (Hz)</label>
+                                <select id="cfg-sample-rate">
+                                    <option value="22050">22050 Hz</option>
+                                    <option value="44100" selected>44100 Hz</option>
+                                    <option value="48000">48000 Hz</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h3>📚 M4B Settings</h3>
+                        <div class="form-group">
+                            <label for="cfg-chapter-gap">Gap Between Chapters (seconds)</label>
+                            <input type="number" id="cfg-chapter-gap" min="0" max="10" value="2">
+                            <small>Silence duration inserted between chapters</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="cfg-max-file-size">Max File Size (MB)</label>
+                            <input type="number" id="cfg-max-file-size" min="100" max="4000" value="2000">
+                            <small>Books larger than this will be split into multiple parts</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Audiobookshelf Tab -->
+                <div class="tab-content" id="tab-audiobookshelf">
+                    <div class="settings-section">
+                        <h3>📚 Audiobookshelf Integration</h3>
+                        <p class="section-description">
+                            Configure automatic upload to your Audiobookshelf server after conversion completes.
+                        </p>
+                        <div class="form-group">
+                            <label for="cfg-abs-url">Server URL</label>
+                            <input type="text" id="cfg-abs-url" placeholder="http://localhost:13378">
+                            <small>Leave empty to disable auto-upload</small>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="cfg-abs-user">Username</label>
+                                <input type="text" id="cfg-abs-user" placeholder="admin">
+                            </div>
+                            <div class="form-group">
+                                <label for="cfg-abs-password">Password</label>
+                                <input type="password" id="cfg-abs-password" placeholder="••••••••">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="cfg-abs-library">Library Name</label>
+                            <input type="text" id="cfg-abs-library" placeholder="TTS Books">
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-secondary" id="test-abs-connection">
+                                🔌 Test Connection
+                            </button>
+                            <span class="connection-result" id="abs-connection-result"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="settings-cancel">Cancel</button>
+                <button class="btn btn-primary" id="settings-save">💾 Save Settings</button>
+            </div>
+        </div>
+    </div>
 
     <script src="/assets/app.js"></script>
 </body>

@@ -11,6 +11,7 @@ class App {
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 10;
         this.reconnectDelay = 1000;
+        this.settings = {};
 
         this.init();
     }
@@ -65,6 +66,17 @@ class App {
 
         // Toast container
         this.toastContainer = document.getElementById('toast-container');
+
+        // Settings modal elements
+        this.settingsBtn = document.getElementById('settings-btn');
+        this.settingsModal = document.getElementById('settings-modal');
+        this.settingsClose = document.getElementById('settings-close');
+        this.settingsCancel = document.getElementById('settings-cancel');
+        this.settingsSave = document.getElementById('settings-save');
+        this.settingsTabs = document.querySelectorAll('.tab-btn');
+        this.tabContents = document.querySelectorAll('.tab-content');
+        this.testAbsBtn = document.getElementById('test-abs-connection');
+        this.absConnectionResult = document.getElementById('abs-connection-result');
     }
 
     bindEvents() {
@@ -94,6 +106,23 @@ class App {
         // Preview section events
         this.closePreviewBtn.addEventListener('click', () => this.closePreview());
         this.confirmConvertBtn.addEventListener('click', () => this.confirmConvert());
+
+        // Settings modal events
+        this.settingsBtn.addEventListener('click', () => this.openSettings());
+        this.settingsClose.addEventListener('click', () => this.closeSettings());
+        this.settingsCancel.addEventListener('click', () => this.closeSettings());
+        this.settingsSave.addEventListener('click', () => this.saveSettings());
+        this.settingsModal.querySelector('.modal-overlay').addEventListener('click', () => this.closeSettings());
+        
+        // Settings tabs
+        this.settingsTabs.forEach(tab => {
+            tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
+        });
+
+        // Test Audiobookshelf connection
+        if (this.testAbsBtn) {
+            this.testAbsBtn.addEventListener('click', () => this.testAudiobookshelfConnection());
+        }
     }
 
     // WebSocket connection
@@ -623,6 +652,169 @@ class App {
             alert(`Output files available at:\n${data.output_path}\n\nFiles:\n${files}`);
         } catch (e) {
             this.showToast('Failed to get download info: ' + e.message, 'error');
+        }
+    }
+
+    // Settings Methods
+    async openSettings() {
+        await this.loadSettings();
+        this.populateSettingsForm();
+        this.settingsModal.classList.add('active');
+    }
+
+    closeSettings() {
+        this.settingsModal.classList.remove('active');
+        this.absConnectionResult.textContent = '';
+        this.absConnectionResult.className = 'connection-result';
+    }
+
+    switchTab(tabName) {
+        // Update tab buttons
+        this.settingsTabs.forEach(tab => {
+            tab.classList.toggle('active', tab.dataset.tab === tabName);
+        });
+        
+        // Update tab content
+        this.tabContents.forEach(content => {
+            content.classList.toggle('active', content.id === `tab-${tabName}`);
+        });
+    }
+
+    async loadSettings() {
+        try {
+            const response = await fetch('/api/settings');
+            if (response.ok) {
+                this.settings = await response.json();
+            }
+        } catch (e) {
+            console.error('Failed to load settings:', e);
+            this.showToast('Failed to load settings', 'error');
+        }
+    }
+
+    populateSettingsForm() {
+        const s = this.settings;
+        
+        // General tab
+        document.getElementById('cfg-server-host').value = s.server_host || '0.0.0.0';
+        document.getElementById('cfg-server-port').value = s.server_port || '8080';
+        document.getElementById('cfg-open-browser').checked = s.open_browser !== false;
+        document.getElementById('cfg-output-dir').value = s.output_dir || './output';
+        document.getElementById('cfg-temp-dir').value = s.temp_dir || './temp';
+        document.getElementById('cfg-log-file').value = s.log_file || 'abb_tts.log';
+        
+        // TTS tab
+        document.getElementById('cfg-default-provider').value = s.default_provider || 'espeak';
+        document.getElementById('cfg-default-voice').value = s.default_voice || 'en-US';
+        document.getElementById('cfg-default-speed').value = s.default_speed || 1.0;
+        document.getElementById('cfg-default-pitch').value = s.default_pitch || 1.0;
+        document.getElementById('cfg-use-default-pronunciation').checked = s.use_default_pronunciation !== false;
+        document.getElementById('cfg-pronunciation-dict').value = s.pronunciation_dict_file || '';
+        
+        // Output tab
+        document.getElementById('cfg-bit-rate').value = s.bit_rate_kbs || 128;
+        document.getElementById('cfg-sample-rate').value = s.sample_rate_hz || 44100;
+        document.getElementById('cfg-chapter-gap').value = s.chapter_gap_seconds || 2;
+        document.getElementById('cfg-max-file-size').value = s.max_file_size_mb || 2000;
+        
+        // Audiobookshelf tab
+        document.getElementById('cfg-abs-url').value = s.audiobookshelf_url || '';
+        document.getElementById('cfg-abs-user').value = s.audiobookshelf_user || 'admin';
+        document.getElementById('cfg-abs-password').value = s.audiobookshelf_password || '';
+        document.getElementById('cfg-abs-library').value = s.audiobookshelf_library || 'TTS Books';
+    }
+
+    collectSettingsForm() {
+        return {
+            // General
+            server_host: document.getElementById('cfg-server-host').value,
+            server_port: document.getElementById('cfg-server-port').value,
+            open_browser: document.getElementById('cfg-open-browser').checked,
+            output_dir: document.getElementById('cfg-output-dir').value,
+            temp_dir: document.getElementById('cfg-temp-dir').value,
+            log_file: document.getElementById('cfg-log-file').value,
+            
+            // TTS
+            default_provider: document.getElementById('cfg-default-provider').value,
+            default_voice: document.getElementById('cfg-default-voice').value,
+            default_speed: parseFloat(document.getElementById('cfg-default-speed').value),
+            default_pitch: parseFloat(document.getElementById('cfg-default-pitch').value),
+            use_default_pronunciation: document.getElementById('cfg-use-default-pronunciation').checked,
+            pronunciation_dict_file: document.getElementById('cfg-pronunciation-dict').value,
+            
+            // Output
+            bit_rate_kbs: parseInt(document.getElementById('cfg-bit-rate').value),
+            sample_rate_hz: parseInt(document.getElementById('cfg-sample-rate').value),
+            chapter_gap_seconds: parseInt(document.getElementById('cfg-chapter-gap').value),
+            max_file_size_mb: parseInt(document.getElementById('cfg-max-file-size').value),
+            
+            // Audiobookshelf
+            audiobookshelf_url: document.getElementById('cfg-abs-url').value,
+            audiobookshelf_user: document.getElementById('cfg-abs-user').value,
+            audiobookshelf_password: document.getElementById('cfg-abs-password').value,
+            audiobookshelf_library: document.getElementById('cfg-abs-library').value
+        };
+    }
+
+    async saveSettings() {
+        try {
+            const settings = this.collectSettingsForm();
+            
+            const response = await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings)
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to save settings');
+            }
+
+            this.settings = settings;
+            this.closeSettings();
+            this.showToast('Settings saved successfully', 'success');
+            
+            // Reload config to update defaults
+            await this.loadConfig();
+        } catch (e) {
+            this.showToast('Failed to save settings: ' + e.message, 'error');
+        }
+    }
+
+    async testAudiobookshelfConnection() {
+        const url = document.getElementById('cfg-abs-url').value;
+        const user = document.getElementById('cfg-abs-user').value;
+        const password = document.getElementById('cfg-abs-password').value;
+
+        if (!url) {
+            this.absConnectionResult.textContent = '❌ Please enter a server URL';
+            this.absConnectionResult.className = 'connection-result error';
+            return;
+        }
+
+        this.absConnectionResult.textContent = '⏳ Testing...';
+        this.absConnectionResult.className = 'connection-result';
+
+        try {
+            const response = await fetch('/api/settings/test-audiobookshelf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, user, password })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                this.absConnectionResult.textContent = '✅ Connection successful!';
+                this.absConnectionResult.className = 'connection-result success';
+            } else {
+                this.absConnectionResult.textContent = '❌ ' + (data.error || 'Connection failed');
+                this.absConnectionResult.className = 'connection-result error';
+            }
+        } catch (e) {
+            this.absConnectionResult.textContent = '❌ ' + e.message;
+            this.absConnectionResult.className = 'connection-result error';
         }
     }
 

@@ -250,6 +250,8 @@ Flags:
 | Gap Between Chapters | ✅ Done | Configurable silence padding (chapter_gap_seconds) |
 | Pronunciation Dictionary | ✅ Done | Regex-based text fixes with default rules |
 | Multi-Part Audiobooks | ✅ Done | Split large books based on max_file_size_mb |
+| SQLite Storage Layer | ✅ Done | Config and job persistence with SQLite |
+| Settings UI | ✅ Done | Multi-tab configuration modal (General, TTS, Output, Audiobookshelf) |
 
 ### In Progress 🔄
 
