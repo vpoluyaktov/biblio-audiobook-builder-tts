@@ -13,6 +13,7 @@ import (
 	"abb_tts/internal/audio"
 	"abb_tts/internal/audiobookshelf"
 	"abb_tts/internal/config"
+	"abb_tts/internal/logger"
 	"abb_tts/internal/parser"
 	"abb_tts/internal/tts"
 )
@@ -41,15 +42,15 @@ func NewWorker(store *JobStore, hub *Hub, ttsService tts.Service, cfg *config.Co
 		for _, rule := range tts.GetDefaultRules() {
 			pronunciation.AddRule(rule.Pattern, rule.Replacement)
 		}
-		log.Printf("Loaded %d default pronunciation rules", pronunciation.RuleCount())
+		logger.Info("Loaded %d default pronunciation rules", pronunciation.RuleCount())
 	}
 
 	// Load custom dictionary if specified
 	if cfg.PronunciationDictFile != "" {
 		if err := pronunciation.LoadFromFile(cfg.PronunciationDictFile); err != nil {
-			log.Printf("Warning: Failed to load pronunciation dictionary: %v", err)
+			logger.Warn("Failed to load pronunciation dictionary: %v", err)
 		} else {
-			log.Printf("Loaded pronunciation dictionary from %s", cfg.PronunciationDictFile)
+			logger.Info("Loaded pronunciation dictionary from %s", cfg.PronunciationDictFile)
 		}
 	}
 
@@ -101,7 +102,7 @@ func (w *Worker) processLoop() {
 
 // processJob handles a single conversion job
 func (w *Worker) processJob(job *Job) {
-	log.Printf("Processing job %s: %s", job.ID, job.FileName)
+	logger.Info("Processing job %s: %s", job.ID, job.FileName)
 
 	// Parse the book
 	job.SetStatus(JobStatusParsing)
@@ -137,11 +138,11 @@ func (w *Worker) processJob(job *Job) {
 
 	m4bFile, err := w.buildM4B(job, book, chapterFiles)
 	if err != nil {
-		log.Printf("Warning: M4B build failed: %v (chapter files still available)", err)
+		logger.Warn("M4B build failed: %v (chapter files still available)", err)
 		// Don't fail the job, chapter files are still available
 	} else {
 		job.M4BFile = m4bFile
-		log.Printf("M4B file created: %s", m4bFile)
+		logger.Info("M4B file created: %s", m4bFile)
 
 		// Upload to Audiobookshelf if configured
 		if w.cfg.AudiobookshelfURL != "" && m4bFile != "" {
@@ -149,10 +150,10 @@ func (w *Worker) processJob(job *Job) {
 			w.broadcastJobUpdate(job)
 
 			if err := w.uploadToAudiobookshelf(job, book); err != nil {
-				log.Printf("Warning: Audiobookshelf upload failed: %v", err)
+				logger.Warn("Audiobookshelf upload failed: %v", err)
 				// Don't fail the job, M4B file is still available locally
 			} else {
-				log.Printf("Uploaded to Audiobookshelf: %s", book.Title)
+				logger.Info("Uploaded to Audiobookshelf: %s", book.Title)
 			}
 		}
 	}
@@ -162,7 +163,7 @@ func (w *Worker) processJob(job *Job) {
 	job.SetProgress(1.0, "", len(book.Chapters))
 	w.broadcastJobCompleted(job)
 
-	log.Printf("Job %s completed: %s", job.ID, outputDir)
+	logger.Info("Job %s completed: %s", job.ID, outputDir)
 }
 
 // parseBook parses the ebook file
@@ -218,9 +219,9 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 		textFileName := fmt.Sprintf("%02d_%s.txt", i+1, sanitizeFileName(chapter.Title))
 		textFilePath := filepath.Join(outputDir, textFileName)
 		if err := os.WriteFile(textFilePath, []byte(content), 0644); err != nil {
-			log.Printf("Warning: Failed to save chapter text file '%s': %v", textFileName, err)
+			logger.Warn("Failed to save chapter text file '%s': %v", textFileName, err)
 		} else {
-			log.Printf("Saved chapter text: %s", textFileName)
+			logger.Debug("Saved chapter text: %s", textFileName)
 		}
 
 		// Convert chapter
@@ -231,7 +232,7 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 			Pitch:    job.Pitch,
 		})
 		if err != nil {
-			log.Printf("Warning: Failed to convert chapter '%s': %v", chapter.Title, err)
+			logger.Warn("Failed to convert chapter '%s': %v", chapter.Title, err)
 			continue // Skip failed chapters but continue with others
 		}
 
@@ -241,19 +242,19 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 
 		outputFile, err := os.Create(outputPath)
 		if err != nil {
-			log.Printf("Warning: Failed to create output file for chapter '%s': %v", chapter.Title, err)
+			logger.Warn("Failed to create output file for chapter '%s': %v", chapter.Title, err)
 			continue
 		}
 
 		if _, err := outputFile.ReadFrom(reader); err != nil {
 			outputFile.Close()
-			log.Printf("Warning: Failed to write audio for chapter '%s': %v", chapter.Title, err)
+			logger.Warn("Failed to write audio for chapter '%s': %v", chapter.Title, err)
 			continue
 		}
 		outputFile.Close()
 
 		chapterFiles = append(chapterFiles, outputPath)
-		log.Printf("Converted chapter %d/%d: %s", i+1, totalChapters, chapter.Title)
+		logger.Debug("Converted chapter %d/%d: %s", i+1, totalChapters, chapter.Title)
 	}
 
 	return outputDir, chapterFiles, nil
@@ -284,7 +285,7 @@ func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (s
 	}
 
 	if len(parts) > 1 {
-		log.Printf("Book will be split into %d parts", len(parts))
+		logger.Info("Book will be split into %d parts", len(parts))
 	}
 
 	// Prepare M4B options
@@ -378,7 +379,7 @@ func (w *Worker) uploadToAudiobookshelf(job *Job, book *parser.Book) error {
 
 	// Upload with progress callback
 	progressCallback := func(fileID int, fileName string, size int64, pos int64, percent int) {
-		log.Printf("Upload progress: %s - %d%%", fileName, percent)
+		logger.Debug("Upload progress: %s - %d%%", fileName, percent)
 	}
 
 	if err := client.UploadBook(ab, libraryID, folderID, progressCallback); err != nil {
@@ -387,7 +388,7 @@ func (w *Worker) uploadToAudiobookshelf(job *Job, book *parser.Book) error {
 
 	// Trigger library scan
 	if err := client.ScanLibrary(libraryID); err != nil {
-		log.Printf("Warning: Failed to trigger library scan: %v", err)
+		logger.Warn("Failed to trigger library scan: %v", err)
 		// Don't fail, upload was successful
 	}
 

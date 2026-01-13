@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"abb_tts/internal/logger"
 	"abb_tts/internal/opds"
 	"abb_tts/internal/parser"
 	"abb_tts/internal/storage"
@@ -151,7 +151,7 @@ func (s *Server) createOPDSSource(w http.ResponseWriter, r *http.Request, db OPD
 		return
 	}
 
-	log.Printf("Created OPDS source: %s (%s)", source.Name, source.URL)
+	logger.Info("Created OPDS source: %s (%s)", source.Name, source.URL)
 	s.jsonResponse(w, http.StatusCreated, source)
 }
 
@@ -221,7 +221,7 @@ func (s *Server) updateOPDSSource(w http.ResponseWriter, r *http.Request, db OPD
 		return
 	}
 
-	log.Printf("Updated OPDS source: %s", source.Name)
+	logger.Info("Updated OPDS source: %s", source.Name)
 	s.jsonResponse(w, http.StatusOK, source)
 }
 
@@ -242,7 +242,7 @@ func (s *Server) deleteOPDSSource(w http.ResponseWriter, r *http.Request, db OPD
 		return
 	}
 
-	log.Printf("Deleted OPDS source: %s", source.Name)
+	logger.Info("Deleted OPDS source: %s", source.Name)
 	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
@@ -433,7 +433,7 @@ func (s *Server) handleOPDSDownload(w http.ResponseWriter, r *http.Request) {
 	// Store the temp path in the preview for later use
 	preview.FilePath = tempPath
 
-	log.Printf("Downloaded and parsed OPDS book: %s (%d chapters)", preview.BookTitle, preview.TotalChapters)
+	logger.Info("Downloaded and parsed OPDS book: %s (%d chapters)", preview.BookTitle, preview.TotalChapters)
 
 	s.jsonResponse(w, http.StatusOK, preview)
 }
@@ -508,7 +508,7 @@ func (s *Server) handleOPDSConvert(w http.ResponseWriter, r *http.Request) {
 		Payload: job.Clone(),
 	})
 
-	log.Printf("Created job %s from OPDS book %s", job.ID, preview.BookTitle)
+	logger.Info("Created job %s from OPDS book %s", job.ID, preview.BookTitle)
 
 	s.jsonResponse(w, http.StatusCreated, job.Clone())
 }

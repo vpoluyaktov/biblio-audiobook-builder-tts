@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"abb_tts/internal/config"
+	"abb_tts/internal/logger"
 	"abb_tts/internal/server"
 	"abb_tts/internal/storage"
 	"abb_tts/internal/tts"
@@ -22,34 +22,6 @@ import (
 
 	"golang.org/x/term"
 )
-
-// LogLevel represents logging verbosity
-type LogLevel int
-
-const (
-	LogLevelDebug LogLevel = iota
-	LogLevelInfo
-	LogLevelWarn
-	LogLevelError
-)
-
-var currentLogLevel = LogLevelInfo
-
-// parseLogLevel converts a string to LogLevel
-func parseLogLevel(level string) LogLevel {
-	switch strings.ToUpper(level) {
-	case "DEBUG":
-		return LogLevelDebug
-	case "INFO":
-		return LogLevelInfo
-	case "WARN", "WARNING":
-		return LogLevelWarn
-	case "ERROR":
-		return LogLevelError
-	default:
-		return LogLevelInfo
-	}
-}
 
 func main() {
 	// Customize usage
@@ -82,24 +54,24 @@ func main() {
 	flag.Parse()
 
 	// Set log level
-	currentLogLevel = parseLogLevel(*logLevel)
+	logger.SetLevelFromString(*logLevel)
 
 	// Initialize database
 	db, err := storage.NewDB(*dbPath)
 	if err != nil {
-		log.Fatalf("Failed to open database: %v", err)
+		logger.Fatal("Failed to open database: %v", err)
 	}
 	defer db.Close()
 
 	// Initialize database with defaults if empty
 	if err := db.InitializeDefaults(); err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
+		logger.Fatal("Failed to initialize database: %v", err)
 	}
 
 	// Load configuration from database
 	dbConfig, err := db.GetAllConfig()
 	if err != nil {
-		log.Fatalf("Failed to load configuration from database: %v", err)
+		logger.Fatal("Failed to load configuration from database: %v", err)
 	}
 
 	// Convert to app config
@@ -135,9 +107,9 @@ func main() {
 	if cfg.LogFile != "" {
 		logFile, err := os.OpenFile(cfg.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err != nil {
-			log.Printf("Warning: Failed to open log file: %v", err)
+			logger.Warn("Failed to open log file: %v", err)
 		} else {
-			log.SetOutput(logFile)
+			logger.SetOutput(logFile)
 			defer logFile.Close()
 		}
 	}
@@ -151,12 +123,12 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-sigChan
-		log.Println("Shutdown signal received")
+		logger.Info("Shutdown signal received")
 		cancel()
 	}()
 
 	// Create TTS service
-	log.Printf("Creating TTS service with OpenTTS URL: '%s'", cfg.OpenTTSURL)
+	logger.Debug("Creating TTS service with OpenTTS URL: '%s'", cfg.OpenTTSURL)
 	ttsService := tts.NewService(cfg)
 
 	// Create and start server
@@ -176,7 +148,7 @@ func main() {
 	// Check if server failed to start
 	select {
 	case err := <-errChan:
-		log.Fatalf("Server failed to start: %v", err)
+		logger.Fatal("Server failed to start: %v", err)
 	default:
 		// Server started successfully
 	}
@@ -196,7 +168,7 @@ func main() {
 		// Run TUI - it will handle shutdown
 		go func() {
 			if err := tui.RunTUI(url, srv.GetStore(), ttsService, srv.GetHub()); err != nil {
-				log.Printf("TUI error: %v", err)
+				logger.Error("TUI error: %v", err)
 			}
 			// TUI exited, trigger shutdown
 			cancel()
@@ -210,19 +182,19 @@ func main() {
 	// Wait for shutdown signal or server error
 	select {
 	case <-ctx.Done():
-		log.Println("Shutting down server...")
+		logger.Info("Shutting down server...")
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownCancel()
 		if err := srv.Stop(shutdownCtx); err != nil {
-			log.Printf("Server shutdown error: %v", err)
+			logger.Error("Server shutdown error: %v", err)
 		}
 	case err := <-errChan:
 		if err != nil {
-			log.Fatalf("Server error: %v", err)
+			logger.Fatal("Server error: %v", err)
 		}
 	}
 
-	log.Println("Server stopped")
+	logger.Info("Server stopped")
 }
 
 // openBrowser opens the default browser to the given URL
@@ -237,11 +209,11 @@ func openBrowser(url string) {
 	case "windows":
 		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
 	default:
-		log.Printf("Cannot open browser on %s", runtime.GOOS)
+		logger.Warn("Cannot open browser on %s", runtime.GOOS)
 		return
 	}
 
 	if err := cmd.Start(); err != nil {
-		log.Printf("Failed to open browser: %v", err)
+		logger.Warn("Failed to open browser: %v", err)
 	}
 }

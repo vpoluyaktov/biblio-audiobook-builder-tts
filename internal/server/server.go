@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"abb_tts/internal/config"
+	"abb_tts/internal/logger"
 	"abb_tts/internal/parser"
 	"abb_tts/internal/tts"
 )
@@ -117,7 +117,7 @@ func (s *Server) Start() error {
 		Handler: mux,
 	}
 
-	log.Printf("Server starting on %s", s.addr)
+	logger.Info("Server starting on %s", s.addr)
 	return s.httpServer.ListenAndServe()
 }
 
@@ -137,7 +137,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	data, err := templatesFS.ReadFile("templates/index.html")
 	if err != nil {
 		http.Error(w, "Error loading page", http.StatusInternalServerError)
-		log.Printf("Template error: %v", err)
+		logger.Error("Template error: %v", err)
 		return
 	}
 
@@ -398,7 +398,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		Payload: job.Clone(),
 	})
 
-	log.Printf("Created job %s for file %s", job.ID, header.Filename)
+	logger.Info("Created job %s for file %s", job.ID, header.Filename)
 
 	s.jsonResponse(w, http.StatusCreated, job.Clone())
 }
@@ -645,7 +645,7 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 	// Create preview
 	preview := s.previewStore.CreatePreview(book, header.Filename)
 
-	log.Printf("Created preview %s for %s (%d chapters, %d words)",
+	logger.Info("Created preview %s for %s (%d chapters, %d words)",
 		preview.ID, preview.BookTitle, preview.TotalChapters, preview.TotalWords)
 
 	s.jsonResponse(w, http.StatusOK, preview)
@@ -790,7 +790,7 @@ func (s *Server) handleTestVoice(w http.ResponseWriter, r *http.Request) {
 
 	audioReader, err := adapter.ConvertToSpeech(req.Text, req.Voice, options, nil)
 	if err != nil {
-		log.Printf("TTS conversion failed: %v", err)
+		logger.Error("TTS conversion failed: %v", err)
 		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("TTS conversion failed: %v", err))
 		return
 	}
