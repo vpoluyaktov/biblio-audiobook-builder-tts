@@ -15,6 +15,7 @@ import (
 
 // Pre-compiled regex patterns for HTML to text conversion (performance optimization)
 var (
+	reHead     = regexp.MustCompile(`(?is)<head[^>]*>.*?</head>`)
 	reScript   = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
 	reStyle    = regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`)
 	reBlock    = regexp.MustCompile(`(?i)</(p|div|br|h[1-6]|li|tr)>`)
@@ -166,8 +167,13 @@ func (p *epubParser) ParseEpub(r io.Reader) (*Book, error) {
 
 	if tocType == "ncx" {
 		chapters, _ := parseNCXChapters(tocBytes)
-		for _, ch := range chapters {
-			chapterText := readEPUBChapterContent(zipReader, baseDir, ch.Href)
+		for i, ch := range chapters {
+			// Get next chapter href to determine end boundary (if in same file)
+			var nextHref string
+			if i < len(chapters)-1 {
+				nextHref = chapters[i+1].Href
+			}
+			chapterText := readEPUBChapterContentWithBoundary(zipReader, baseDir, ch.Href, nextHref)
 			book.Chapters = append(book.Chapters, Chapter{
 				Title:   ch.Title,
 				Content: chapterText,
@@ -175,8 +181,13 @@ func (p *epubParser) ParseEpub(r io.Reader) (*Book, error) {
 		}
 	} else if tocType == "nav" {
 		chapters, _ := parseNavChapters(tocBytes)
-		for _, ch := range chapters {
-			chapterText := readEPUBChapterContent(zipReader, baseDir, ch.Href)
+		for i, ch := range chapters {
+			// Get next chapter href to determine end boundary (if in same file)
+			var nextHref string
+			if i < len(chapters)-1 {
+				nextHref = chapters[i+1].Href
+			}
+			chapterText := readEPUBChapterContentWithBoundary(zipReader, baseDir, ch.Href, nextHref)
 			book.Chapters = append(book.Chapters, Chapter{
 				Title:   ch.Title,
 				Content: chapterText,
@@ -275,9 +286,16 @@ func parseNavChapters(nav []byte) ([]tocChapter, error) {
 }
 
 func readEPUBChapterContent(zr *zip.Reader, baseDir, href string) string {
+	return readEPUBChapterContentWithBoundary(zr, baseDir, href, "")
+}
+
+// readEPUBChapterContentWithBoundary reads chapter content with optional end boundary
+// Based on Python EBook_audiobook_creator fetch_chapters_text logic
+func readEPUBChapterContentWithBoundary(zr *zip.Reader, baseDir, href, nextHref string) string {
 	// href may be "file.xhtml#anchor"
 	parts := strings.SplitN(href, "#", 2)
-	file := filepath.Join(baseDir, parts[0])
+	fileName := parts[0]
+	file := filepath.Join(baseDir, fileName)
 	f, err := findFile(zr, file)
 	if err != nil {
 		return ""
@@ -289,19 +307,38 @@ func readEPUBChapterContent(zr *zip.Reader, baseDir, href string) string {
 
 	html := string(contentBytes)
 
-	// If there's an anchor, try to extract just that section
+	// Determine start position from current anchor
+	var startPos int
 	if len(parts) > 1 && parts[1] != "" {
 		anchor := parts[1]
-		html = extractAnchorSection(html, anchor)
+		startPos = findAnchorPosition(html, anchor)
 	}
 
+	// Determine end position from next chapter anchor (only if in same file)
+	endPos := len(html)
+	if nextHref != "" {
+		nextParts := strings.SplitN(nextHref, "#", 2)
+		nextFileName := nextParts[0]
+		// Only set end boundary if next chapter is in the same file
+		if nextFileName == fileName && len(nextParts) > 1 && nextParts[1] != "" {
+			nextAnchor := nextParts[1]
+			nextPos := findAnchorPosition(html, nextAnchor)
+			if nextPos > startPos {
+				endPos = nextPos
+			}
+		}
+	}
+
+	// Extract the chapter HTML
+	chapterHTML := html[startPos:endPos]
+
 	// Convert HTML to plain text
-	return htmlToText(html)
+	return htmlToText(chapterHTML)
 }
 
-// extractAnchorSection extracts content starting from an anchor ID
-// Based on Python fetch_chapters_text logic
-func extractAnchorSection(html, anchor string) string {
+// findAnchorPosition finds the position of an anchor ID in HTML
+// Returns the position of the opening tag containing the ID
+func findAnchorPosition(html, anchor string) int {
 	// Find the element with this ID
 	idPattern := fmt.Sprintf(`id="%s"`, anchor)
 	idPos := strings.Index(html, idPattern)
@@ -311,16 +348,16 @@ func extractAnchorSection(html, anchor string) string {
 		idPos = strings.Index(html, idPattern)
 	}
 	if idPos == -1 {
-		return html // anchor not found, return full content
+		return 0 // anchor not found, return start
 	}
 
 	// Find the start of the tag containing this ID
 	tagStart := strings.LastIndex(html[:idPos], "<")
 	if tagStart == -1 {
-		return html[idPos:]
+		return idPos
 	}
 
-	return html[tagStart:]
+	return tagStart
 }
 
 func findFile(zr *zip.Reader, name string) (io.Reader, error) {
@@ -377,6 +414,9 @@ func extractCoverHref(pkg epubPackage, baseDir string) string {
 // Based on Python html2text library behavior
 // Uses pre-compiled regex patterns for performance
 func htmlToText(html string) string {
+	// Remove head section (contains title, meta, etc.)
+	html = reHead.ReplaceAllString(html, "")
+
 	// Remove script and style tags with content
 	html = reScript.ReplaceAllString(html, "")
 	html = reStyle.ReplaceAllString(html, "")

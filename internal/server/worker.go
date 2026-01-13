@@ -214,6 +214,15 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 			content = w.pronunciation.Apply(content)
 		}
 
+		// Save chapter text file for debugging
+		textFileName := fmt.Sprintf("%02d_%s.txt", i+1, sanitizeFileName(chapter.Title))
+		textFilePath := filepath.Join(outputDir, textFileName)
+		if err := os.WriteFile(textFilePath, []byte(content), 0644); err != nil {
+			log.Printf("Warning: Failed to save chapter text file '%s': %v", textFileName, err)
+		} else {
+			log.Printf("Saved chapter text: %s", textFileName)
+		}
+
 		// Convert chapter
 		reader, err := w.ttsService.ConvertToSpeech(content, &tts.ConversionOptions{
 			Voice:    job.Voice,

@@ -188,14 +188,24 @@ func (p *fb2Parser) addFB2Sections(book *Book, sections []fb2Section, depth int)
 		}
 
 		// Extract text content, excluding nested sections
+		// The section.Content contains innerxml which includes nested <section> tags
+		// fb2TreeToText already removes <section>...</section> blocks via regex
 		content := fb2TreeToText(section.Content)
 
-		book.Chapters = append(book.Chapters, Chapter{
-			Title:    strings.TrimSpace(title),
-			Content:  content,
-			ID:       fmt.Sprintf("section_%d_%d", depth, i),
-			TOCDepth: depth,
-		})
+		// Only add chapter if it has actual content (not just title)
+		// Sections that only contain nested sections should not be added as separate chapters
+		hasNestedSections := len(section.Sections) > 0
+		contentIsEmpty := strings.TrimSpace(content) == "" || strings.TrimSpace(content) == strings.TrimSpace(title)
+
+		if !contentIsEmpty || !hasNestedSections {
+			// Add this section as a chapter if it has content OR if it has no nested sections
+			book.Chapters = append(book.Chapters, Chapter{
+				Title:    strings.TrimSpace(title),
+				Content:  content,
+				ID:       fmt.Sprintf("section_%d_%d", depth, i),
+				TOCDepth: depth,
+			})
+		}
 
 		// Recursively process nested sections if within depth limit
 		if depth < p.TOCMaxDepth && len(section.Sections) > 0 {
@@ -213,7 +223,15 @@ func fb2TreeToText(xmlContent string) string {
 	}
 
 	// Remove nested section tags (we process them separately)
-	text := reFB2Section.ReplaceAllString(xmlContent, "")
+	// Must loop to handle deeply nested sections since regex can't handle arbitrary nesting
+	text := xmlContent
+	for {
+		newText := reFB2Section.ReplaceAllString(text, "")
+		if newText == text {
+			break // No more sections to remove
+		}
+		text = newText
+	}
 
 	// Handle special elements
 	text = reFB2Table.ReplaceAllString(text, "\nTable omitted.\n")
