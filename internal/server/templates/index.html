@@ -387,6 +387,27 @@
                 <!-- Cloud TTS Tab -->
                 <div class="tab-content" id="tab-cloud">
                     <div class="settings-section">
+                        <h3>🤖 OpenAI TTS</h3>
+                        <p class="section-description">
+                            Configure OpenAI Text-to-Speech API for natural-sounding voices.
+                            Get your API key from the <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>.
+                        </p>
+                        <div class="form-group">
+                            <label for="cfg-openai-api-key">OpenAI API Key</label>
+                            <input type="password" id="cfg-openai-api-key" placeholder="sk-...">
+                            <small>Your OpenAI API key with TTS access</small>
+                        </div>
+                        <div class="settings-subsection">
+                            <h4>🎤 Available Voices</h4>
+                            <p class="voice-list">alloy, echo, fable, onyx, nova, shimmer</p>
+                            <h4>💰 Pricing (per 1 million characters)</h4>
+                            <ul class="pricing-list">
+                                <li><strong>tts-1 (Standard):</strong> $15.00</li>
+                                <li><strong>tts-1-hd (HD):</strong> $30.00</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="settings-section">
                         <h3>☁️ Google Cloud TTS</h3>
                         <p class="section-description">
                             Configure Google Cloud Text-to-Speech API for high-quality voices.
@@ -397,7 +418,7 @@
                             <input type="password" id="cfg-google-api-key" placeholder="AIza...">
                             <small>Enable the Cloud Text-to-Speech API in your Google Cloud project</small>
                         </div>
-                        <div class="settings-section">
+                        <div class="settings-subsection">
                             <h4>💰 Pricing (per 1 million characters)</h4>
                             <ul class="pricing-list">
                                 <li><strong>Standard voices:</strong> $4.00</li>

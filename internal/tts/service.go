@@ -66,6 +66,14 @@ func NewService(cfg *config.Config) Service {
 		log.Printf("OpenTTS URL not configured, skipping OpenTTS provider")
 	}
 
+	// Initialize OpenAI TTS if API key is configured
+	if cfg.OpenAIAPIKey != "" {
+		log.Printf("Initializing OpenAI TTS provider")
+		s.providers["openai"] = NewOpenAIProvider(cfg.OpenAIAPIKey)
+	} else {
+		log.Printf("OpenAI API key not configured, skipping OpenAI provider")
+	}
+
 	// Initialize other cloud providers if configured (legacy support)
 	if cfg.CloudAPIKey != "" {
 		if cfg.AzureTTSEndpoint != "" {
@@ -151,6 +159,11 @@ func (s *service) GetVoicesFiltered(providerName, language, model string) []Voic
 			return op.GetVoicesFiltered(language, model)
 		}
 
+		// Check if provider supports filtering (OpenAIProvider does)
+		if oap, ok := provider.(*OpenAIProvider); ok {
+			return oap.GetVoicesFiltered(language, model)
+		}
+
 		// For other providers, get all voices and filter manually
 		allVoices := provider.GetAvailableVoices()
 		for _, v := range allVoices {
@@ -201,6 +214,11 @@ func (s *service) GetAvailableLanguages(providerName string) []string {
 			return op.GetAvailableLanguages()
 		}
 
+		// Check if provider has GetAvailableLanguages method (OpenAI)
+		if oap, ok := provider.(*OpenAIProvider); ok {
+			return oap.GetAvailableLanguages()
+		}
+
 		// For other providers, extract from voices
 		for _, v := range provider.GetAvailableVoices() {
 			langMap[v.Language] = true
@@ -239,6 +257,11 @@ func (s *service) GetAvailableModels(providerName string) []string {
 		// Check if provider is OpenTTS - use engines as models
 		if op, ok := provider.(*OpenTTSProvider); ok {
 			return op.GetAvailableEngines()
+		}
+
+		// Check if provider is OpenAI - use models
+		if oap, ok := provider.(*OpenAIProvider); ok {
+			return oap.GetAvailableModels()
 		}
 
 		// For other providers, extract from voices
@@ -282,6 +305,11 @@ func (s *service) ReloadProviders() {
 	// Initialize OpenTTS if URL is configured
 	if s.cfg.OpenTTSURL != "" {
 		s.providers["opentts"] = NewOpenTTSProvider(s.cfg.OpenTTSURL)
+	}
+
+	// Initialize OpenAI TTS if API key is configured
+	if s.cfg.OpenAIAPIKey != "" {
+		s.providers["openai"] = NewOpenAIProvider(s.cfg.OpenAIAPIKey)
 	}
 
 	// Initialize other cloud providers if configured (legacy support)

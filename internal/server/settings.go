@@ -35,6 +35,7 @@ type SettingsRequest struct {
 	MaxFileSizeMB     int `json:"max_file_size_mb"`
 
 	// Cloud TTS
+	OpenAIAPIKey string `json:"openai_api_key"`
 	GoogleAPIKey string `json:"google_api_key"`
 
 	// OpenTTS
@@ -90,6 +91,7 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 		MaxFileSizeMB:     s.cfg.MaxFileSizeMB,
 
 		// Cloud TTS
+		OpenAIAPIKey: s.cfg.OpenAIAPIKey,
 		GoogleAPIKey: s.cfg.GoogleAPIKey,
 
 		// OpenTTS
@@ -191,6 +193,9 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Cloud TTS
+	if wasProvided("openai_api_key") {
+		s.cfg.OpenAIAPIKey = req.OpenAIAPIKey
+	}
 	if wasProvided("google_api_key") {
 		s.cfg.GoogleAPIKey = req.GoogleAPIKey
 	}
@@ -240,6 +245,7 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 			"audiobookshelf_user":       {req.AudiobookshelfUser, wasProvided("audiobookshelf_user")},
 			"audiobookshelf_password":   {req.AudiobookshelfPassword, wasProvided("audiobookshelf_password")},
 			"audiobookshelf_library":    {req.AudiobookshelfLibrary, wasProvided("audiobookshelf_library")},
+			"openai_api_key":            {req.OpenAIAPIKey, wasProvided("openai_api_key")},
 			"google_api_key":            {req.GoogleAPIKey, wasProvided("google_api_key")},
 			"opentts_url":               {req.OpenTTSURL, wasProvided("opentts_url")},
 		}
