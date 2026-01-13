@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"github.com/gdamore/tcell/v2"
 	"github.com/vpoluyaktov/tview"
-	"github.com/vpoluyaktov/abb_tts/internal/dto"
-	"github.com/vpoluyaktov/abb_tts/internal/mq"
-	parser "github.com/vpoluyaktov/abb_tts/internal/parser"
-	"github.com/vpoluyaktov/abb_tts/internal/tts"
+	"abb_tts/internal/dto"
+	"abb_tts/internal/mq"
+	parser "abb_tts/internal/parser"
+	"abb_tts/internal/tts"
 )
 
 type BookPage struct {

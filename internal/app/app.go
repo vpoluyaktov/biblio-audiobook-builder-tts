@@ -1,9 +1,9 @@
 package app
 
 import (
-	"github.com/vpoluyaktov/abb_tts/internal/config"
-	"github.com/vpoluyaktov/abb_tts/internal/parser"
-	"github.com/vpoluyaktov/abb_tts/internal/tts"
+	"abb_tts/internal/config"
+	"abb_tts/internal/parser"
+	"abb_tts/internal/tts"
 )
 
 // App represents the main application

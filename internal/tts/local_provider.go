@@ -17,7 +17,7 @@ type LocalProvider struct {
 func NewLocalProvider(engine string) Provider {
 	return &LocalProvider{
 		BaseProvider: BaseProvider{name: "local"},
-		engine:      engine,
+		engine:       engine,
 	}
 }
 
@@ -43,12 +43,17 @@ func (p *LocalProvider) GetAvailableVoices() []Voice {
 }
 
 // ConvertToSpeech converts text to speech using the local engine
+// Note: This method handles a single chunk of text. Use Adapter for automatic chunking.
 func (p *LocalProvider) ConvertToSpeech(text string, voice string, options *ConversionOptions) (io.Reader, error) {
 	var cmd *exec.Cmd
+	var stderr bytes.Buffer
 
 	switch p.engine {
 	case "espeak":
-		cmd = exec.Command("espeak", "-v", voice, "-w", "-", text)
+		// Use --stdin to read text from stdin instead of command line
+		// This avoids "argument list too long" errors for large texts
+		cmd = exec.Command("espeak", "-v", voice, "-w", "/dev/stdout", "--stdin")
+		cmd.Stdin = bytes.NewBufferString(text)
 	case "festival":
 		cmd = exec.Command("festival", "--tts")
 		cmd.Stdin = bytes.NewBufferString(text)
@@ -56,9 +61,10 @@ func (p *LocalProvider) ConvertToSpeech(text string, voice string, options *Conv
 		return nil, fmt.Errorf("unsupported TTS engine: %s", p.engine)
 	}
 
+	cmd.Stderr = &stderr
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("TTS conversion failed: %v", err)
+		return nil, fmt.Errorf("TTS conversion failed: %v (stderr: %s)", err, stderr.String())
 	}
 
 	return bytes.NewReader(output), nil

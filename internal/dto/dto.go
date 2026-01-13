@@ -1,7 +1,7 @@
 package dto
 
 import (
-	"github.com/vpoluyaktov/abb_tts/internal/parser"
+	"abb_tts/internal/parser"
 )
 
 // Base interface for all DTOs

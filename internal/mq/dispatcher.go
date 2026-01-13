@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vpoluyaktov/abb_tts/internal/dto"
-	"github.com/vpoluyaktov/abb_tts/internal/monitoring"
+	"abb_tts/internal/dto"
+	"abb_tts/internal/monitoring"
 )
 
 type Dispatcher struct {
