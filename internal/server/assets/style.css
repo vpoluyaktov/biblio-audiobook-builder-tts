@@ -680,6 +680,45 @@ h1 .icon {
     color: var(--warning);
 }
 
+.cost-single {
+    background: var(--bg-tertiary);
+    padding: 1.5rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.cost-details {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.cost-provider-label {
+    font-size: 1rem;
+    color: var(--text-secondary);
+}
+
+.cost-value-large {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--success);
+}
+
+.cost-value-large.paid {
+    color: var(--warning);
+}
+
+.cost-value-large.free {
+    color: var(--success);
+}
+
+.cost-note {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
 .chapter-list {
     max-height: 300px;
     overflow-y: auto;

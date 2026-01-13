@@ -12,6 +12,9 @@ type Service interface {
 	ConvertToSpeech(text string, options *ConversionOptions) (io.Reader, error)
 	ConvertToSpeechWithProgress(text string, options *ConversionOptions, progressCb ProgressCallback) (io.Reader, error)
 	GetAvailableVoices() []Voice
+	GetVoicesFiltered(provider, language, model string) []Voice
+	GetAvailableLanguages(provider string) []string
+	GetAvailableModels(provider string) []string
 	GetAvailableProviders() []string
 	GetAdapter(providerName string) (*Adapter, error)
 	ReloadProviders()
@@ -116,6 +119,128 @@ func (s *service) GetAvailableProviders() []string {
 		providers = append(providers, name)
 	}
 	return providers
+}
+
+// GetVoicesFiltered returns voices filtered by provider, language, and model
+func (s *service) GetVoicesFiltered(providerName, language, model string) []Voice {
+	var voices []Voice
+
+	// If provider is specified, only get voices from that provider
+	if providerName != "" {
+		provider, exists := s.providers[providerName]
+		if !exists {
+			return voices
+		}
+
+		// Check if provider supports filtering (GoogleProvider does)
+		if gp, ok := provider.(*GoogleProvider); ok {
+			return gp.GetVoicesFiltered(language, model)
+		}
+
+		// For other providers, get all voices and filter manually
+		allVoices := provider.GetAvailableVoices()
+		for _, v := range allVoices {
+			matchLang := language == "" || v.Language == language
+			matchModel := model == "" || extractModelType(v.ID) == model
+			if matchLang && matchModel {
+				voices = append(voices, v)
+			}
+		}
+		return voices
+	}
+
+	// Get voices from all providers and filter
+	for _, provider := range s.providers {
+		if gp, ok := provider.(*GoogleProvider); ok {
+			voices = append(voices, gp.GetVoicesFiltered(language, model)...)
+		} else {
+			allVoices := provider.GetAvailableVoices()
+			for _, v := range allVoices {
+				matchLang := language == "" || v.Language == language
+				matchModel := model == "" || extractModelType(v.ID) == model
+				if matchLang && matchModel {
+					voices = append(voices, v)
+				}
+			}
+		}
+	}
+	return voices
+}
+
+// GetAvailableLanguages returns available languages for a provider
+func (s *service) GetAvailableLanguages(providerName string) []string {
+	langMap := make(map[string]bool)
+
+	if providerName != "" {
+		provider, exists := s.providers[providerName]
+		if !exists {
+			return []string{}
+		}
+
+		// Check if provider has GetAvailableLanguages method
+		if gp, ok := provider.(*GoogleProvider); ok {
+			return gp.GetAvailableLanguages()
+		}
+
+		// For other providers, extract from voices
+		for _, v := range provider.GetAvailableVoices() {
+			langMap[v.Language] = true
+		}
+	} else {
+		// Get from all providers
+		for _, provider := range s.providers {
+			for _, v := range provider.GetAvailableVoices() {
+				langMap[v.Language] = true
+			}
+		}
+	}
+
+	languages := make([]string, 0, len(langMap))
+	for lang := range langMap {
+		languages = append(languages, lang)
+	}
+	return languages
+}
+
+// GetAvailableModels returns available model types for a provider
+func (s *service) GetAvailableModels(providerName string) []string {
+	modelMap := make(map[string]bool)
+
+	if providerName != "" {
+		provider, exists := s.providers[providerName]
+		if !exists {
+			return []string{}
+		}
+
+		// Check if provider has GetAvailableModels method
+		if gp, ok := provider.(*GoogleProvider); ok {
+			return gp.GetAvailableModels()
+		}
+
+		// For other providers, extract from voices
+		for _, v := range provider.GetAvailableVoices() {
+			model := extractModelType(v.ID)
+			if model != "" {
+				modelMap[model] = true
+			}
+		}
+	} else {
+		// Get from all providers
+		for _, provider := range s.providers {
+			for _, v := range provider.GetAvailableVoices() {
+				model := extractModelType(v.ID)
+				if model != "" {
+					modelMap[model] = true
+				}
+			}
+		}
+	}
+
+	models := make([]string, 0, len(modelMap))
+	for model := range modelMap {
+		models = append(models, model)
+	}
+	return models
 }
 
 // ReloadProviders reinitializes providers based on current config

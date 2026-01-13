@@ -80,7 +80,7 @@ func Load(configFile string) (*Config, error) {
 	viper.SetDefault("audiobookshelf_url", "")
 	viper.SetDefault("audiobookshelf_user", "admin")
 	viper.SetDefault("audiobookshelf_password", "")
-	viper.SetDefault("audiobookshelf_library", "TTS Books")
+	viper.SetDefault("audiobookshelf_library", "TTS books")
 
 	if configFile != "" {
 		viper.SetConfigFile(configFile)

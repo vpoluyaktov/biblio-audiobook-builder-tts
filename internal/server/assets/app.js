@@ -34,6 +34,8 @@ class App {
         this.fileSizeEl = document.getElementById('file-size');
         this.removeFileBtn = document.getElementById('remove-file');
         this.providerSelect = document.getElementById('provider');
+        this.languageSelect = document.getElementById('language');
+        this.modelSelect = document.getElementById('model');
         this.voiceSelect = document.getElementById('voice');
         this.speedInput = document.getElementById('speed');
         this.speedValue = document.getElementById('speed-value');
@@ -88,8 +90,13 @@ class App {
         this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
         this.removeFileBtn.addEventListener('click', () => this.clearSelectedFile());
 
-        // Provider change
-        this.providerSelect.addEventListener('change', () => this.loadVoices());
+        // Cascading dropdown changes
+        this.providerSelect.addEventListener('change', () => {
+            this.loadLanguages();
+            this.updateCostEstimate();
+        });
+        this.languageSelect.addEventListener('change', () => this.loadModels());
+        this.modelSelect.addEventListener('change', () => this.loadVoices());
 
         // Range inputs
         this.speedInput.addEventListener('input', () => {
@@ -222,26 +229,97 @@ class App {
                 `<option value="${p}" ${p === data.default ? 'selected' : ''}>${p}</option>`
             ).join('');
 
-            await this.loadVoices();
+            await this.loadLanguages();
         } catch (e) {
             console.error('Failed to load providers:', e);
+        }
+    }
+
+    async loadLanguages() {
+        try {
+            const provider = this.providerSelect.value;
+            const response = await fetch(`/api/languages?provider=${provider}`);
+            const data = await response.json();
+            const languages = data.languages || [];
+
+            // Sort languages alphabetically
+            languages.sort();
+
+            if (languages.length === 0) {
+                this.languageSelect.innerHTML = '<option value="">No languages available</option>';
+                this.modelSelect.innerHTML = '<option value="">Select language first</option>';
+                this.voiceSelect.innerHTML = '<option value="">Select model first</option>';
+                return;
+            }
+
+            // Default to en-US if available, otherwise first language
+            const defaultLang = languages.includes('en-US') ? 'en-US' : languages[0];
+
+            this.languageSelect.innerHTML = languages.map(lang => 
+                `<option value="${lang}" ${lang === defaultLang ? 'selected' : ''}>${lang}</option>`
+            ).join('');
+
+            await this.loadModels();
+        } catch (e) {
+            console.error('Failed to load languages:', e);
+        }
+    }
+
+    async loadModels() {
+        try {
+            const provider = this.providerSelect.value;
+            const response = await fetch(`/api/models?provider=${provider}`);
+            const data = await response.json();
+            const models = data.models || [];
+
+            // Sort models by quality (custom order)
+            const modelOrder = ['Chirp3-HD', 'Studio', 'Neural2', 'Wavenet', 'Standard'];
+            models.sort((a, b) => {
+                const aIdx = modelOrder.indexOf(a);
+                const bIdx = modelOrder.indexOf(b);
+                if (aIdx === -1 && bIdx === -1) return a.localeCompare(b);
+                if (aIdx === -1) return 1;
+                if (bIdx === -1) return -1;
+                return aIdx - bIdx;
+            });
+
+            if (models.length === 0) {
+                this.modelSelect.innerHTML = '<option value="">No models available</option>';
+                this.voiceSelect.innerHTML = '<option value="">Select model first</option>';
+                return;
+            }
+
+            this.modelSelect.innerHTML = models.map(model => 
+                `<option value="${model}">${model}</option>`
+            ).join('');
+
+            await this.loadVoices();
+        } catch (e) {
+            console.error('Failed to load models:', e);
         }
     }
 
     async loadVoices() {
         try {
             const provider = this.providerSelect.value;
-            const response = await fetch(`/api/voices?provider=${provider}`);
+            const language = this.languageSelect.value;
+            const model = this.modelSelect.value;
+            
+            const response = await fetch(`/api/voices?provider=${provider}&language=${language}&model=${model}`);
             const data = await response.json();
             this.voices = data.voices || [];
 
-            this.voiceSelect.innerHTML = this.voices.map(v => 
-                `<option value="${v.ID}" ${v.ID === data.default ? 'selected' : ''}>${v.Name} (${v.Language})</option>`
-            ).join('');
-
             if (this.voices.length === 0) {
                 this.voiceSelect.innerHTML = '<option value="">No voices available</option>';
+                return;
             }
+
+            // Sort voices by name
+            this.voices.sort((a, b) => a.Name.localeCompare(b.Name));
+
+            this.voiceSelect.innerHTML = this.voices.map(v => 
+                `<option value="${v.ID}" ${v.ID === data.default ? 'selected' : ''}>${v.Name}</option>`
+            ).join('');
         } catch (e) {
             console.error('Failed to load voices:', e);
         }
@@ -420,17 +498,8 @@ class App {
         this.previewWords.textContent = this.formatNumber(preview.total_words);
         this.previewDuration.textContent = preview.estimated_duration_formatted;
 
-        // Set cost estimates
-        this.previewCosts.innerHTML = Object.entries(preview.cost_estimates)
-            .sort((a, b) => a[1].cost - b[1].cost)
-            .map(([provider, cost]) => `
-                <div class="cost-item">
-                    <span class="cost-provider">${provider}</span>
-                    <span class="cost-value ${cost.cost > 0 ? 'paid' : ''}">
-                        ${cost.cost === 0 ? 'Free' : '$' + cost.cost.toFixed(2)}
-                    </span>
-                </div>
-            `).join('');
+        // Update cost estimate for current selection
+        this.updateCostEstimate();
 
         // Set chapter list
         this.previewChapterList.innerHTML = preview.chapters.map((ch, i) => `
@@ -447,6 +516,48 @@ class App {
 
     closePreview() {
         this.previewSection.style.display = 'none';
+    }
+
+    async updateCostEstimate() {
+        // Only update if preview is visible and we have character count
+        if (!this.currentPreview || this.previewSection.style.display === 'none') {
+            return;
+        }
+
+        const provider = this.providerSelect.value;
+        const chars = this.currentPreview.total_characters || 0;
+
+        if (!provider) {
+            this.previewCosts.innerHTML = '<div class="cost-item"><span>Select a provider to see pricing</span></div>';
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/pricing?provider=${provider}&chars=${chars}`);
+            const data = await response.json();
+
+            if (!data.models || data.models.length === 0) {
+                // Local provider (free)
+                this.previewCosts.innerHTML = `
+                    <div class="cost-item">
+                        <span class="cost-provider">${provider}</span>
+                        <span class="cost-value">Free</span>
+                    </div>
+                `;
+                return;
+            }
+
+            // Display all models sorted by cost
+            this.previewCosts.innerHTML = data.models.map(m => `
+                <div class="cost-item">
+                    <span class="cost-provider">${m.model}</span>
+                    <span class="cost-value paid">$${m.cost.toFixed(2)}</span>
+                </div>
+            `).join('');
+        } catch (e) {
+            console.error('Failed to fetch pricing:', e);
+            this.previewCosts.innerHTML = '<div class="cost-item"><span>Unable to fetch pricing</span></div>';
+        }
     }
 
     async confirmConvert() {

@@ -8,12 +8,16 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // GoogleProvider implements TTS using Google Cloud Text-to-Speech API
 type GoogleProvider struct {
 	BaseProvider
-	apiKey string
+	apiKey       string
+	cachedVoices []Voice
+	lastFetch    time.Time
+	cacheTTL     time.Duration
 }
 
 // GoogleTTSRequest represents the request body for Google Cloud TTS API
@@ -58,14 +62,32 @@ type GoogleTTSErrorResponse struct {
 	} `json:"error"`
 }
 
-// Google Cloud TTS API endpoint
-const googleTTSEndpoint = "https://texttospeech.googleapis.com/v1/text:synthesize"
+// GoogleVoicesListResponse represents the response from voices.list API
+type GoogleVoicesListResponse struct {
+	Voices []GoogleVoiceInfo `json:"voices"`
+}
+
+// GoogleVoiceInfo represents a single voice from the API
+type GoogleVoiceInfo struct {
+	LanguageCodes          []string `json:"languageCodes"`
+	Name                   string   `json:"name"`
+	SsmlGender             string   `json:"ssmlGender"`
+	NaturalSampleRateHertz int      `json:"naturalSampleRateHertz"`
+}
+
+// Google Cloud TTS API endpoints
+const (
+	googleTTSEndpoint    = "https://texttospeech.googleapis.com/v1/text:synthesize"
+	googleVoicesEndpoint = "https://texttospeech.googleapis.com/v1/voices"
+	defaultVoiceCacheTTL = 1 * time.Hour
+)
 
 // NewGoogleProvider creates a new Google Cloud TTS provider
 func NewGoogleProvider(apiKey string) Provider {
 	return &GoogleProvider{
 		BaseProvider: BaseProvider{name: "google"},
 		apiKey:       apiKey,
+		cacheTTL:     defaultVoiceCacheTTL,
 	}
 }
 
@@ -74,67 +96,218 @@ func (p *GoogleProvider) GetName() string {
 	return "google"
 }
 
-// GetAvailableVoices returns available Google Cloud TTS voices
-// This is a curated list of popular voices - the full list has 400+ voices
+// GetAvailableVoices returns all available Google Cloud TTS voices from the API
+// Results are cached for cacheTTL duration to avoid excessive API calls
 func (p *GoogleProvider) GetAvailableVoices() []Voice {
-	return []Voice{
-		// English (US) - Standard voices (cheaper)
-		{ID: "en-US-Standard-A", Name: "Standard A (Female)", Language: "en-US", Gender: "female", Provider: "google"},
-		{ID: "en-US-Standard-B", Name: "Standard B (Male)", Language: "en-US", Gender: "male", Provider: "google"},
-		{ID: "en-US-Standard-C", Name: "Standard C (Female)", Language: "en-US", Gender: "female", Provider: "google"},
-		{ID: "en-US-Standard-D", Name: "Standard D (Male)", Language: "en-US", Gender: "male", Provider: "google"},
-		{ID: "en-US-Standard-E", Name: "Standard E (Female)", Language: "en-US", Gender: "female", Provider: "google"},
-		{ID: "en-US-Standard-F", Name: "Standard F (Female)", Language: "en-US", Gender: "female", Provider: "google"},
-		{ID: "en-US-Standard-G", Name: "Standard G (Female)", Language: "en-US", Gender: "female", Provider: "google"},
-		{ID: "en-US-Standard-H", Name: "Standard H (Female)", Language: "en-US", Gender: "female", Provider: "google"},
-		{ID: "en-US-Standard-I", Name: "Standard I (Male)", Language: "en-US", Gender: "male", Provider: "google"},
-		{ID: "en-US-Standard-J", Name: "Standard J (Male)", Language: "en-US", Gender: "male", Provider: "google"},
-
-		// English (US) - WaveNet voices (higher quality)
-		{ID: "en-US-Wavenet-A", Name: "WaveNet A (Male)", Language: "en-US", Gender: "male", Provider: "google"},
-		{ID: "en-US-Wavenet-B", Name: "WaveNet B (Male)", Language: "en-US", Gender: "male", Provider: "google"},
-		{ID: "en-US-Wavenet-C", Name: "WaveNet C (Female)", Language: "en-US", Gender: "female", Provider: "google"},
-		{ID: "en-US-Wavenet-D", Name: "WaveNet D (Male)", Language: "en-US", Gender: "male", Provider: "google"},
-		{ID: "en-US-Wavenet-E", Name: "WaveNet E (Female)", Language: "en-US", Gender: "female", Provider: "google"},
-		{ID: "en-US-Wavenet-F", Name: "WaveNet F (Female)", Language: "en-US", Gender: "female", Provider: "google"},
-		{ID: "en-US-Wavenet-G", Name: "WaveNet G (Female)", Language: "en-US", Gender: "female", Provider: "google"},
-		{ID: "en-US-Wavenet-H", Name: "WaveNet H (Female)", Language: "en-US", Gender: "female", Provider: "google"},
-		{ID: "en-US-Wavenet-I", Name: "WaveNet I (Male)", Language: "en-US", Gender: "male", Provider: "google"},
-		{ID: "en-US-Wavenet-J", Name: "WaveNet J (Male)", Language: "en-US", Gender: "male", Provider: "google"},
-
-		// English (US) - Neural2 voices (best quality)
-		{ID: "en-US-Neural2-A", Name: "Neural2 A (Male)", Language: "en-US", Gender: "male", Provider: "google"},
-		{ID: "en-US-Neural2-C", Name: "Neural2 C (Female)", Language: "en-US", Gender: "female", Provider: "google"},
-		{ID: "en-US-Neural2-D", Name: "Neural2 D (Male)", Language: "en-US", Gender: "male", Provider: "google"},
-		{ID: "en-US-Neural2-E", Name: "Neural2 E (Female)", Language: "en-US", Gender: "female", Provider: "google"},
-		{ID: "en-US-Neural2-F", Name: "Neural2 F (Female)", Language: "en-US", Gender: "female", Provider: "google"},
-		{ID: "en-US-Neural2-G", Name: "Neural2 G (Female)", Language: "en-US", Gender: "female", Provider: "google"},
-		{ID: "en-US-Neural2-H", Name: "Neural2 H (Female)", Language: "en-US", Gender: "female", Provider: "google"},
-		{ID: "en-US-Neural2-I", Name: "Neural2 I (Male)", Language: "en-US", Gender: "male", Provider: "google"},
-		{ID: "en-US-Neural2-J", Name: "Neural2 J (Male)", Language: "en-US", Gender: "male", Provider: "google"},
-
-		// English (US) - Studio voices (premium, most natural)
-		{ID: "en-US-Studio-M", Name: "Studio M (Male)", Language: "en-US", Gender: "male", Provider: "google"},
-		{ID: "en-US-Studio-O", Name: "Studio O (Female)", Language: "en-US", Gender: "female", Provider: "google"},
-
-		// English (GB) - British voices
-		{ID: "en-GB-Standard-A", Name: "GB Standard A (Female)", Language: "en-GB", Gender: "female", Provider: "google"},
-		{ID: "en-GB-Standard-B", Name: "GB Standard B (Male)", Language: "en-GB", Gender: "male", Provider: "google"},
-		{ID: "en-GB-Standard-C", Name: "GB Standard C (Female)", Language: "en-GB", Gender: "female", Provider: "google"},
-		{ID: "en-GB-Standard-D", Name: "GB Standard D (Male)", Language: "en-GB", Gender: "male", Provider: "google"},
-		{ID: "en-GB-Wavenet-A", Name: "GB WaveNet A (Female)", Language: "en-GB", Gender: "female", Provider: "google"},
-		{ID: "en-GB-Wavenet-B", Name: "GB WaveNet B (Male)", Language: "en-GB", Gender: "male", Provider: "google"},
-		{ID: "en-GB-Neural2-A", Name: "GB Neural2 A (Female)", Language: "en-GB", Gender: "female", Provider: "google"},
-		{ID: "en-GB-Neural2-B", Name: "GB Neural2 B (Male)", Language: "en-GB", Gender: "male", Provider: "google"},
-
-		// English (AU) - Australian voices
-		{ID: "en-AU-Standard-A", Name: "AU Standard A (Female)", Language: "en-AU", Gender: "female", Provider: "google"},
-		{ID: "en-AU-Standard-B", Name: "AU Standard B (Male)", Language: "en-AU", Gender: "male", Provider: "google"},
-		{ID: "en-AU-Wavenet-A", Name: "AU WaveNet A (Female)", Language: "en-AU", Gender: "female", Provider: "google"},
-		{ID: "en-AU-Wavenet-B", Name: "AU WaveNet B (Male)", Language: "en-AU", Gender: "male", Provider: "google"},
-		{ID: "en-AU-Neural2-A", Name: "AU Neural2 A (Female)", Language: "en-AU", Gender: "female", Provider: "google"},
-		{ID: "en-AU-Neural2-B", Name: "AU Neural2 B (Male)", Language: "en-AU", Gender: "male", Provider: "google"},
+	// Return cached voices if still valid
+	if len(p.cachedVoices) > 0 && time.Since(p.lastFetch) < p.cacheTTL {
+		return p.cachedVoices
 	}
+
+	// Fetch from API
+	voices, err := p.fetchVoicesFromAPI("")
+	if err != nil {
+		// If API call fails and we have cached voices, return them
+		if len(p.cachedVoices) > 0 {
+			return p.cachedVoices
+		}
+		// Return empty slice on error with no cache
+		return []Voice{}
+	}
+
+	p.cachedVoices = voices
+	p.lastFetch = time.Now()
+	return voices
+}
+
+// GetVoicesByLanguage returns voices filtered by language code
+func (p *GoogleProvider) GetVoicesByLanguage(languageCode string) []Voice {
+	allVoices := p.GetAvailableVoices()
+	if languageCode == "" {
+		return allVoices
+	}
+
+	filtered := make([]Voice, 0)
+	for _, v := range allVoices {
+		if v.Language == languageCode {
+			filtered = append(filtered, v)
+		}
+	}
+	return filtered
+}
+
+// GetVoicesByModel returns voices filtered by model type (e.g., "Standard", "Wavenet", "Neural2", "Studio", "Chirp3-HD")
+func (p *GoogleProvider) GetVoicesByModel(modelType string) []Voice {
+	allVoices := p.GetAvailableVoices()
+	if modelType == "" {
+		return allVoices
+	}
+
+	filtered := make([]Voice, 0)
+	for _, v := range allVoices {
+		if extractModelType(v.ID) == modelType {
+			filtered = append(filtered, v)
+		}
+	}
+	return filtered
+}
+
+// GetVoicesFiltered returns voices filtered by both language and model type
+func (p *GoogleProvider) GetVoicesFiltered(languageCode, modelType string) []Voice {
+	allVoices := p.GetAvailableVoices()
+
+	filtered := make([]Voice, 0)
+	for _, v := range allVoices {
+		matchLang := languageCode == "" || v.Language == languageCode
+		matchModel := modelType == "" || extractModelType(v.ID) == modelType
+		if matchLang && matchModel {
+			filtered = append(filtered, v)
+		}
+	}
+	return filtered
+}
+
+// GetAvailableLanguages returns a list of unique language codes from available voices
+func (p *GoogleProvider) GetAvailableLanguages() []string {
+	allVoices := p.GetAvailableVoices()
+	langMap := make(map[string]bool)
+	for _, v := range allVoices {
+		langMap[v.Language] = true
+	}
+
+	languages := make([]string, 0, len(langMap))
+	for lang := range langMap {
+		languages = append(languages, lang)
+	}
+	return languages
+}
+
+// GetAvailableModels returns a list of unique model types from available voices
+func (p *GoogleProvider) GetAvailableModels() []string {
+	allVoices := p.GetAvailableVoices()
+	modelMap := make(map[string]bool)
+	for _, v := range allVoices {
+		model := extractModelType(v.ID)
+		if model != "" {
+			modelMap[model] = true
+		}
+	}
+
+	models := make([]string, 0, len(modelMap))
+	for model := range modelMap {
+		models = append(models, model)
+	}
+	return models
+}
+
+// fetchVoicesFromAPI fetches voices from Google Cloud TTS API
+// If languageCode is provided, only voices for that language are returned
+func (p *GoogleProvider) fetchVoicesFromAPI(languageCode string) ([]Voice, error) {
+	if p.apiKey == "" {
+		return nil, fmt.Errorf("Google Cloud TTS API key not configured")
+	}
+
+	// Build URL with optional language filter
+	url := fmt.Sprintf("%s?key=%s", googleVoicesEndpoint, p.apiKey)
+	if languageCode != "" {
+		url += "&languageCode=" + languageCode
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %v", err)
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("API request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		var errorResp GoogleTTSErrorResponse
+		if err := json.Unmarshal(body, &errorResp); err == nil && errorResp.Error.Message != "" {
+			return nil, fmt.Errorf("Google TTS API error: %s (code: %d)", errorResp.Error.Message, errorResp.Error.Code)
+		}
+		return nil, fmt.Errorf("Google TTS API error: status %d", resp.StatusCode)
+	}
+
+	var voicesResp GoogleVoicesListResponse
+	if err := json.Unmarshal(body, &voicesResp); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	// Convert to Voice structs
+	voices := make([]Voice, 0, len(voicesResp.Voices))
+	for _, gv := range voicesResp.Voices {
+		// Each voice can support multiple languages, create an entry for each
+		for _, lang := range gv.LanguageCodes {
+			gender := strings.ToLower(gv.SsmlGender)
+			if gender == "ssml_voice_gender_unspecified" {
+				gender = "neutral"
+			}
+
+			modelType := extractModelType(gv.Name)
+			voiceLetter := extractVoiceLetter(gv.Name)
+			displayName := fmt.Sprintf("%s %s (%s)", modelType, voiceLetter, capitalizeFirst(gender))
+
+			voices = append(voices, Voice{
+				ID:       gv.Name,
+				Name:     displayName,
+				Language: lang,
+				Gender:   gender,
+				Provider: "google",
+			})
+		}
+	}
+
+	return voices, nil
+}
+
+// extractModelType extracts the model type from a voice name
+// e.g., "en-US-Wavenet-A" -> "Wavenet", "en-US-Chirp3-HD-Achernar" -> "Chirp3-HD"
+func extractModelType(voiceName string) string {
+	parts := strings.Split(voiceName, "-")
+	if len(parts) < 3 {
+		return ""
+	}
+
+	// Handle multi-part model names like "Chirp3-HD"
+	if len(parts) >= 4 && parts[2] == "Chirp3" && parts[3] == "HD" {
+		return "Chirp3-HD"
+	}
+
+	return parts[2]
+}
+
+// extractVoiceLetter extracts the voice identifier from a voice name
+// e.g., "en-US-Wavenet-A" -> "A", "en-US-Chirp3-HD-Achernar" -> "Achernar"
+func extractVoiceLetter(voiceName string) string {
+	parts := strings.Split(voiceName, "-")
+	if len(parts) < 4 {
+		return ""
+	}
+
+	// Handle multi-part model names like "Chirp3-HD"
+	if len(parts) >= 5 && parts[2] == "Chirp3" && parts[3] == "HD" {
+		return parts[4]
+	}
+
+	return parts[len(parts)-1]
+}
+
+// capitalizeFirst capitalizes the first letter of a string
+func capitalizeFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }
 
 // ConvertToSpeech converts text to speech using Google Cloud TTS API

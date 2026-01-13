@@ -88,6 +88,9 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/preview/", s.handlePreviewByID)
 	mux.HandleFunc("/api/providers", s.handleProviders)
 	mux.HandleFunc("/api/voices", s.handleVoices)
+	mux.HandleFunc("/api/languages", s.handleLanguages)
+	mux.HandleFunc("/api/models", s.handleModels)
+	mux.HandleFunc("/api/pricing", s.handlePricing)
 	mux.HandleFunc("/api/config", s.handleConfig)
 	mux.HandleFunc("/api/settings", s.handleSettings)
 	mux.HandleFunc("/api/settings/test-audiobookshelf", s.handleTestAudiobookshelf)
@@ -409,6 +412,7 @@ func (s *Server) handleProviders(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleVoices returns available voices for a provider
+// Supports query params: provider, language, model
 func (s *Server) handleVoices(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
 		s.handleCORS(w)
@@ -420,23 +424,93 @@ func (s *Server) handleVoices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	voices := s.ttsService.GetAvailableVoices()
-
-	// Optionally filter by provider
 	provider := r.URL.Query().Get("provider")
-	if provider != "" {
-		filtered := make([]tts.Voice, 0)
-		for _, v := range voices {
-			if v.Provider == provider {
-				filtered = append(filtered, v)
-			}
-		}
-		voices = filtered
+	language := r.URL.Query().Get("language")
+	model := r.URL.Query().Get("model")
+
+	// Use filtered method if any filter is specified
+	var voices []tts.Voice
+	if provider != "" || language != "" || model != "" {
+		voices = s.ttsService.GetVoicesFiltered(provider, language, model)
+	} else {
+		voices = s.ttsService.GetAvailableVoices()
 	}
 
 	s.jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"voices":  voices,
 		"default": s.cfg.DefaultVoice,
+	})
+}
+
+// handleLanguages returns available languages for a provider
+func (s *Server) handleLanguages(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.handleCORS(w)
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	provider := r.URL.Query().Get("provider")
+	languages := s.ttsService.GetAvailableLanguages(provider)
+
+	s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"languages": languages,
+	})
+}
+
+// handleModels returns available model types for a provider
+func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.handleCORS(w)
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	provider := r.URL.Query().Get("provider")
+	models := s.ttsService.GetAvailableModels(provider)
+
+	s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"models": models,
+	})
+}
+
+// handlePricing returns pricing for all models of a provider
+// Query params: provider, chars (character count)
+func (s *Server) handlePricing(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.handleCORS(w)
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	provider := r.URL.Query().Get("provider")
+	charsStr := r.URL.Query().Get("chars")
+
+	chars := 0
+	if charsStr != "" {
+		fmt.Sscanf(charsStr, "%d", &chars)
+	}
+
+	// Get all model pricing for this provider
+	models := GetAllModelPricing(provider, chars)
+
+	s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"provider":   provider,
+		"characters": chars,
+		"currency":   "USD",
+		"models":     models,
 	})
 }
 
