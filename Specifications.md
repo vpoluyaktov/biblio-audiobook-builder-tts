@@ -269,7 +269,7 @@ Flags:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| - | - | No features currently in progress |
+| Test Voice UI | 🔄 In Progress | Allow users to test TTS voice before conversion |
 
 ### Not Started ❌
 
@@ -284,6 +284,76 @@ Flags:
 ---
 
 ## Future Enhancements
+
+### Phase -1: Test Voice UI (High Priority)
+
+**Goal**: Allow users to test TTS voices before starting a book conversion by generating a short audio sample with custom text.
+
+#### -1.1 Feature Overview
+
+User workflow:
+1. Upload an ebook or select from OPDS catalog
+2. Select provider, language, model, and voice on the main screen
+3. Adjust speed and pitch settings
+4. Click "Test Voice" button to open test dialog
+5. In the dialog, enter custom test text and click "Generate Audio"
+6. Listen to the sample directly in the browser
+7. Close dialog and adjust settings if needed (can test again)
+8. Proceed with book preview or conversion
+
+#### -1.2 API Endpoint
+
+**New Endpoint:**
+```
+POST /api/test-voice
+```
+
+**Request:**
+```json
+{
+  "provider": "espeak",
+  "voice": "en-us",
+  "text": "Hello, this is a test of the text to speech voice.",
+  "speed": 1.0,
+  "pitch": 1.0
+}
+```
+
+**Response:**
+- Content-Type: `audio/wav` or `audio/mpeg`
+- Body: Raw audio data
+
+**Error Response:**
+```json
+{
+  "error": "TTS provider not available"
+}
+```
+
+#### -1.3 UI Component
+
+The test voice feature is accessible from the **main upload form** via a "Test Voice" button that opens a modal dialog.
+
+**Test Voice Dialog contains:**
+- Display of currently selected provider, voice, speed, and pitch
+- Text input field (default: "Hello, this is a test of the text to speech voice.")
+- "Generate Audio" button
+- Audio player (HTML5 `<audio>` element)
+- Loading indicator during generation
+- Status message (success/error)
+
+#### -1.4 Implementation Tasks
+
+- [x] Add `POST /api/test-voice` endpoint in server.go
+- [x] Create TTS test function that generates short audio sample
+- [x] Add "Test Voice" button to main upload form
+- [x] Create test voice modal dialog
+- [x] Implement generateTestVoice() in app.js
+- [x] Limit test text length (max 500 characters)
+- [x] Add loading state and error handling
+- [x] Add CSS styles for test voice modal
+
+---
 
 ### Phase 0: Book Preview & Cost Estimation (High Priority)
 
