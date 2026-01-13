@@ -94,6 +94,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/config", s.handleConfig)
 	mux.HandleFunc("/api/settings", s.handleSettings)
 	mux.HandleFunc("/api/settings/test-audiobookshelf", s.handleTestAudiobookshelf)
+	mux.HandleFunc("/api/settings/test-opentts", s.handleTestOpenTTS)
 	mux.HandleFunc("/api/ws", func(w http.ResponseWriter, r *http.Request) {
 		ServeWS(s.hub, w, r)
 	})

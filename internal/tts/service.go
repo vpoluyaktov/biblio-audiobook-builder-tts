@@ -3,6 +3,7 @@ package tts
 import (
 	"fmt"
 	"io"
+	"log"
 
 	"abb_tts/internal/config"
 )
@@ -55,6 +56,14 @@ func NewService(cfg *config.Config) Service {
 	// Initialize Google Cloud TTS if API key is configured
 	if cfg.GoogleAPIKey != "" {
 		s.providers["google"] = NewGoogleProvider(cfg.GoogleAPIKey)
+	}
+
+	// Initialize OpenTTS if URL is configured
+	if cfg.OpenTTSURL != "" {
+		log.Printf("Initializing OpenTTS provider with URL: %s", cfg.OpenTTSURL)
+		s.providers["opentts"] = NewOpenTTSProvider(cfg.OpenTTSURL)
+	} else {
+		log.Printf("OpenTTS URL not configured, skipping OpenTTS provider")
 	}
 
 	// Initialize other cloud providers if configured (legacy support)
@@ -137,6 +146,11 @@ func (s *service) GetVoicesFiltered(providerName, language, model string) []Voic
 			return gp.GetVoicesFiltered(language, model)
 		}
 
+		// Check if provider supports filtering (OpenTTSProvider does)
+		if op, ok := provider.(*OpenTTSProvider); ok {
+			return op.GetVoicesFiltered(language, model)
+		}
+
 		// For other providers, get all voices and filter manually
 		allVoices := provider.GetAvailableVoices()
 		for _, v := range allVoices {
@@ -182,6 +196,11 @@ func (s *service) GetAvailableLanguages(providerName string) []string {
 			return gp.GetAvailableLanguages()
 		}
 
+		// Check if provider has GetAvailableLanguages method (OpenTTS)
+		if op, ok := provider.(*OpenTTSProvider); ok {
+			return op.GetAvailableLanguages()
+		}
+
 		// For other providers, extract from voices
 		for _, v := range provider.GetAvailableVoices() {
 			langMap[v.Language] = true
@@ -215,6 +234,11 @@ func (s *service) GetAvailableModels(providerName string) []string {
 		// Check if provider has GetAvailableModels method
 		if gp, ok := provider.(*GoogleProvider); ok {
 			return gp.GetAvailableModels()
+		}
+
+		// Check if provider is OpenTTS - use engines as models
+		if op, ok := provider.(*OpenTTSProvider); ok {
+			return op.GetAvailableEngines()
 		}
 
 		// For other providers, extract from voices
@@ -253,6 +277,11 @@ func (s *service) ReloadProviders() {
 	// Initialize Google Cloud TTS if API key is configured
 	if s.cfg.GoogleAPIKey != "" {
 		s.providers["google"] = NewGoogleProvider(s.cfg.GoogleAPIKey)
+	}
+
+	// Initialize OpenTTS if URL is configured
+	if s.cfg.OpenTTSURL != "" {
+		s.providers["opentts"] = NewOpenTTSProvider(s.cfg.OpenTTSURL)
 	}
 
 	// Initialize other cloud providers if configured (legacy support)

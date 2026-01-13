@@ -281,18 +281,25 @@ func (c *Client) convertEntry(entry Entry, base *url.URL) CatalogEntry {
 			}
 			ce.DownloadLinks = append(ce.DownloadLinks, dl)
 		case link.Rel == "subsection" || link.Rel == "http://opds-spec.org/sort/popular" ||
-			link.Rel == "http://opds-spec.org/sort/new" || link.Rel == "alternate" ||
-			strings.Contains(link.Type, "navigation") || strings.Contains(link.Type, "opds-catalog"):
+			link.Rel == "http://opds-spec.org/sort/new" ||
+			strings.Contains(link.Type, "navigation"):
 			// This is a navigation entry
 			if ce.NavigationLink == "" {
 				ce.NavigationLink = absURL
 				ce.IsNavigation = true
 			}
-		case link.Rel == "" && strings.Contains(link.Type, "atom+xml"):
-			// Links with no rel but atom+xml type are typically navigation links
+		case link.Rel == "" && (strings.Contains(link.Type, "atom+xml") || strings.Contains(link.Type, "opds-catalog")):
+			// Links with no rel but atom+xml or opds-catalog type are typically navigation links (FreeLib style)
 			if ce.NavigationLink == "" && len(ce.DownloadLinks) == 0 {
 				ce.NavigationLink = absURL
 				ce.IsNavigation = true
+			}
+		case link.Rel == "alternate" && strings.Contains(link.Type, "opds-catalog"):
+			// Alternate links with opds-catalog type lead to book acquisition pages (Project Gutenberg style)
+			// Only treat as navigation if no download links exist yet
+			if ce.NavigationLink == "" && len(ce.DownloadLinks) == 0 {
+				ce.NavigationLink = absURL
+				// Don't set IsNavigation=true - this is a book detail page, not a folder
 			}
 		}
 	}
