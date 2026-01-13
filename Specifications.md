@@ -263,6 +263,7 @@ Flags:
 | SQLite Storage Layer | ✅ Done | Config and job persistence with SQLite |
 | Settings UI | ✅ Done | Multi-tab configuration modal (General, TTS, Output, Audiobookshelf) |
 | OPDS Client | ✅ Done | Browse OPDS catalogs, download books for conversion |
+| OpenTTS Integration | ✅ Done | Self-hosted TTS server with multiple engines (Larynx, MaryTTS, NanoTTS, etc.) |
 
 ### In Progress 🔄
 

@@ -85,6 +85,8 @@ class App {
         this.tabContents = document.querySelectorAll('.tab-content');
         this.testAbsBtn = document.getElementById('test-abs-connection');
         this.absConnectionResult = document.getElementById('abs-connection-result');
+        this.testOpenTTSBtn = document.getElementById('test-opentts-connection');
+        this.openTTSConnectionResult = document.getElementById('opentts-connection-result');
 
         // Main tab elements
         this.mainTabs = document.querySelectorAll('.main-tab');
@@ -171,6 +173,11 @@ class App {
         // Test Audiobookshelf connection
         if (this.testAbsBtn) {
             this.testAbsBtn.addEventListener('click', () => this.testAudiobookshelfConnection());
+        }
+
+        // Test OpenTTS connection
+        if (this.testOpenTTSBtn) {
+            this.testOpenTTSBtn.addEventListener('click', () => this.testOpenTTSConnection());
         }
 
         // Main tab navigation
@@ -1009,6 +1016,9 @@ class App {
         // Cloud TTS tab
         document.getElementById('cfg-google-api-key').value = s.google_api_key || '';
         
+        // OpenTTS tab
+        document.getElementById('cfg-opentts-url').value = s.opentts_url || '';
+        
         // Audiobookshelf tab
         document.getElementById('cfg-abs-url').value = s.audiobookshelf_url || '';
         document.getElementById('cfg-abs-user').value = s.audiobookshelf_user || 'admin';
@@ -1042,6 +1052,9 @@ class App {
             
             // Cloud TTS
             google_api_key: document.getElementById('cfg-google-api-key').value,
+            
+            // OpenTTS
+            opentts_url: document.getElementById('cfg-opentts-url').value,
             
             // Audiobookshelf
             audiobookshelf_url: document.getElementById('cfg-abs-url').value,
@@ -1110,6 +1123,40 @@ class App {
         } catch (e) {
             this.absConnectionResult.textContent = '❌ ' + e.message;
             this.absConnectionResult.className = 'connection-result error';
+        }
+    }
+
+    async testOpenTTSConnection() {
+        const url = document.getElementById('cfg-opentts-url').value;
+
+        if (!url) {
+            this.openTTSConnectionResult.textContent = '❌ Please enter a server URL';
+            this.openTTSConnectionResult.className = 'connection-result error';
+            return;
+        }
+
+        this.openTTSConnectionResult.textContent = '⏳ Testing...';
+        this.openTTSConnectionResult.className = 'connection-result';
+
+        try {
+            const response = await fetch('/api/settings/test-opentts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                this.openTTSConnectionResult.textContent = `✅ Connected! ${data.voice_count} voices available`;
+                this.openTTSConnectionResult.className = 'connection-result success';
+            } else {
+                this.openTTSConnectionResult.textContent = '❌ ' + (data.error || 'Connection failed');
+                this.openTTSConnectionResult.className = 'connection-result error';
+            }
+        } catch (e) {
+            this.openTTSConnectionResult.textContent = '❌ ' + e.message;
+            this.openTTSConnectionResult.className = 'connection-result error';
         }
     }
 

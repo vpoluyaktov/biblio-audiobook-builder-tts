@@ -430,3 +430,238 @@ func TestDownloadBook_WithAuth(t *testing.T) {
 		t.Errorf("expected 'authenticated content', got '%s'", data)
 	}
 }
+
+// Tests for OPDS navigation link detection
+
+func TestParseEntry_NavigationLink_Subsection(t *testing.T) {
+	// Test that subsection rel is detected as navigation
+	xmlData := []byte(`<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>tag:test</id>
+  <title>Test</title>
+  <entry>
+    <id>tag:category</id>
+    <title>Fiction</title>
+    <link rel="subsection" href="/opds/fiction" type="application/atom+xml"/>
+  </entry>
+</feed>`)
+
+	client := NewClient()
+	catalog, err := client.ParseCatalog(xmlData, "http://example.com/opds")
+	if err != nil {
+		t.Fatalf("parseCatalog failed: %v", err)
+	}
+
+	if len(catalog.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(catalog.Entries))
+	}
+
+	entry := catalog.Entries[0]
+	if !entry.IsNavigation {
+		t.Error("entry with subsection rel should be navigation")
+	}
+	if entry.NavigationLink == "" {
+		t.Error("navigation link should not be empty")
+	}
+}
+
+func TestParseEntry_NavigationLink_FreeLibStyle(t *testing.T) {
+	// Test FreeLib-style navigation: empty rel with opds-catalog type
+	xmlData := []byte(`<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>tag:test</id>
+  <title>Test</title>
+  <entry>
+    <id>tag:category</id>
+    <title>Authors</title>
+    <link href="/opds/authors" type="application/atom+xml;profile=opds-catalog"/>
+  </entry>
+</feed>`)
+
+	client := NewClient()
+	catalog, err := client.ParseCatalog(xmlData, "http://example.com/opds")
+	if err != nil {
+		t.Fatalf("parseCatalog failed: %v", err)
+	}
+
+	if len(catalog.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(catalog.Entries))
+	}
+
+	entry := catalog.Entries[0]
+	if !entry.IsNavigation {
+		t.Error("entry with empty rel and opds-catalog type should be navigation")
+	}
+	if entry.NavigationLink == "" {
+		t.Error("navigation link should not be empty")
+	}
+}
+
+func TestParseEntry_AcquisitionLink_ProjectGutenbergStyle(t *testing.T) {
+	// Test Project Gutenberg style: alternate rel with opds-catalog type should NOT be navigation folder
+	// It's a book detail page, not a folder
+	xmlData := []byte(`<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opds="http://opds-spec.org/2010/catalog">
+  <id>tag:test</id>
+  <title>Test</title>
+  <entry>
+    <id>tag:book1</id>
+    <title>A Great Book</title>
+    <author><name>John Doe</name></author>
+    <link rel="alternate" href="/ebooks/12345.opds" type="application/atom+xml;profile=opds-catalog"/>
+  </entry>
+</feed>`)
+
+	client := NewClient()
+	catalog, err := client.ParseCatalog(xmlData, "http://example.com/opds")
+	if err != nil {
+		t.Fatalf("parseCatalog failed: %v", err)
+	}
+
+	if len(catalog.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(catalog.Entries))
+	}
+
+	entry := catalog.Entries[0]
+	// Should NOT be marked as navigation (folder) - it's a book detail page
+	if entry.IsNavigation {
+		t.Error("entry with alternate rel and opds-catalog type should NOT be marked as navigation folder")
+	}
+	// But should have a navigation link to the book detail page
+	if entry.NavigationLink == "" {
+		t.Error("navigation link should be set for book detail page")
+	}
+}
+
+func TestParseEntry_AcquisitionLink_DirectDownload(t *testing.T) {
+	// Test direct acquisition links (epub, mobi, etc.)
+	xmlData := []byte(`<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opds="http://opds-spec.org/2010/catalog">
+  <id>tag:test</id>
+  <title>Test</title>
+  <entry>
+    <id>tag:book1</id>
+    <title>A Great Book</title>
+    <link rel="http://opds-spec.org/acquisition" href="/download/book.epub" type="application/epub+zip"/>
+    <link rel="http://opds-spec.org/acquisition" href="/download/book.mobi" type="application/x-mobipocket-ebook"/>
+  </entry>
+</feed>`)
+
+	client := NewClient()
+	catalog, err := client.ParseCatalog(xmlData, "http://example.com/opds")
+	if err != nil {
+		t.Fatalf("parseCatalog failed: %v", err)
+	}
+
+	if len(catalog.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(catalog.Entries))
+	}
+
+	entry := catalog.Entries[0]
+	if entry.IsNavigation {
+		t.Error("entry with acquisition links should not be navigation")
+	}
+	if len(entry.DownloadLinks) != 2 {
+		t.Errorf("expected 2 download links, got %d", len(entry.DownloadLinks))
+	}
+}
+
+func TestParseEntry_MixedLinks(t *testing.T) {
+	// Test entry with both acquisition and navigation links
+	// Acquisition links should take precedence
+	xmlData := []byte(`<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opds="http://opds-spec.org/2010/catalog">
+  <id>tag:test</id>
+  <title>Test</title>
+  <entry>
+    <id>tag:book1</id>
+    <title>A Great Book</title>
+    <link rel="http://opds-spec.org/acquisition/open-access" href="/download/book.epub" type="application/epub+zip"/>
+    <link rel="alternate" href="/ebooks/12345.opds" type="application/atom+xml;profile=opds-catalog"/>
+  </entry>
+</feed>`)
+
+	client := NewClient()
+	catalog, err := client.ParseCatalog(xmlData, "http://example.com/opds")
+	if err != nil {
+		t.Fatalf("parseCatalog failed: %v", err)
+	}
+
+	if len(catalog.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(catalog.Entries))
+	}
+
+	entry := catalog.Entries[0]
+	// Should have download links
+	if len(entry.DownloadLinks) != 1 {
+		t.Errorf("expected 1 download link, got %d", len(entry.DownloadLinks))
+	}
+	// Should NOT be marked as navigation since it has download links
+	if entry.IsNavigation {
+		t.Error("entry with acquisition links should not be marked as navigation")
+	}
+}
+
+func TestParseEntry_NavigationType(t *testing.T) {
+	// Test navigation type in link type attribute
+	xmlData := []byte(`<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>tag:test</id>
+  <title>Test</title>
+  <entry>
+    <id>tag:nav</id>
+    <title>Browse by Author</title>
+    <link href="/opds/authors" type="application/atom+xml;type=navigation"/>
+  </entry>
+</feed>`)
+
+	client := NewClient()
+	catalog, err := client.ParseCatalog(xmlData, "http://example.com/opds")
+	if err != nil {
+		t.Fatalf("parseCatalog failed: %v", err)
+	}
+
+	if len(catalog.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(catalog.Entries))
+	}
+
+	entry := catalog.Entries[0]
+	if !entry.IsNavigation {
+		t.Error("entry with navigation type should be navigation")
+	}
+}
+
+func TestParseEntry_SortLinks(t *testing.T) {
+	// Test OPDS sort links (popular, new)
+	xmlData := []byte(`<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>tag:test</id>
+  <title>Test</title>
+  <entry>
+    <id>tag:popular</id>
+    <title>Most Popular</title>
+    <link rel="http://opds-spec.org/sort/popular" href="/opds/popular" type="application/atom+xml"/>
+  </entry>
+  <entry>
+    <id>tag:new</id>
+    <title>New Releases</title>
+    <link rel="http://opds-spec.org/sort/new" href="/opds/new" type="application/atom+xml"/>
+  </entry>
+</feed>`)
+
+	client := NewClient()
+	catalog, err := client.ParseCatalog(xmlData, "http://example.com/opds")
+	if err != nil {
+		t.Fatalf("parseCatalog failed: %v", err)
+	}
+
+	if len(catalog.Entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(catalog.Entries))
+	}
+
+	for _, entry := range catalog.Entries {
+		if !entry.IsNavigation {
+			t.Errorf("entry '%s' with sort link should be navigation", entry.Title)
+		}
+	}
+}

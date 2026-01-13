@@ -156,6 +156,7 @@ func main() {
 	}()
 
 	// Create TTS service
+	log.Printf("Creating TTS service with OpenTTS URL: '%s'", cfg.OpenTTSURL)
 	ttsService := tts.NewService(cfg)
 
 	// Create and start server

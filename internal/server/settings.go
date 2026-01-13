@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 
@@ -35,6 +36,9 @@ type SettingsRequest struct {
 
 	// Cloud TTS
 	GoogleAPIKey string `json:"google_api_key"`
+
+	// OpenTTS
+	OpenTTSURL string `json:"opentts_url"`
 
 	// Audiobookshelf
 	AudiobookshelfURL      string `json:"audiobookshelf_url"`
@@ -88,6 +92,9 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 		// Cloud TTS
 		GoogleAPIKey: s.cfg.GoogleAPIKey,
 
+		// OpenTTS
+		OpenTTSURL: s.cfg.OpenTTSURL,
+
 		// Audiobookshelf
 		AudiobookshelfURL:      s.cfg.AudiobookshelfURL,
 		AudiobookshelfUser:     s.cfg.AudiobookshelfUser,
@@ -99,74 +106,149 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 // saveSettings saves configuration settings
+// Note: This uses a raw map to detect which fields were actually provided,
+// preventing accidental overwrites of unset fields.
 func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
-	var req SettingsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	// First decode into a raw map to see which fields were provided
+	var rawMap map[string]interface{}
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		s.jsonError(w, http.StatusBadRequest, "Failed to read request body")
+		return
+	}
+
+	if err := json.Unmarshal(bodyBytes, &rawMap); err != nil {
 		s.jsonError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	// Update config in memory
+	// Now decode into the struct for type safety
+	var req SettingsRequest
+	if err := json.Unmarshal(bodyBytes, &req); err != nil {
+		s.jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// Helper to check if a field was provided in the request
+	wasProvided := func(field string) bool {
+		_, ok := rawMap[field]
+		return ok
+	}
+
+	// Update config in memory - only update fields that were provided
 	// General
-	s.cfg.ServerHost = req.ServerHost
-	s.cfg.ServerPort = req.ServerPort
-	s.cfg.OpenBrowser = req.OpenBrowser
-	s.cfg.OutputDir = req.OutputDir
-	s.cfg.TempDir = req.TempDir
-	s.cfg.LogFile = req.LogFile
+	if wasProvided("server_host") {
+		s.cfg.ServerHost = req.ServerHost
+	}
+	if wasProvided("server_port") {
+		s.cfg.ServerPort = req.ServerPort
+	}
+	if wasProvided("open_browser") {
+		s.cfg.OpenBrowser = req.OpenBrowser
+	}
+	if wasProvided("output_dir") {
+		s.cfg.OutputDir = req.OutputDir
+	}
+	if wasProvided("temp_dir") {
+		s.cfg.TempDir = req.TempDir
+	}
+	if wasProvided("log_file") {
+		s.cfg.LogFile = req.LogFile
+	}
 
 	// TTS
-	s.cfg.DefaultProvider = req.DefaultProvider
-	s.cfg.DefaultVoice = req.DefaultVoice
-	s.cfg.DefaultSpeed = req.DefaultSpeed
-	s.cfg.DefaultPitch = req.DefaultPitch
-	s.cfg.UseDefaultPronunciation = req.UseDefaultPronunciation
-	s.cfg.PronunciationDictFile = req.PronunciationDictFile
+	if wasProvided("default_provider") {
+		s.cfg.DefaultProvider = req.DefaultProvider
+	}
+	if wasProvided("default_voice") {
+		s.cfg.DefaultVoice = req.DefaultVoice
+	}
+	if wasProvided("default_speed") {
+		s.cfg.DefaultSpeed = req.DefaultSpeed
+	}
+	if wasProvided("default_pitch") {
+		s.cfg.DefaultPitch = req.DefaultPitch
+	}
+	if wasProvided("use_default_pronunciation") {
+		s.cfg.UseDefaultPronunciation = req.UseDefaultPronunciation
+	}
+	if wasProvided("pronunciation_dict_file") {
+		s.cfg.PronunciationDictFile = req.PronunciationDictFile
+	}
 
 	// Output
-	s.cfg.BitRateKbs = req.BitRateKbs
-	s.cfg.SampleRateHz = req.SampleRateHz
-	s.cfg.ChapterGapSeconds = req.ChapterGapSeconds
-	s.cfg.MaxFileSizeMB = req.MaxFileSizeMB
+	if wasProvided("bit_rate_kbs") {
+		s.cfg.BitRateKbs = req.BitRateKbs
+	}
+	if wasProvided("sample_rate_hz") {
+		s.cfg.SampleRateHz = req.SampleRateHz
+	}
+	if wasProvided("chapter_gap_seconds") {
+		s.cfg.ChapterGapSeconds = req.ChapterGapSeconds
+	}
+	if wasProvided("max_file_size_mb") {
+		s.cfg.MaxFileSizeMB = req.MaxFileSizeMB
+	}
 
 	// Cloud TTS
-	s.cfg.GoogleAPIKey = req.GoogleAPIKey
+	if wasProvided("google_api_key") {
+		s.cfg.GoogleAPIKey = req.GoogleAPIKey
+	}
+
+	// OpenTTS
+	if wasProvided("opentts_url") {
+		s.cfg.OpenTTSURL = req.OpenTTSURL
+	}
 
 	// Audiobookshelf
-	s.cfg.AudiobookshelfURL = req.AudiobookshelfURL
-	s.cfg.AudiobookshelfUser = req.AudiobookshelfUser
-	s.cfg.AudiobookshelfPassword = req.AudiobookshelfPassword
-	s.cfg.AudiobookshelfLibrary = req.AudiobookshelfLibrary
+	if wasProvided("audiobookshelf_url") {
+		s.cfg.AudiobookshelfURL = req.AudiobookshelfURL
+	}
+	if wasProvided("audiobookshelf_user") {
+		s.cfg.AudiobookshelfUser = req.AudiobookshelfUser
+	}
+	if wasProvided("audiobookshelf_password") {
+		s.cfg.AudiobookshelfPassword = req.AudiobookshelfPassword
+	}
+	if wasProvided("audiobookshelf_library") {
+		s.cfg.AudiobookshelfLibrary = req.AudiobookshelfLibrary
+	}
 
-	// Persist to database if available
+	// Persist to database if available - only save fields that were provided
 	if s.db != nil {
-		configs := map[string]string{
-			"log_file":                  req.LogFile,
-			"output_dir":                req.OutputDir,
-			"temp_dir":                  req.TempDir,
-			"default_voice":             req.DefaultVoice,
-			"default_provider":          req.DefaultProvider,
-			"server_port":               req.ServerPort,
-			"server_host":               req.ServerHost,
-			"open_browser":              fmt.Sprintf("%t", req.OpenBrowser),
-			"bit_rate_kbs":              fmt.Sprintf("%d", req.BitRateKbs),
-			"sample_rate_hz":            fmt.Sprintf("%d", req.SampleRateHz),
-			"default_speed":             fmt.Sprintf("%.2f", req.DefaultSpeed),
-			"default_pitch":             fmt.Sprintf("%.2f", req.DefaultPitch),
-			"chapter_gap_seconds":       fmt.Sprintf("%d", req.ChapterGapSeconds),
-			"pronunciation_dict_file":   req.PronunciationDictFile,
-			"use_default_pronunciation": fmt.Sprintf("%t", req.UseDefaultPronunciation),
-			"max_file_size_mb":          fmt.Sprintf("%d", req.MaxFileSizeMB),
-			"audiobookshelf_url":        req.AudiobookshelfURL,
-			"audiobookshelf_user":       req.AudiobookshelfUser,
-			"audiobookshelf_password":   req.AudiobookshelfPassword,
-			"audiobookshelf_library":    req.AudiobookshelfLibrary,
-			"google_api_key":            req.GoogleAPIKey,
+		configs := map[string]struct {
+			value    string
+			provided bool
+		}{
+			"log_file":                  {req.LogFile, wasProvided("log_file")},
+			"output_dir":                {req.OutputDir, wasProvided("output_dir")},
+			"temp_dir":                  {req.TempDir, wasProvided("temp_dir")},
+			"default_voice":             {req.DefaultVoice, wasProvided("default_voice")},
+			"default_provider":          {req.DefaultProvider, wasProvided("default_provider")},
+			"server_port":               {req.ServerPort, wasProvided("server_port")},
+			"server_host":               {req.ServerHost, wasProvided("server_host")},
+			"open_browser":              {fmt.Sprintf("%t", req.OpenBrowser), wasProvided("open_browser")},
+			"bit_rate_kbs":              {fmt.Sprintf("%d", req.BitRateKbs), wasProvided("bit_rate_kbs")},
+			"sample_rate_hz":            {fmt.Sprintf("%d", req.SampleRateHz), wasProvided("sample_rate_hz")},
+			"default_speed":             {fmt.Sprintf("%.2f", req.DefaultSpeed), wasProvided("default_speed")},
+			"default_pitch":             {fmt.Sprintf("%.2f", req.DefaultPitch), wasProvided("default_pitch")},
+			"chapter_gap_seconds":       {fmt.Sprintf("%d", req.ChapterGapSeconds), wasProvided("chapter_gap_seconds")},
+			"pronunciation_dict_file":   {req.PronunciationDictFile, wasProvided("pronunciation_dict_file")},
+			"use_default_pronunciation": {fmt.Sprintf("%t", req.UseDefaultPronunciation), wasProvided("use_default_pronunciation")},
+			"max_file_size_mb":          {fmt.Sprintf("%d", req.MaxFileSizeMB), wasProvided("max_file_size_mb")},
+			"audiobookshelf_url":        {req.AudiobookshelfURL, wasProvided("audiobookshelf_url")},
+			"audiobookshelf_user":       {req.AudiobookshelfUser, wasProvided("audiobookshelf_user")},
+			"audiobookshelf_password":   {req.AudiobookshelfPassword, wasProvided("audiobookshelf_password")},
+			"audiobookshelf_library":    {req.AudiobookshelfLibrary, wasProvided("audiobookshelf_library")},
+			"google_api_key":            {req.GoogleAPIKey, wasProvided("google_api_key")},
+			"opentts_url":               {req.OpenTTSURL, wasProvided("opentts_url")},
 		}
 
-		for key, value := range configs {
-			if err := s.db.SetConfig(key, value); err != nil {
-				log.Printf("Warning: Failed to save config %s: %v", key, err)
+		for key, cfg := range configs {
+			if cfg.provided {
+				if err := s.db.SetConfig(key, cfg.value); err != nil {
+					log.Printf("Warning: Failed to save config %s: %v", key, err)
+				}
 			}
 		}
 	}
@@ -230,5 +312,79 @@ func (s *Server) handleTestAudiobookshelf(w http.ResponseWriter, r *http.Request
 	s.jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"success":   true,
 		"libraries": len(libraries),
+	})
+}
+
+// TestOpenTTSRequest represents the test connection request
+type TestOpenTTSRequest struct {
+	URL string `json:"url"`
+}
+
+// handleTestOpenTTS tests connection to OpenTTS server
+func (s *Server) handleTestOpenTTS(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.handleCORS(w)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req TestOpenTTSRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.URL == "" {
+		s.jsonError(w, http.StatusBadRequest, "Server URL is required")
+		return
+	}
+
+	// Test connection by fetching languages
+	client := &http.Client{}
+	resp, err := client.Get(req.URL + "/api/languages")
+	if err != nil {
+		s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Connection failed: %v", err),
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Server returned status %d", resp.StatusCode),
+		})
+		return
+	}
+
+	// Get voice count
+	voiceResp, err := client.Get(req.URL + "/api/voices")
+	if err != nil {
+		s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+			"success":     true,
+			"voice_count": 0,
+		})
+		return
+	}
+	defer voiceResp.Body.Close()
+
+	var voices map[string]interface{}
+	if err := json.NewDecoder(voiceResp.Body).Decode(&voices); err != nil {
+		s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+			"success":     true,
+			"voice_count": 0,
+		})
+		return
+	}
+
+	s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"success":     true,
+		"voice_count": len(voices),
 	})
 }
