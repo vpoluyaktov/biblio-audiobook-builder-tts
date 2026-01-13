@@ -13,6 +13,11 @@ class App {
         this.reconnectDelay = 1000;
         this.settings = {};
 
+        // OPDS state
+        this.opdsSources = [];
+        this.opdsHistory = []; // Navigation history for breadcrumbs
+        this.currentOPDSBook = null;
+
         this.init();
     }
 
@@ -22,6 +27,7 @@ class App {
         await this.loadConfig();
         await this.loadProviders();
         await this.loadJobs();
+        await this.loadOPDSSources();
         this.connectWebSocket();
     }
 
@@ -79,6 +85,42 @@ class App {
         this.tabContents = document.querySelectorAll('.tab-content');
         this.testAbsBtn = document.getElementById('test-abs-connection');
         this.absConnectionResult = document.getElementById('abs-connection-result');
+
+        // Main tab elements
+        this.mainTabs = document.querySelectorAll('.main-tab');
+        this.mainTabContents = document.querySelectorAll('.main-tab-content');
+
+        // OPDS elements
+        this.opdsSourceSelect = document.getElementById('opds-source');
+        this.opdsBrowseBtn = document.getElementById('opds-browse-btn');
+        this.opdsSearchContainer = document.getElementById('opds-search-container');
+        this.opdsSearchInput = document.getElementById('opds-search-input');
+        this.opdsSearchBtn = document.getElementById('opds-search-btn');
+        this.opdsBreadcrumb = document.getElementById('opds-breadcrumb');
+        this.opdsContent = document.getElementById('opds-content');
+        this.opdsLoading = document.getElementById('opds-loading');
+
+        // OPDS Book Modal
+        this.opdsBookModal = document.getElementById('opds-book-modal');
+        this.opdsBookTitle = document.getElementById('opds-book-title');
+        this.opdsBookCover = document.getElementById('opds-book-cover');
+        this.opdsBookAuthor = document.getElementById('opds-book-author');
+        this.opdsBookSummary = document.getElementById('opds-book-summary');
+        this.opdsBookLanguage = document.getElementById('opds-book-language');
+        this.opdsBookPublisher = document.getElementById('opds-book-publisher');
+        this.opdsBookCategories = document.getElementById('opds-book-categories');
+        this.opdsDownloadOptions = document.getElementById('opds-download-options');
+        this.opdsBookClose = document.getElementById('opds-book-close');
+        this.opdsBookCancel = document.getElementById('opds-book-cancel');
+
+        // OPDS Sources (in Settings tab)
+        this.opdsSourcesList = document.getElementById('opds-sources-list');
+        this.newSourceName = document.getElementById('new-source-name');
+        this.newSourceUrl = document.getElementById('new-source-url');
+        this.newSourceDesc = document.getElementById('new-source-desc');
+        this.newSourceUsername = document.getElementById('new-source-username');
+        this.newSourcePassword = document.getElementById('new-source-password');
+        this.addSourceBtn = document.getElementById('add-source-btn');
     }
 
     bindEvents() {
@@ -129,6 +171,39 @@ class App {
         // Test Audiobookshelf connection
         if (this.testAbsBtn) {
             this.testAbsBtn.addEventListener('click', () => this.testAudiobookshelfConnection());
+        }
+
+        // Main tab navigation
+        this.mainTabs.forEach(tab => {
+            tab.addEventListener('click', () => this.switchMainTab(tab.dataset.tab));
+        });
+
+        // OPDS events
+        if (this.opdsBrowseBtn) {
+            this.opdsBrowseBtn.addEventListener('click', () => this.browseOPDS());
+        }
+        if (this.opdsSearchBtn) {
+            this.opdsSearchBtn.addEventListener('click', () => this.searchOPDS());
+        }
+        if (this.opdsSearchInput) {
+            this.opdsSearchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') this.searchOPDS();
+            });
+        }
+        // OPDS Book Modal events
+        if (this.opdsBookClose) {
+            this.opdsBookClose.addEventListener('click', () => this.closeBookModal());
+        }
+        if (this.opdsBookCancel) {
+            this.opdsBookCancel.addEventListener('click', () => this.closeBookModal());
+        }
+        if (this.opdsBookModal) {
+            this.opdsBookModal.querySelector('.modal-overlay').addEventListener('click', () => this.closeBookModal());
+        }
+
+        // OPDS Sources (in Settings tab)
+        if (this.addSourceBtn) {
+            this.addSourceBtn.addEventListener('click', () => this.addOPDSSource());
         }
     }
 
@@ -887,6 +962,11 @@ class App {
         this.tabContents.forEach(content => {
             content.classList.toggle('active', content.id === `tab-${tabName}`);
         });
+
+        // Render OPDS sources when switching to OPDS tab
+        if (tabName === 'opds') {
+            this.renderSourcesList();
+        }
     }
 
     async loadSettings() {
@@ -1030,6 +1110,450 @@ class App {
         } catch (e) {
             this.absConnectionResult.textContent = '❌ ' + e.message;
             this.absConnectionResult.className = 'connection-result error';
+        }
+    }
+
+    // Main Tab Navigation
+    switchMainTab(tabName) {
+        this.mainTabs.forEach(tab => {
+            tab.classList.toggle('active', tab.dataset.tab === tabName);
+        });
+        this.mainTabContents.forEach(content => {
+            content.classList.toggle('active', content.id === `tab-${tabName}`);
+        });
+    }
+
+    // OPDS Methods
+    async loadOPDSSources() {
+        try {
+            const response = await fetch('/api/opds/sources');
+            if (response.ok) {
+                const data = await response.json();
+                this.opdsSources = data.sources || [];
+                this.populateSourceSelect();
+            }
+        } catch (e) {
+            console.error('Failed to load OPDS sources:', e);
+        }
+    }
+
+    populateSourceSelect() {
+        if (!this.opdsSourceSelect) return;
+
+        if (this.opdsSources.length === 0) {
+            this.opdsSourceSelect.innerHTML = '<option value="">No sources configured</option>';
+            return;
+        }
+
+        this.opdsSourceSelect.innerHTML = this.opdsSources
+            .filter(s => s.enabled)
+            .map(s => `<option value="${s.id}" data-url="${s.url}">${this.escapeHtml(s.name)}${s.username ? ' 🔒' : ''}</option>`)
+            .join('');
+    }
+
+    getCurrentSourceId() {
+        return this.opdsSourceSelect?.value || '';
+    }
+
+    getCurrentSourceUrl() {
+        const option = this.opdsSourceSelect?.selectedOptions[0];
+        return option?.dataset.url || '';
+    }
+
+    async browseOPDS() {
+        const sourceId = this.getCurrentSourceId();
+        const url = this.getCurrentSourceUrl();
+        if (!sourceId || !url) {
+            this.showToast('Please select a catalog source', 'error');
+            return;
+        }
+
+        // Store current source ID for subsequent requests
+        this.currentOPDSSourceId = sourceId;
+
+        // Reset history and start fresh
+        const sourceName = this.opdsSourceSelect.options[this.opdsSourceSelect.selectedIndex].text;
+        this.opdsHistory = [{ url, title: sourceName }];
+        await this.fetchOPDSCatalog(url);
+    }
+
+    async fetchOPDSCatalog(url) {
+        this.showOPDSLoading(true);
+
+        try {
+            let apiUrl = `/api/opds/browse?url=${encodeURIComponent(url)}`;
+            if (this.currentOPDSSourceId) {
+                apiUrl += `&source_id=${encodeURIComponent(this.currentOPDSSourceId)}`;
+            }
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to fetch catalog');
+            }
+
+            const catalog = await response.json();
+            this.renderOPDSCatalog(catalog);
+        } catch (e) {
+            this.showToast('Failed to load catalog: ' + e.message, 'error');
+            this.opdsContent.innerHTML = `
+                <div class="opds-empty">
+                    <span class="icon">❌</span>
+                    <p>Failed to load catalog</p>
+                    <p>${this.escapeHtml(e.message)}</p>
+                </div>
+            `;
+        } finally {
+            this.showOPDSLoading(false);
+        }
+    }
+
+    renderOPDSCatalog(catalog) {
+        // Update breadcrumb
+        this.renderBreadcrumb();
+
+        // Show search if available
+        this.opdsSearchContainer.style.display = 'none'; // TODO: detect search capability
+
+        if (!catalog.entries || catalog.entries.length === 0) {
+            this.opdsContent.innerHTML = `
+                <div class="opds-empty">
+                    <span class="icon">📭</span>
+                    <p>No entries found</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Render entries as a grid
+        let html = '<div class="opds-grid">';
+        
+        for (const entry of catalog.entries) {
+            if (entry.is_navigation) {
+                // Navigation entry (folder)
+                html += this.renderNavigationEntry(entry);
+            } else {
+                // Book entry
+                html += this.renderBookEntry(entry);
+            }
+        }
+
+        html += '</div>';
+
+        // Add pagination if available
+        if (catalog.next_page_url) {
+            html += `
+                <div class="opds-pagination">
+                    <button class="btn btn-secondary" onclick="app.loadNextPage('${this.escapeHtml(catalog.next_page_url)}')">
+                        Load More →
+                    </button>
+                </div>
+            `;
+        }
+
+        this.opdsContent.innerHTML = html;
+    }
+
+    renderNavigationEntry(entry) {
+        const navUrl = entry.navigation_link;
+        return `
+            <div class="opds-entry navigation" onclick="app.navigateOPDS('${this.escapeHtml(navUrl)}', '${this.escapeHtml(entry.title)}')">
+                <div class="opds-entry-cover">
+                    <span class="nav-icon">📁</span>
+                </div>
+                <div class="opds-entry-info">
+                    <div class="opds-entry-title">${this.escapeHtml(entry.title)}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    renderBookEntry(entry) {
+        const coverUrl = entry.cover_url || entry.thumbnail_url;
+        const coverHtml = coverUrl 
+            ? `<img src="/api/opds/proxy?url=${encodeURIComponent(coverUrl)}" alt="Cover" onerror="this.parentElement.innerHTML='<span class=\\'no-cover\\'>📖</span>'">`
+            : '<span class="no-cover">📖</span>';
+
+        const authors = entry.authors && entry.authors.length > 0 
+            ? entry.authors.join(', ') 
+            : '';
+
+        const formats = entry.download_links
+            .filter(dl => dl.format === 'epub' || dl.format === 'fb2')
+            .map(dl => dl.format.toUpperCase())
+            .filter((v, i, a) => a.indexOf(v) === i)
+            .join(', ');
+
+        return `
+            <div class="opds-entry" onclick='app.showBookDetails(${JSON.stringify(entry).replace(/'/g, "\\'")})'>
+                <div class="opds-entry-cover">${coverHtml}</div>
+                <div class="opds-entry-info">
+                    <div class="opds-entry-title">${this.escapeHtml(entry.title)}</div>
+                    ${authors ? `<div class="opds-entry-author">${this.escapeHtml(authors)}</div>` : ''}
+                    ${formats ? `<span class="opds-entry-format">${formats}</span>` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    navigateOPDS(url, title) {
+        this.opdsHistory.push({ url, title });
+        this.fetchOPDSCatalog(url);
+    }
+
+    renderBreadcrumb() {
+        if (this.opdsHistory.length <= 1) {
+            this.opdsBreadcrumb.innerHTML = '';
+            return;
+        }
+
+        let html = '';
+        this.opdsHistory.forEach((item, index) => {
+            if (index > 0) {
+                html += '<span class="opds-breadcrumb-separator">›</span>';
+            }
+            if (index === this.opdsHistory.length - 1) {
+                html += `<span class="opds-breadcrumb-current">${this.escapeHtml(item.title)}</span>`;
+            } else {
+                html += `<span class="opds-breadcrumb-item" onclick="app.goToHistoryIndex(${index})">${this.escapeHtml(item.title)}</span>`;
+            }
+        });
+
+        this.opdsBreadcrumb.innerHTML = html;
+    }
+
+    goToHistoryIndex(index) {
+        const item = this.opdsHistory[index];
+        this.opdsHistory = this.opdsHistory.slice(0, index + 1);
+        this.fetchOPDSCatalog(item.url);
+    }
+
+    loadNextPage(url) {
+        // Don't add to history, just load more content
+        this.fetchOPDSCatalog(url);
+    }
+
+    async searchOPDS() {
+        const query = this.opdsSearchInput.value.trim();
+        if (!query) return;
+
+        // TODO: Implement search using the catalog's search link
+        this.showToast('Search not yet implemented', 'info');
+    }
+
+    showOPDSLoading(show) {
+        if (this.opdsLoading) {
+            this.opdsLoading.style.display = show ? 'block' : 'none';
+        }
+        if (this.opdsContent) {
+            this.opdsContent.style.display = show ? 'none' : 'block';
+        }
+    }
+
+    // Book Details Modal
+    showBookDetails(entry) {
+        this.currentOPDSBook = entry;
+
+        // Set title
+        this.opdsBookTitle.textContent = entry.title || 'Unknown Title';
+
+        // Set cover
+        const coverUrl = entry.cover_url || entry.thumbnail_url;
+        if (coverUrl) {
+            this.opdsBookCover.innerHTML = `<img src="/api/opds/proxy?url=${encodeURIComponent(coverUrl)}" alt="Cover" onerror="this.parentElement.innerHTML='<span class=\\'no-cover\\'>No Cover</span>'">`;
+        } else {
+            this.opdsBookCover.innerHTML = '<span class="no-cover">No Cover</span>';
+        }
+
+        // Set author
+        this.opdsBookAuthor.textContent = entry.authors && entry.authors.length > 0 
+            ? 'by ' + entry.authors.join(', ')
+            : '';
+
+        // Set summary
+        this.opdsBookSummary.textContent = entry.summary || 'No description available';
+
+        // Set meta
+        this.opdsBookLanguage.textContent = entry.language ? `Language: ${entry.language}` : '';
+        this.opdsBookPublisher.textContent = entry.publisher ? `Publisher: ${entry.publisher}` : '';
+
+        // Set categories
+        if (entry.categories && entry.categories.length > 0) {
+            this.opdsBookCategories.innerHTML = entry.categories
+                .map(cat => `<span class="opds-book-category">${this.escapeHtml(cat)}</span>`)
+                .join('');
+        } else {
+            this.opdsBookCategories.innerHTML = '';
+        }
+
+        // Set download options
+        this.renderDownloadOptions(entry.download_links);
+
+        // Show modal
+        this.opdsBookModal.classList.add('active');
+    }
+
+    renderDownloadOptions(downloadLinks) {
+        if (!downloadLinks || downloadLinks.length === 0) {
+            this.opdsDownloadOptions.innerHTML = '<p>No download options available</p>';
+            return;
+        }
+
+        const supportedFormats = ['epub', 'fb2'];
+        
+        this.opdsDownloadOptions.innerHTML = downloadLinks.map(dl => {
+            const isSupported = supportedFormats.includes(dl.format);
+            const formatClass = isSupported ? '' : 'unsupported';
+            const buttonHtml = isSupported 
+                ? `<button class="btn btn-primary" onclick="app.downloadAndConvert('${this.escapeHtml(dl.url)}', '${dl.format}')">📥 Convert to Audiobook</button>`
+                : `<span class="btn btn-secondary" disabled>Not Supported</span>`;
+
+            return `
+                <div class="download-option">
+                    <div class="download-option-info">
+                        <span class="download-option-format ${formatClass}">${dl.format.toUpperCase()}</span>
+                        <span class="download-option-title">${dl.title || dl.type || 'Download'}</span>
+                    </div>
+                    ${buttonHtml}
+                </div>
+            `;
+        }).join('');
+    }
+
+    async downloadAndConvert(url, format) {
+        this.closeBookModal();
+        this.showToast('Downloading book...', 'info');
+
+        try {
+            const response = await fetch('/api/opds/download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    url: url,
+                    title: this.currentOPDSBook?.title || 'book',
+                    format: format,
+                    author: this.currentOPDSBook?.authors?.[0] || '',
+                    source_id: this.currentOPDSSourceId || ''
+                })
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Download failed');
+            }
+
+            const preview = await response.json();
+            
+            // Switch to upload tab and show preview
+            this.switchMainTab('upload');
+            this.currentPreview = preview;
+            this.showPreview(preview);
+            
+            // Set the file info
+            this.fileNameEl.textContent = preview.file_name;
+            this.fileSizeEl.textContent = '';
+            this.selectedFileEl.classList.add('visible');
+            this.previewBtn.disabled = true; // Already have preview
+            this.uploadBtn.disabled = true; // Use confirm button in preview
+
+            this.showToast('Book downloaded! Review and start conversion.', 'success');
+        } catch (e) {
+            this.showToast('Download failed: ' + e.message, 'error');
+        }
+    }
+
+    closeBookModal() {
+        this.opdsBookModal.classList.remove('active');
+        this.currentOPDSBook = null;
+    }
+
+    // OPDS Sources Management
+    renderSourcesList() {
+        if (!this.opdsSourcesList) return;
+        if (this.opdsSources.length === 0) {
+            this.opdsSourcesList.innerHTML = '<p style="padding: 1rem; color: var(--text-muted);">No sources configured</p>';
+            return;
+        }
+
+        this.opdsSourcesList.innerHTML = this.opdsSources.map(source => `
+            <div class="opds-source-item">
+                <div class="opds-source-info">
+                    <div class="opds-source-name">
+                        ${this.escapeHtml(source.name)}
+                        ${source.username ? '<span class="opds-source-badge">🔒 Auth</span>' : ''}
+                        ${source.is_default ? '<span class="opds-source-badge">Default</span>' : ''}
+                    </div>
+                    <div class="opds-source-url">${this.escapeHtml(source.url)}</div>
+                    ${source.description ? `<div class="opds-source-desc">${this.escapeHtml(source.description)}</div>` : ''}
+                </div>
+                <div class="opds-source-actions">
+                    ${!source.is_default ? `<button class="btn btn-danger" onclick="app.deleteOPDSSource('${source.id}')">🗑️</button>` : ''}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async addOPDSSource() {
+        const name = this.newSourceName.value.trim();
+        const url = this.newSourceUrl.value.trim();
+        const description = this.newSourceDesc.value.trim();
+        const username = this.newSourceUsername?.value.trim() || '';
+        const password = this.newSourcePassword?.value || '';
+
+        if (!name || !url) {
+            this.showToast('Name and URL are required', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/opds/sources', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, url, description, username, password, enabled: true })
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to add source');
+            }
+
+            const source = await response.json();
+            this.opdsSources.push(source);
+            this.renderSourcesList();
+            this.populateSourceSelect();
+
+            // Clear form
+            this.newSourceName.value = '';
+            this.newSourceUrl.value = '';
+            this.newSourceDesc.value = '';
+            if (this.newSourceUsername) this.newSourceUsername.value = '';
+            if (this.newSourcePassword) this.newSourcePassword.value = '';
+
+            this.showToast('Source added successfully', 'success');
+        } catch (e) {
+            this.showToast('Failed to add source: ' + e.message, 'error');
+        }
+    }
+
+    async deleteOPDSSource(id) {
+        if (!confirm('Are you sure you want to delete this source?')) return;
+
+        try {
+            const response = await fetch(`/api/opds/sources/${id}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to delete source');
+            }
+
+            this.opdsSources = this.opdsSources.filter(s => s.id !== id);
+            this.renderSourcesList();
+            this.populateSourceSelect();
+
+            this.showToast('Source deleted', 'success');
+        } catch (e) {
+            this.showToast('Failed to delete source: ' + e.message, 'error');
         }
     }
 

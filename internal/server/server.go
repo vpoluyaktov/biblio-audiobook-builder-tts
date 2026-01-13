@@ -98,6 +98,15 @@ func (s *Server) Start() error {
 		ServeWS(s.hub, w, r)
 	})
 
+	// OPDS endpoints
+	mux.HandleFunc("/api/opds/sources", s.handleOPDSSources)
+	mux.HandleFunc("/api/opds/sources/", s.handleOPDSSource)
+	mux.HandleFunc("/api/opds/browse", s.handleOPDSBrowse)
+	mux.HandleFunc("/api/opds/search", s.handleOPDSSearch)
+	mux.HandleFunc("/api/opds/download", s.handleOPDSDownload)
+	mux.HandleFunc("/api/opds/convert", s.handleOPDSConvert)
+	mux.HandleFunc("/api/opds/proxy", s.handleOPDSProxy)
+
 	// Serve main page
 	mux.HandleFunc("/", s.handleIndex)
 

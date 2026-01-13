@@ -144,6 +144,21 @@ func (db *DB) migrate() error {
 
 	CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 	CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at);
+
+	CREATE TABLE IF NOT EXISTS opds_sources (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL,
+		url TEXT NOT NULL,
+		description TEXT,
+		username TEXT DEFAULT '',
+		password TEXT DEFAULT '',
+		is_default BOOLEAN DEFAULT 0,
+		enabled BOOLEAN DEFAULT 1,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_opds_sources_enabled ON opds_sources(enabled);
 	`
 
 	_, err := db.conn.Exec(schema)
@@ -524,6 +539,165 @@ func (db *DB) CleanupOldJobs(olderThan time.Duration) (int64, error) {
 	return result.RowsAffected()
 }
 
+// OPDSSource represents an OPDS catalog source
+type OPDSSource struct {
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	URL         string    `json:"url"`
+	Description string    `json:"description"`
+	Username    string    `json:"username,omitempty"`
+	Password    string    `json:"password,omitempty"`
+	IsDefault   bool      `json:"is_default"`
+	Enabled     bool      `json:"enabled"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// CreateOPDSSource creates a new OPDS source
+func (db *DB) CreateOPDSSource(source *OPDSSource) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	_, err := db.conn.Exec(`
+		INSERT INTO opds_sources (id, name, url, description, username, password, is_default, enabled, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, source.ID, source.Name, source.URL, source.Description, source.Username, source.Password,
+		source.IsDefault, source.Enabled, source.CreatedAt, source.UpdatedAt)
+
+	return err
+}
+
+// UpdateOPDSSource updates an existing OPDS source
+func (db *DB) UpdateOPDSSource(source *OPDSSource) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	_, err := db.conn.Exec(`
+		UPDATE opds_sources SET name = ?, url = ?, description = ?, username = ?, password = ?, is_default = ?, enabled = ?, updated_at = ?
+		WHERE id = ?
+	`, source.Name, source.URL, source.Description, source.Username, source.Password,
+		source.IsDefault, source.Enabled, time.Now(), source.ID)
+
+	return err
+}
+
+// GetOPDSSource retrieves an OPDS source by ID
+func (db *DB) GetOPDSSource(id string) (*OPDSSource, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	source := &OPDSSource{}
+	err := db.conn.QueryRow(`
+		SELECT id, name, url, description, username, password, is_default, enabled, created_at, updated_at
+		FROM opds_sources WHERE id = ?
+	`, id).Scan(&source.ID, &source.Name, &source.URL, &source.Description,
+		&source.Username, &source.Password, &source.IsDefault, &source.Enabled, &source.CreatedAt, &source.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return source, nil
+}
+
+// ListOPDSSources retrieves all OPDS sources
+func (db *DB) ListOPDSSources(enabledOnly bool) ([]*OPDSSource, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	query := `SELECT id, name, url, description, username, password, is_default, enabled, created_at, updated_at FROM opds_sources`
+	if enabledOnly {
+		query += " WHERE enabled = 1"
+	}
+	query += " ORDER BY is_default DESC, name ASC"
+
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sources []*OPDSSource
+	for rows.Next() {
+		source := &OPDSSource{}
+		err := rows.Scan(&source.ID, &source.Name, &source.URL, &source.Description,
+			&source.Username, &source.Password, &source.IsDefault, &source.Enabled, &source.CreatedAt, &source.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		sources = append(sources, source)
+	}
+
+	return sources, nil
+}
+
+// DeleteOPDSSource deletes an OPDS source by ID
+func (db *DB) DeleteOPDSSource(id string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	_, err := db.conn.Exec("DELETE FROM opds_sources WHERE id = ?", id)
+	return err
+}
+
+// InitializeDefaultOPDSSources adds default OPDS sources if none exist
+func (db *DB) InitializeDefaultOPDSSources() error {
+	sources, err := db.ListOPDSSources(false)
+	if err != nil {
+		return err
+	}
+
+	if len(sources) > 0 {
+		return nil // Already have sources
+	}
+
+	log.Println("Initializing default OPDS sources")
+
+	defaults := []OPDSSource{
+		{
+			ID:          "gutenberg",
+			Name:        "Project Gutenberg",
+			URL:         "https://m.gutenberg.org/ebooks.opds/",
+			Description: "Free ebooks from Project Gutenberg. Over 70,000 free ebooks.",
+			IsDefault:   true,
+			Enabled:     true,
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		},
+		{
+			ID:          "standardebooks",
+			Name:        "Standard Ebooks",
+			URL:         "https://standardebooks.org/feeds/opds",
+			Description: "Free, beautifully formatted ebooks with modern typography.",
+			IsDefault:   true,
+			Enabled:     true,
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		},
+		{
+			ID:          "feedbooks-public",
+			Name:        "Feedbooks Public Domain",
+			URL:         "https://catalog.feedbooks.com/publicdomain/browse/en/homepage.atom",
+			Description: "Public domain books from Feedbooks.",
+			IsDefault:   true,
+			Enabled:     true,
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		},
+	}
+
+	for _, source := range defaults {
+		if err := db.CreateOPDSSource(&source); err != nil {
+			log.Printf("Failed to create default OPDS source %s: %v", source.Name, err)
+		}
+	}
+
+	return nil
+}
+
 // InitializeDefaults initializes the database with default configuration if empty
 func (db *DB) InitializeDefaults() error {
 	// Check if config is empty (all defaults)
@@ -531,7 +705,14 @@ func (db *DB) InitializeDefaults() error {
 	if existingValue == "" {
 		log.Println("Initializing database with default configuration")
 		cfg := DefaultConfig()
-		return db.SaveAllConfig(cfg)
+		if err := db.SaveAllConfig(cfg); err != nil {
+			return err
+		}
+	}
+
+	// Initialize default OPDS sources
+	if err := db.InitializeDefaultOPDSSources(); err != nil {
+		log.Printf("Warning: failed to initialize OPDS sources: %v", err)
 	}
 
 	return nil

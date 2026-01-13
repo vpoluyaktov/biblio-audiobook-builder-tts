@@ -1,0 +1,432 @@
+package opds
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"testing"
+)
+
+func TestNewClient(t *testing.T) {
+	client := NewClient()
+	if client == nil {
+		t.Fatal("NewClient returned nil")
+	}
+	if client.httpClient == nil {
+		t.Error("httpClient is nil")
+	}
+}
+
+func TestNewClientWithAuth(t *testing.T) {
+	client := NewClientWithAuth("user", "pass")
+	if client == nil {
+		t.Fatal("NewClientWithAuth returned nil")
+	}
+	if client.username != "user" {
+		t.Errorf("expected username 'user', got '%s'", client.username)
+	}
+	if client.password != "pass" {
+		t.Errorf("expected password 'pass', got '%s'", client.password)
+	}
+}
+
+func TestSetAuth(t *testing.T) {
+	client := NewClient()
+	client.SetAuth("testuser", "testpass")
+	if client.username != "testuser" {
+		t.Errorf("expected username 'testuser', got '%s'", client.username)
+	}
+	if client.password != "testpass" {
+		t.Errorf("expected password 'testpass', got '%s'", client.password)
+	}
+}
+
+func TestParseCatalog_NavigationFeed(t *testing.T) {
+	xmlData := []byte(`<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>tag:root</id>
+  <title>Test Catalog</title>
+  <updated>2024-01-01T00:00:00Z</updated>
+  <link rel="self" href="/opds" type="application/atom+xml"/>
+  <link rel="start" href="/opds" type="application/atom+xml"/>
+  <link rel="search" href="/search" type="application/opensearchdescription+xml"/>
+  <entry>
+    <id>tag:authors</id>
+    <title>By Authors</title>
+    <content type="text">Browse by author</content>
+    <link type="application/atom+xml;profile=opds-catalog" href="/authors"/>
+  </entry>
+  <entry>
+    <id>tag:genres</id>
+    <title>By Genre</title>
+    <content type="text">Browse by genre</content>
+    <link rel="subsection" type="application/atom+xml" href="/genres"/>
+  </entry>
+</feed>`)
+
+	client := NewClient()
+	catalog, err := client.ParseCatalog(xmlData, "http://example.com/opds")
+	if err != nil {
+		t.Fatalf("ParseCatalog failed: %v", err)
+	}
+
+	if catalog.Title != "Test Catalog" {
+		t.Errorf("expected title 'Test Catalog', got '%s'", catalog.Title)
+	}
+
+	if len(catalog.Entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(catalog.Entries))
+	}
+
+	// First entry - navigation via type attribute
+	entry1 := catalog.Entries[0]
+	if entry1.Title != "By Authors" {
+		t.Errorf("expected title 'By Authors', got '%s'", entry1.Title)
+	}
+	if !entry1.IsNavigation {
+		t.Error("expected entry1 to be navigation")
+	}
+	if entry1.NavigationLink != "http://example.com/authors" {
+		t.Errorf("expected navigation link 'http://example.com/authors', got '%s'", entry1.NavigationLink)
+	}
+
+	// Second entry - navigation via rel attribute
+	entry2 := catalog.Entries[1]
+	if entry2.Title != "By Genre" {
+		t.Errorf("expected title 'By Genre', got '%s'", entry2.Title)
+	}
+	if !entry2.IsNavigation {
+		t.Error("expected entry2 to be navigation")
+	}
+	if entry2.NavigationLink != "http://example.com/genres" {
+		t.Errorf("expected navigation link 'http://example.com/genres', got '%s'", entry2.NavigationLink)
+	}
+}
+
+func TestParseCatalog_AcquisitionFeed(t *testing.T) {
+	xmlData := []byte(`<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/terms/">
+  <id>tag:books</id>
+  <title>Books</title>
+  <updated>2024-01-01T00:00:00Z</updated>
+  <entry>
+    <id>urn:book:123</id>
+    <title>Test Book</title>
+    <author><name>John Doe</name></author>
+    <author><name>Jane Smith</name></author>
+    <summary>A test book summary</summary>
+    <dc:language>en</dc:language>
+    <dc:publisher>Test Publisher</dc:publisher>
+    <category term="fiction" label="Fiction"/>
+    <category term="adventure"/>
+    <link rel="http://opds-spec.org/image" href="/covers/123.jpg" type="image/jpeg"/>
+    <link rel="http://opds-spec.org/image/thumbnail" href="/thumbs/123.jpg" type="image/jpeg"/>
+    <link rel="http://opds-spec.org/acquisition" href="/download/123.epub" type="application/epub+zip" title="EPUB"/>
+    <link rel="http://opds-spec.org/acquisition" href="/download/123.fb2" type="application/fb2+xml" title="FB2"/>
+  </entry>
+</feed>`)
+
+	client := NewClient()
+	catalog, err := client.ParseCatalog(xmlData, "http://example.com/opds")
+	if err != nil {
+		t.Fatalf("ParseCatalog failed: %v", err)
+	}
+
+	if len(catalog.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(catalog.Entries))
+	}
+
+	entry := catalog.Entries[0]
+
+	// Check basic metadata
+	if entry.Title != "Test Book" {
+		t.Errorf("expected title 'Test Book', got '%s'", entry.Title)
+	}
+	if entry.Summary != "A test book summary" {
+		t.Errorf("expected summary 'A test book summary', got '%s'", entry.Summary)
+	}
+	if entry.Language != "en" {
+		t.Errorf("expected language 'en', got '%s'", entry.Language)
+	}
+	if entry.Publisher != "Test Publisher" {
+		t.Errorf("expected publisher 'Test Publisher', got '%s'", entry.Publisher)
+	}
+
+	// Check authors
+	if len(entry.Authors) != 2 {
+		t.Fatalf("expected 2 authors, got %d", len(entry.Authors))
+	}
+	if entry.Authors[0] != "John Doe" {
+		t.Errorf("expected first author 'John Doe', got '%s'", entry.Authors[0])
+	}
+	if entry.Authors[1] != "Jane Smith" {
+		t.Errorf("expected second author 'Jane Smith', got '%s'", entry.Authors[1])
+	}
+
+	// Check categories
+	if len(entry.Categories) != 2 {
+		t.Fatalf("expected 2 categories, got %d", len(entry.Categories))
+	}
+	if entry.Categories[0] != "Fiction" {
+		t.Errorf("expected first category 'Fiction', got '%s'", entry.Categories[0])
+	}
+
+	// Check cover images
+	if entry.CoverURL != "http://example.com/covers/123.jpg" {
+		t.Errorf("expected cover URL 'http://example.com/covers/123.jpg', got '%s'", entry.CoverURL)
+	}
+	if entry.ThumbnailURL != "http://example.com/thumbs/123.jpg" {
+		t.Errorf("expected thumbnail URL 'http://example.com/thumbs/123.jpg', got '%s'", entry.ThumbnailURL)
+	}
+
+	// Check download links
+	if len(entry.DownloadLinks) != 2 {
+		t.Fatalf("expected 2 download links, got %d", len(entry.DownloadLinks))
+	}
+
+	epub := entry.DownloadLinks[0]
+	if epub.Format != "epub" {
+		t.Errorf("expected format 'epub', got '%s'", epub.Format)
+	}
+	if epub.URL != "http://example.com/download/123.epub" {
+		t.Errorf("expected URL 'http://example.com/download/123.epub', got '%s'", epub.URL)
+	}
+
+	fb2 := entry.DownloadLinks[1]
+	if fb2.Format != "fb2" {
+		t.Errorf("expected format 'fb2', got '%s'", fb2.Format)
+	}
+
+	// Should not be navigation
+	if entry.IsNavigation {
+		t.Error("expected entry to not be navigation")
+	}
+}
+
+func TestParseCatalog_Pagination(t *testing.T) {
+	xmlData := []byte(`<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>tag:page1</id>
+  <title>Page 1</title>
+  <updated>2024-01-01T00:00:00Z</updated>
+  <link rel="next" href="/opds?page=2" type="application/atom+xml"/>
+  <link rel="self" href="/opds?page=1" type="application/atom+xml"/>
+</feed>`)
+
+	client := NewClient()
+	catalog, err := client.ParseCatalog(xmlData, "http://example.com/opds")
+	if err != nil {
+		t.Fatalf("ParseCatalog failed: %v", err)
+	}
+
+	if catalog.NextPageURL != "http://example.com/opds?page=2" {
+		t.Errorf("expected next page URL 'http://example.com/opds?page=2', got '%s'", catalog.NextPageURL)
+	}
+}
+
+func TestParseCatalog_ContentAsSummary(t *testing.T) {
+	xmlData := []byte(`<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>tag:test</id>
+  <title>Test</title>
+  <updated>2024-01-01T00:00:00Z</updated>
+  <entry>
+    <id>1</id>
+    <title>Entry with content</title>
+    <content type="text">This is the content used as summary</content>
+  </entry>
+</feed>`)
+
+	client := NewClient()
+	catalog, err := client.ParseCatalog(xmlData, "http://example.com/opds")
+	if err != nil {
+		t.Fatalf("ParseCatalog failed: %v", err)
+	}
+
+	if len(catalog.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(catalog.Entries))
+	}
+
+	if catalog.Entries[0].Summary != "This is the content used as summary" {
+		t.Errorf("expected summary from content, got '%s'", catalog.Entries[0].Summary)
+	}
+}
+
+func TestDetectFormat(t *testing.T) {
+	tests := []struct {
+		mimeType string
+		expected string
+	}{
+		{"application/epub+zip", "epub"},
+		{"application/fb2+xml", "fb2"},
+		{"application/x-fictionbook+xml", "fb2"},
+		{"application/pdf", "pdf"},
+		{"application/x-mobipocket-ebook", "mobi"},
+		{"text/plain", "txt"},
+		{"text/html", "html"},
+		{"application/octet-stream", "unknown"},
+	}
+
+	for _, tt := range tests {
+		result := detectFormat(tt.mimeType)
+		if result != tt.expected {
+			t.Errorf("detectFormat(%s) = %s, expected %s", tt.mimeType, result, tt.expected)
+		}
+	}
+}
+
+func TestFetchCatalog_WithAuth(t *testing.T) {
+	// Create test server that requires auth
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
+		if !ok || user != "testuser" || pass != "testpass" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/atom+xml")
+		w.Write([]byte(`<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>tag:auth</id>
+  <title>Authenticated Feed</title>
+  <updated>2024-01-01T00:00:00Z</updated>
+</feed>`))
+	}))
+	defer server.Close()
+
+	// Test without auth - should fail
+	client := NewClient()
+	_, err := client.FetchCatalog(server.URL)
+	if err == nil {
+		t.Error("expected error without auth")
+	}
+
+	// Test with auth - should succeed
+	clientWithAuth := NewClientWithAuth("testuser", "testpass")
+	catalog, err := clientWithAuth.FetchCatalog(server.URL)
+	if err != nil {
+		t.Fatalf("FetchCatalog with auth failed: %v", err)
+	}
+	if catalog.Title != "Authenticated Feed" {
+		t.Errorf("expected title 'Authenticated Feed', got '%s'", catalog.Title)
+	}
+}
+
+func TestFetchCatalog_Error(t *testing.T) {
+	// Create test server that returns error
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	client := NewClient()
+	_, err := client.FetchCatalog(server.URL)
+	if err == nil {
+		t.Error("expected error for 500 response")
+	}
+}
+
+func TestResolveURL(t *testing.T) {
+	tests := []struct {
+		base     string
+		href     string
+		expected string
+	}{
+		{"http://example.com/opds", "/authors", "http://example.com/authors"},
+		{"http://example.com/opds/", "authors", "http://example.com/opds/authors"},
+		{"http://example.com/opds", "http://other.com/feed", "http://other.com/feed"},
+		{"http://example.com/opds", "", ""},
+	}
+
+	for _, tt := range tests {
+		base, _ := parseURL(tt.base)
+		result := resolveURL(base, tt.href)
+		if result != tt.expected {
+			t.Errorf("resolveURL(%s, %s) = %s, expected %s", tt.base, tt.href, result, tt.expected)
+		}
+	}
+}
+
+func parseURL(s string) (*url.URL, error) {
+	return url.Parse(s)
+}
+
+func TestSearch(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query().Get("q")
+		if query != "test query" {
+			t.Errorf("expected query 'test query', got '%s'", query)
+		}
+
+		w.Header().Set("Content-Type", "application/atom+xml")
+		w.Write([]byte(`<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>tag:search</id>
+  <title>Search Results</title>
+  <updated>2024-01-01T00:00:00Z</updated>
+</feed>`))
+	}))
+	defer server.Close()
+
+	client := NewClient()
+	catalog, err := client.Search(server.URL+"/search?q={searchTerms}", "test query")
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if catalog.Title != "Search Results" {
+		t.Errorf("expected title 'Search Results', got '%s'", catalog.Title)
+	}
+}
+
+func TestDownloadBook(t *testing.T) {
+	bookContent := []byte("fake epub content")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/epub+zip")
+		w.Write(bookContent)
+	}))
+	defer server.Close()
+
+	client := NewClient()
+	data, contentType, err := client.DownloadBook(server.URL + "/book.epub")
+	if err != nil {
+		t.Fatalf("DownloadBook failed: %v", err)
+	}
+
+	if string(data) != string(bookContent) {
+		t.Errorf("expected content '%s', got '%s'", bookContent, data)
+	}
+	if contentType != "application/epub+zip" {
+		t.Errorf("expected content type 'application/epub+zip', got '%s'", contentType)
+	}
+}
+
+func TestDownloadBook_WithAuth(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
+		if !ok || user != "user" || pass != "pass" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "application/epub+zip")
+		w.Write([]byte("authenticated content"))
+	}))
+	defer server.Close()
+
+	// Without auth
+	client := NewClient()
+	_, _, err := client.DownloadBook(server.URL)
+	if err == nil {
+		t.Error("expected error without auth")
+	}
+
+	// With auth
+	clientWithAuth := NewClientWithAuth("user", "pass")
+	data, _, err := clientWithAuth.DownloadBook(server.URL)
+	if err != nil {
+		t.Fatalf("DownloadBook with auth failed: %v", err)
+	}
+	if string(data) != "authenticated content" {
+		t.Errorf("expected 'authenticated content', got '%s'", data)
+	}
+}

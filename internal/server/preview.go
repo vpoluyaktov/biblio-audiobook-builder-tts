@@ -14,6 +14,7 @@ import (
 type Preview struct {
 	ID                         string                  `json:"id"`
 	FileName                   string                  `json:"file_name"`
+	FilePath                   string                  `json:"file_path,omitempty"`
 	BookTitle                  string                  `json:"book_title"`
 	BookAuthor                 string                  `json:"book_author"`
 	Description                string                  `json:"description"`
