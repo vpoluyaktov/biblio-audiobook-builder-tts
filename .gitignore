@@ -5,6 +5,8 @@
 *.so
 *.dylib
 abb_tts
+abb_tts_bin
+abb_tts_server
 
 # Test binary, built with `go test -c`
 *.test
