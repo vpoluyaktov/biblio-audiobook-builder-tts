@@ -15,6 +15,7 @@ import (
 
 // Pre-compiled regex patterns for HTML to text conversion (performance optimization)
 var (
+	reHead     = regexp.MustCompile(`(?is)<head[^>]*>.*?</head>`)
 	reScript   = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
 	reStyle    = regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`)
 	reBlock    = regexp.MustCompile(`(?i)</(p|div|br|h[1-6]|li|tr)>`)
@@ -299,7 +300,7 @@ func readEPUBChapterContent(zr *zip.Reader, baseDir, href string) string {
 	return htmlToText(html)
 }
 
-// extractAnchorSection extracts content starting from an anchor ID
+// extractAnchorSection extracts content starting from an anchor ID until the next anchor/section
 // Based on Python fetch_chapters_text logic
 func extractAnchorSection(html, anchor string) string {
 	// Find the element with this ID
@@ -320,7 +321,37 @@ func extractAnchorSection(html, anchor string) string {
 		return html[idPos:]
 	}
 
-	return html[tagStart:]
+	// Extract from this anchor to the next anchor (id="...") or end of content
+	// This prevents including content from subsequent sections
+	remainingHTML := html[tagStart:]
+
+	// Find the next id= attribute after the current one (skip the current anchor)
+	nextIDPatterns := []string{`id="tocref`, `id='tocref`, `id="navpoint`, `id='navpoint`}
+	nextIDPos := -1
+	for _, pattern := range nextIDPatterns {
+		// Search after the current anchor position
+		searchStart := len(idPattern) + 10 // Skip past current id="anchor"
+		if searchStart < len(remainingHTML) {
+			pos := strings.Index(remainingHTML[searchStart:], pattern)
+			if pos != -1 {
+				actualPos := searchStart + pos
+				if nextIDPos == -1 || actualPos < nextIDPos {
+					nextIDPos = actualPos
+				}
+			}
+		}
+	}
+
+	if nextIDPos != -1 {
+		// Find the start of the tag containing the next ID
+		tagStart := strings.LastIndex(remainingHTML[:nextIDPos], "<")
+		if tagStart != -1 {
+			return remainingHTML[:tagStart]
+		}
+		return remainingHTML[:nextIDPos]
+	}
+
+	return remainingHTML
 }
 
 func findFile(zr *zip.Reader, name string) (io.Reader, error) {
@@ -377,6 +408,9 @@ func extractCoverHref(pkg epubPackage, baseDir string) string {
 // Based on Python html2text library behavior
 // Uses pre-compiled regex patterns for performance
 func htmlToText(html string) string {
+	// Remove head section (contains title, meta, etc.)
+	html = reHead.ReplaceAllString(html, "")
+
 	// Remove script and style tags with content
 	html = reScript.ReplaceAllString(html, "")
 	html = reStyle.ReplaceAllString(html, "")
