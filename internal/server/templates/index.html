@@ -24,8 +24,14 @@
             </div>
         </header>
 
+        <!-- Tab Navigation -->
+        <nav class="main-tabs">
+            <button class="main-tab active" data-tab="upload">📤 Upload Book</button>
+            <button class="main-tab" data-tab="opds">📚 Browse OPDS Catalogs</button>
+        </nav>
+
         <!-- Upload Section -->
-        <section class="upload-section">
+        <section class="upload-section main-tab-content active" id="tab-upload">
             <h2>📤 Upload Book</h2>
             <div class="upload-form">
                 <div class="drop-zone" id="drop-zone">
@@ -96,6 +102,77 @@
                 </button>
             </div>
         </section>
+
+        <!-- OPDS Browser Section -->
+        <section class="opds-section main-tab-content" id="tab-opds">
+            <div class="opds-header">
+                <h2>📚 OPDS Catalog Browser</h2>
+            </div>
+            
+            <!-- Source Selection -->
+            <div class="opds-sources">
+                <label for="opds-source">Select Catalog:</label>
+                <select id="opds-source">
+                    <option value="">Loading sources...</option>
+                </select>
+                <button class="btn btn-primary" id="opds-browse-btn">Browse</button>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="opds-search" id="opds-search-container" style="display: none;">
+                <input type="text" id="opds-search-input" placeholder="Search books...">
+                <button class="btn btn-primary" id="opds-search-btn">🔍 Search</button>
+            </div>
+
+            <!-- Breadcrumb Navigation -->
+            <div class="opds-breadcrumb" id="opds-breadcrumb"></div>
+
+            <!-- Catalog Content -->
+            <div class="opds-content" id="opds-content">
+                <div class="opds-empty">
+                    <span class="icon">📚</span>
+                    <p>Select a catalog source and click Browse to explore</p>
+                </div>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div class="opds-loading" id="opds-loading" style="display: none;">
+                <span class="spinner">⏳</span>
+                <p>Loading catalog...</p>
+            </div>
+        </section>
+
+        <!-- OPDS Book Preview Modal -->
+        <div class="modal" id="opds-book-modal">
+            <div class="modal-overlay"></div>
+            <div class="modal-content opds-book-modal">
+                <div class="modal-header">
+                    <h2 id="opds-book-title">Book Title</h2>
+                    <button class="modal-close" id="opds-book-close">×</button>
+                </div>
+                <div class="opds-book-content">
+                    <div class="opds-book-cover" id="opds-book-cover">
+                        <span class="no-cover">No Cover</span>
+                    </div>
+                    <div class="opds-book-info">
+                        <p class="opds-book-author" id="opds-book-author"></p>
+                        <p class="opds-book-summary" id="opds-book-summary"></p>
+                        <div class="opds-book-meta">
+                            <span id="opds-book-language"></span>
+                            <span id="opds-book-publisher"></span>
+                        </div>
+                        <div class="opds-book-categories" id="opds-book-categories"></div>
+                    </div>
+                </div>
+                <div class="opds-book-downloads">
+                    <h4>📥 Download Options</h4>
+                    <div class="download-options" id="opds-download-options"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="opds-book-cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
 
         <!-- Preview Section (hidden by default) -->
         <section class="preview-section" id="preview-section" style="display: none;">
@@ -180,6 +257,7 @@
                 <button class="tab-btn" data-tab="output">Output</button>
                 <button class="tab-btn" data-tab="cloud">Cloud TTS</button>
                 <button class="tab-btn" data-tab="audiobookshelf">Audiobookshelf</button>
+                <button class="tab-btn" data-tab="opds">OPDS Sources</button>
             </div>
             <div class="settings-body">
                 <!-- General Tab -->
@@ -363,6 +441,45 @@
                             </button>
                             <span class="connection-result" id="abs-connection-result"></span>
                         </div>
+                    </div>
+                </div>
+
+                <!-- OPDS Sources Tab -->
+                <div class="tab-content" id="tab-opds">
+                    <div class="settings-section">
+                        <h3>📖 OPDS Catalog Sources</h3>
+                        <p class="section-description">
+                            Configure OPDS catalog sources for browsing and downloading ebooks.
+                        </p>
+                        <div class="opds-sources-list" id="opds-sources-list">
+                            <!-- Sources will be populated by JS -->
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h3>➕ Add New Source</h3>
+                        <div class="form-group">
+                            <label for="new-source-name">Name</label>
+                            <input type="text" id="new-source-name" placeholder="My OPDS Catalog">
+                        </div>
+                        <div class="form-group">
+                            <label for="new-source-url">URL</label>
+                            <input type="text" id="new-source-url" placeholder="https://example.com/opds">
+                        </div>
+                        <div class="form-group">
+                            <label for="new-source-desc">Description (optional)</label>
+                            <input type="text" id="new-source-desc" placeholder="Description">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="new-source-username">Username (optional)</label>
+                                <input type="text" id="new-source-username" placeholder="For authenticated feeds">
+                            </div>
+                            <div class="form-group">
+                                <label for="new-source-password">Password (optional)</label>
+                                <input type="password" id="new-source-password" placeholder="Password">
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" id="add-source-btn">➕ Add Source</button>
                     </div>
                 </div>
             </div>

@@ -132,6 +132,16 @@ abb_tts/
 | `GET` | `/api/voices` | List available voices for a provider |
 | `GET` | `/api/config` | Get client-relevant configuration |
 | `WS` | `/api/ws` | WebSocket for real-time updates |
+| `GET` | `/api/opds/sources` | List OPDS catalog sources |
+| `POST` | `/api/opds/sources` | Add new OPDS source |
+| `GET` | `/api/opds/sources/{id}` | Get OPDS source details |
+| `PUT` | `/api/opds/sources/{id}` | Update OPDS source |
+| `DELETE` | `/api/opds/sources/{id}` | Delete OPDS source |
+| `GET` | `/api/opds/browse?url=` | Browse OPDS catalog at URL |
+| `GET` | `/api/opds/search?url=&q=` | Search OPDS catalog |
+| `POST` | `/api/opds/download` | Download book from OPDS and create preview |
+| `POST` | `/api/opds/convert` | Start conversion from OPDS preview |
+| `GET` | `/api/opds/proxy?url=` | Proxy requests to OPDS (for CORS) |
 
 ### WebSocket Messages
 
@@ -252,6 +262,7 @@ Flags:
 | Multi-Part Audiobooks | ✅ Done | Split large books based on max_file_size_mb |
 | SQLite Storage Layer | ✅ Done | Config and job persistence with SQLite |
 | Settings UI | ✅ Done | Multi-tab configuration modal (General, TTS, Output, Audiobookshelf) |
+| OPDS Client | ✅ Done | Browse OPDS catalogs, download books for conversion |
 
 ### In Progress 🔄
 

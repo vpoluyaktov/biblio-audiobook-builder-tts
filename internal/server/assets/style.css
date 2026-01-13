@@ -1063,3 +1063,493 @@ h1 .icon {
         max-height: 90vh;
     }
 }
+
+/* Main Tab Navigation */
+.main-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 2rem;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 0.25rem;
+    border: 1px solid var(--border);
+}
+
+.main-tab {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.main-tab:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.main-tab.active {
+    background: var(--accent);
+    color: white;
+}
+
+.main-tab-content {
+    display: none;
+}
+
+.main-tab-content.active {
+    display: block;
+}
+
+/* OPDS Section */
+.opds-section {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    border: 1px solid var(--border);
+}
+
+.opds-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.opds-header h2 {
+    font-size: 1.25rem;
+    margin: 0;
+}
+
+.opds-sources {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.opds-sources label {
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.opds-sources select {
+    flex: 1;
+    min-width: 200px;
+    padding: 0.75rem 1rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.opds-search {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.opds-search input {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.opds-search input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.opds-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    font-size: 0.875rem;
+}
+
+.opds-breadcrumb-item {
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.opds-breadcrumb-item:hover {
+    text-decoration: underline;
+}
+
+.opds-breadcrumb-separator {
+    color: var(--text-muted);
+}
+
+.opds-breadcrumb-current {
+    color: var(--text-secondary);
+}
+
+.opds-content {
+    min-height: 300px;
+}
+
+.opds-empty {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-muted);
+}
+
+.opds-empty .icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    display: block;
+}
+
+.opds-loading {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-secondary);
+}
+
+.opds-loading .spinner {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    display: block;
+}
+
+/* OPDS Catalog Grid */
+.opds-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1.5rem;
+}
+
+.opds-entry {
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.opds-entry:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.opds-entry-cover {
+    width: 100%;
+    height: 200px;
+    background: var(--bg-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.opds-entry-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.opds-entry-cover .no-cover {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+.opds-entry-cover .nav-icon {
+    font-size: 3rem;
+}
+
+.opds-entry-info {
+    padding: 1rem;
+}
+
+.opds-entry-title {
+    font-weight: 500;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.opds-entry-author {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.opds-entry-format {
+    display: inline-block;
+    margin-top: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    background: var(--accent);
+    color: white;
+    font-size: 0.7rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+/* OPDS Navigation Entry */
+.opds-entry.navigation .opds-entry-cover {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+}
+
+.opds-entry.navigation .opds-entry-cover .nav-icon {
+    color: white;
+}
+
+/* OPDS Book Modal */
+.opds-book-modal {
+    max-width: 600px;
+}
+
+.opds-book-content {
+    display: flex;
+    gap: 1.5rem;
+    padding: 1.5rem;
+}
+
+.opds-book-cover {
+    width: 150px;
+    height: 200px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.opds-book-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.opds-book-info {
+    flex: 1;
+}
+
+.opds-book-author {
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+}
+
+.opds-book-summary {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+    max-height: 100px;
+    overflow-y: auto;
+    margin-bottom: 0.75rem;
+}
+
+.opds-book-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+
+.opds-book-categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.opds-book-category {
+    padding: 0.25rem 0.5rem;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.opds-book-downloads {
+    padding: 0 1.5rem 1.5rem;
+}
+
+.opds-book-downloads h4 {
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    color: var(--text-secondary);
+}
+
+.download-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.download-option {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+
+.download-option-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.download-option-format {
+    padding: 0.25rem 0.5rem;
+    background: var(--accent);
+    color: white;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+    font-weight: 500;
+}
+
+.download-option-format.unsupported {
+    background: var(--text-muted);
+}
+
+.download-option-title {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+/* OPDS Sources Modal */
+.opds-sources-list {
+    padding: 1.5rem;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.opds-source-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--border);
+}
+
+.opds-source-item:last-child {
+    margin-bottom: 0;
+}
+
+.opds-source-info {
+    flex: 1;
+}
+
+.opds-source-name {
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.opds-source-url {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    word-break: break-all;
+}
+
+.opds-source-desc {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
+.opds-source-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.opds-source-badge {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    background: var(--accent);
+    color: white;
+    font-size: 0.7rem;
+    border-radius: 4px;
+    margin-left: 0.5rem;
+}
+
+.opds-add-source {
+    padding: 1.5rem;
+    border-top: 1px solid var(--border);
+    background: var(--bg-secondary);
+}
+
+.opds-add-source h4 {
+    margin-bottom: 1rem;
+    font-size: 1rem;
+}
+
+/* Pagination */
+.opds-pagination {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+}
+
+@media (max-width: 768px) {
+    .main-tabs {
+        flex-direction: column;
+    }
+
+    .main-tab {
+        text-align: center;
+    }
+
+    .opds-sources {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .opds-sources select {
+        width: 100%;
+    }
+
+    .opds-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 1rem;
+    }
+
+    .opds-book-content {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .opds-book-meta {
+        justify-content: center;
+    }
+
+    .opds-book-categories {
+        justify-content: center;
+    }
+}
