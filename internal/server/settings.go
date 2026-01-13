@@ -35,8 +35,10 @@ type SettingsRequest struct {
 	MaxFileSizeMB     int `json:"max_file_size_mb"`
 
 	// Cloud TTS
-	OpenAIAPIKey string `json:"openai_api_key"`
-	GoogleAPIKey string `json:"google_api_key"`
+	OpenAIAPIKey   string `json:"openai_api_key"`
+	GoogleAPIKey   string `json:"google_api_key"`
+	AzureTTSKey    string `json:"azure_tts_key"`
+	AzureTTSRegion string `json:"azure_tts_region"`
 
 	// OpenTTS
 	OpenTTSURL string `json:"opentts_url"`
@@ -91,8 +93,10 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 		MaxFileSizeMB:     s.cfg.MaxFileSizeMB,
 
 		// Cloud TTS
-		OpenAIAPIKey: s.cfg.OpenAIAPIKey,
-		GoogleAPIKey: s.cfg.GoogleAPIKey,
+		OpenAIAPIKey:   s.cfg.OpenAIAPIKey,
+		GoogleAPIKey:   s.cfg.GoogleAPIKey,
+		AzureTTSKey:    s.cfg.AzureTTSKey,
+		AzureTTSRegion: s.cfg.AzureTTSRegion,
 
 		// OpenTTS
 		OpenTTSURL: s.cfg.OpenTTSURL,
@@ -199,6 +203,12 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 	if wasProvided("google_api_key") {
 		s.cfg.GoogleAPIKey = req.GoogleAPIKey
 	}
+	if wasProvided("azure_tts_key") {
+		s.cfg.AzureTTSKey = req.AzureTTSKey
+	}
+	if wasProvided("azure_tts_region") {
+		s.cfg.AzureTTSRegion = req.AzureTTSRegion
+	}
 
 	// OpenTTS
 	if wasProvided("opentts_url") {
@@ -247,6 +257,8 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 			"audiobookshelf_library":    {req.AudiobookshelfLibrary, wasProvided("audiobookshelf_library")},
 			"openai_api_key":            {req.OpenAIAPIKey, wasProvided("openai_api_key")},
 			"google_api_key":            {req.GoogleAPIKey, wasProvided("google_api_key")},
+			"azure_tts_key":             {req.AzureTTSKey, wasProvided("azure_tts_key")},
+			"azure_tts_region":          {req.AzureTTSRegion, wasProvided("azure_tts_region")},
 			"opentts_url":               {req.OpenTTSURL, wasProvided("opentts_url")},
 		}
 

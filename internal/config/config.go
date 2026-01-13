@@ -43,6 +43,10 @@ type Config struct {
 	// OpenAI TTS settings
 	OpenAIAPIKey string `mapstructure:"openai_api_key"` // OpenAI API key for TTS
 
+	// Azure TTS settings
+	AzureTTSKey    string `mapstructure:"azure_tts_key"`    // Azure Cognitive Services subscription key
+	AzureTTSRegion string `mapstructure:"azure_tts_region"` // Azure region (e.g., eastus, westus2)
+
 	// Audiobookshelf integration
 	AudiobookshelfURL      string `mapstructure:"audiobookshelf_url"`
 	AudiobookshelfUser     string `mapstructure:"audiobookshelf_user"`
@@ -87,6 +91,10 @@ func Load(configFile string) (*Config, error) {
 
 	// OpenAI TTS settings
 	viper.SetDefault("openai_api_key", "")
+
+	// Azure TTS settings
+	viper.SetDefault("azure_tts_key", "")
+	viper.SetDefault("azure_tts_region", "")
 
 	// Audiobookshelf settings
 	viper.SetDefault("audiobookshelf_url", "")
@@ -185,6 +193,12 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 	}
 	if v, ok := dbConfig["openai_api_key"].(string); ok {
 		cfg.OpenAIAPIKey = v
+	}
+	if v, ok := dbConfig["azure_tts_key"].(string); ok {
+		cfg.AzureTTSKey = v
+	}
+	if v, ok := dbConfig["azure_tts_region"].(string); ok {
+		cfg.AzureTTSRegion = v
 	}
 	if v, ok := dbConfig["audiobookshelf_url"].(string); ok {
 		cfg.AudiobookshelfURL = v

@@ -55,6 +55,10 @@ type Config struct {
 	// OpenAI TTS settings
 	OpenAIAPIKey string `json:"openai_api_key"`
 
+	// Azure TTS settings
+	AzureTTSKey    string `json:"azure_tts_key"`
+	AzureTTSRegion string `json:"azure_tts_region"`
+
 	// Audiobookshelf integration
 	AudiobookshelfURL      string `json:"audiobookshelf_url"`
 	AudiobookshelfUser     string `json:"audiobookshelf_user"`
@@ -285,6 +289,12 @@ func (db *DB) GetAllConfig() (*Config, error) {
 	if v, ok := configMap["openai_api_key"]; ok {
 		cfg.OpenAIAPIKey = v
 	}
+	if v, ok := configMap["azure_tts_key"]; ok {
+		cfg.AzureTTSKey = v
+	}
+	if v, ok := configMap["azure_tts_region"]; ok {
+		cfg.AzureTTSRegion = v
+	}
 	if v, ok := configMap["audiobookshelf_url"]; ok {
 		cfg.AudiobookshelfURL = v
 	}
@@ -344,6 +354,8 @@ func (db *DB) SaveAllConfig(cfg *Config) error {
 		"google_api_key":            cfg.GoogleAPIKey,
 		"opentts_url":               cfg.OpenTTSURL,
 		"openai_api_key":            cfg.OpenAIAPIKey,
+		"azure_tts_key":             cfg.AzureTTSKey,
+		"azure_tts_region":          cfg.AzureTTSRegion,
 		"audiobookshelf_url":        cfg.AudiobookshelfURL,
 		"audiobookshelf_user":       cfg.AudiobookshelfUser,
 		"audiobookshelf_password":   cfg.AudiobookshelfPassword,
@@ -384,6 +396,8 @@ func DefaultConfig() *Config {
 		GoogleAPIKey:            "",
 		OpenTTSURL:              "",
 		OpenAIAPIKey:            "",
+		AzureTTSKey:             "",
+		AzureTTSRegion:          "",
 		AudiobookshelfURL:       "",
 		AudiobookshelfUser:      "admin",
 		AudiobookshelfPassword:  "",
@@ -761,6 +775,8 @@ func (c *Config) ToAppConfig() map[string]interface{} {
 		"google_api_key":            c.GoogleAPIKey,
 		"opentts_url":               c.OpenTTSURL,
 		"openai_api_key":            c.OpenAIAPIKey,
+		"azure_tts_key":             c.AzureTTSKey,
+		"azure_tts_region":          c.AzureTTSRegion,
 		"audiobookshelf_url":        c.AudiobookshelfURL,
 		"audiobookshelf_user":       c.AudiobookshelfUser,
 		"audiobookshelf_password":   c.AudiobookshelfPassword,

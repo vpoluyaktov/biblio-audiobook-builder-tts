@@ -1057,6 +1057,8 @@ class App {
         // Cloud TTS tab
         document.getElementById('cfg-openai-api-key').value = s.openai_api_key || '';
         document.getElementById('cfg-google-api-key').value = s.google_api_key || '';
+        document.getElementById('cfg-azure-tts-key').value = s.azure_tts_key || '';
+        document.getElementById('cfg-azure-tts-region').value = s.azure_tts_region || '';
         
         // OpenTTS tab
         document.getElementById('cfg-opentts-url').value = s.opentts_url || '';
@@ -1095,6 +1097,8 @@ class App {
             // Cloud TTS
             openai_api_key: document.getElementById('cfg-openai-api-key').value,
             google_api_key: document.getElementById('cfg-google-api-key').value,
+            azure_tts_key: document.getElementById('cfg-azure-tts-key').value,
+            azure_tts_region: document.getElementById('cfg-azure-tts-region').value,
             
             // OpenTTS
             opentts_url: document.getElementById('cfg-opentts-url').value,

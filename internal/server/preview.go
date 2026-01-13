@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -152,6 +153,14 @@ func GetPricingForVoice(provider, voiceID string) TTSModelPricing {
 		}
 		// Default to tts-1 pricing
 		return providerPricing["tts-1"]
+	}
+
+	// For Azure, voice ID format is "en-US-GuyNeural" - check if it ends with "Neural"
+	if provider == "azure" {
+		if strings.HasSuffix(voiceID, "Neural") || strings.Contains(voiceID, "Neural") {
+			return providerPricing["Neural"]
+		}
+		return providerPricing["Standard"]
 	}
 
 	// Extract model type from voice ID (e.g., "en-US-Wavenet-A" -> "Wavenet")
