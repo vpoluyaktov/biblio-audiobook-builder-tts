@@ -429,6 +429,32 @@
                             <small>First 1M characters/month free for Standard, 1M for WaveNet/Neural2</small>
                         </div>
                     </div>
+                    <div class="settings-section">
+                        <h3>🔷 Azure Cognitive Services TTS</h3>
+                        <p class="section-description">
+                            Configure Azure Cognitive Services Speech API for neural voices.
+                            Get your subscription key from the <a href="https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices" target="_blank">Azure Portal</a>.
+                        </p>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="cfg-azure-tts-key">Subscription Key</label>
+                                <input type="password" id="cfg-azure-tts-key" placeholder="Your Azure subscription key">
+                            </div>
+                            <div class="form-group">
+                                <label for="cfg-azure-tts-region">Region</label>
+                                <input type="text" id="cfg-azure-tts-region" placeholder="eastus">
+                                <small>e.g., eastus, westus2, westeurope</small>
+                            </div>
+                        </div>
+                        <div class="settings-subsection">
+                            <h4>💰 Pricing (per 1 million characters)</h4>
+                            <ul class="pricing-list">
+                                <li><strong>Standard voices:</strong> $4.00</li>
+                                <li><strong>Neural voices:</strong> $16.00</li>
+                            </ul>
+                            <small>500K characters/month free tier available</small>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- OpenTTS Tab -->

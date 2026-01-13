@@ -74,11 +74,12 @@ func NewService(cfg *config.Config) Service {
 		log.Printf("OpenAI API key not configured, skipping OpenAI provider")
 	}
 
-	// Initialize other cloud providers if configured (legacy support)
-	if cfg.CloudAPIKey != "" {
-		if cfg.AzureTTSEndpoint != "" {
-			s.providers["azure"] = NewCloudProvider("azure", cfg.CloudAPIKey, cfg.AzureTTSEndpoint)
-		}
+	// Initialize Azure TTS if subscription key and region are configured
+	if cfg.AzureTTSKey != "" && cfg.AzureTTSRegion != "" {
+		log.Printf("Initializing Azure TTS provider with region: %s", cfg.AzureTTSRegion)
+		s.providers["azure"] = NewAzureProvider(cfg.AzureTTSKey, cfg.AzureTTSRegion)
+	} else {
+		log.Printf("Azure TTS key or region not configured, skipping Azure provider")
 	}
 
 	// If no providers are available, add espeak as default
@@ -164,6 +165,11 @@ func (s *service) GetVoicesFiltered(providerName, language, model string) []Voic
 			return oap.GetVoicesFiltered(language, model)
 		}
 
+		// Check if provider supports filtering (AzureProvider does)
+		if ap, ok := provider.(*AzureProvider); ok {
+			return ap.GetVoicesFiltered(language, model)
+		}
+
 		// For other providers, get all voices and filter manually
 		allVoices := provider.GetAvailableVoices()
 		for _, v := range allVoices {
@@ -219,6 +225,11 @@ func (s *service) GetAvailableLanguages(providerName string) []string {
 			return oap.GetAvailableLanguages()
 		}
 
+		// Check if provider has GetAvailableLanguages method (Azure)
+		if ap, ok := provider.(*AzureProvider); ok {
+			return ap.GetAvailableLanguages()
+		}
+
 		// For other providers, extract from voices
 		for _, v := range provider.GetAvailableVoices() {
 			langMap[v.Language] = true
@@ -262,6 +273,11 @@ func (s *service) GetAvailableModels(providerName string) []string {
 		// Check if provider is OpenAI - use models
 		if oap, ok := provider.(*OpenAIProvider); ok {
 			return oap.GetAvailableModels()
+		}
+
+		// Check if provider is Azure - use models
+		if ap, ok := provider.(*AzureProvider); ok {
+			return ap.GetAvailableModels()
 		}
 
 		// For other providers, extract from voices
@@ -312,10 +328,8 @@ func (s *service) ReloadProviders() {
 		s.providers["openai"] = NewOpenAIProvider(s.cfg.OpenAIAPIKey)
 	}
 
-	// Initialize other cloud providers if configured (legacy support)
-	if s.cfg.CloudAPIKey != "" {
-		if s.cfg.AzureTTSEndpoint != "" {
-			s.providers["azure"] = NewCloudProvider("azure", s.cfg.CloudAPIKey, s.cfg.AzureTTSEndpoint)
-		}
+	// Initialize Azure TTS if subscription key and region are configured
+	if s.cfg.AzureTTSKey != "" && s.cfg.AzureTTSRegion != "" {
+		s.providers["azure"] = NewAzureProvider(s.cfg.AzureTTSKey, s.cfg.AzureTTSRegion)
 	}
 }
