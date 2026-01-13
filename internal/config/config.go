@@ -40,6 +40,9 @@ type Config struct {
 	// OpenTTS settings
 	OpenTTSURL string `mapstructure:"opentts_url"` // OpenTTS server URL (e.g., http://localhost:5500)
 
+	// OpenAI TTS settings
+	OpenAIAPIKey string `mapstructure:"openai_api_key"` // OpenAI API key for TTS
+
 	// Audiobookshelf integration
 	AudiobookshelfURL      string `mapstructure:"audiobookshelf_url"`
 	AudiobookshelfUser     string `mapstructure:"audiobookshelf_user"`
@@ -81,6 +84,9 @@ func Load(configFile string) (*Config, error) {
 
 	// OpenTTS settings
 	viper.SetDefault("opentts_url", "")
+
+	// OpenAI TTS settings
+	viper.SetDefault("openai_api_key", "")
 
 	// Audiobookshelf settings
 	viper.SetDefault("audiobookshelf_url", "")
@@ -176,6 +182,9 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 	}
 	if v, ok := dbConfig["opentts_url"].(string); ok {
 		cfg.OpenTTSURL = v
+	}
+	if v, ok := dbConfig["openai_api_key"].(string); ok {
+		cfg.OpenAIAPIKey = v
 	}
 	if v, ok := dbConfig["audiobookshelf_url"].(string); ok {
 		cfg.AudiobookshelfURL = v

@@ -80,6 +80,10 @@ var ttsPricing = map[string]map[string]TTSModelPricing{
 		"Standard": {4.00, "$4/1M chars", 500000},
 		"Neural":   {16.00, "$16/1M chars", 500000},
 	},
+	"openai": {
+		"tts-1":    {15.00, "$15/1M chars", 0},
+		"tts-1-hd": {30.00, "$30/1M chars", 0},
+	},
 }
 
 // ModelCostInfo represents cost info for a single model
@@ -140,6 +144,16 @@ func GetPricingForVoice(provider, voiceID string) TTSModelPricing {
 		return providerPricing["default"]
 	}
 
+	// For OpenAI, voice ID format is "model:voice" (e.g., "tts-1:alloy", "tts-1-hd:nova")
+	if provider == "openai" {
+		modelType := extractOpenAIModel(voiceID)
+		if pricing, ok := providerPricing[modelType]; ok {
+			return pricing
+		}
+		// Default to tts-1 pricing
+		return providerPricing["tts-1"]
+	}
+
 	// Extract model type from voice ID (e.g., "en-US-Wavenet-A" -> "Wavenet")
 	modelType := extractModelTypeFromVoice(voiceID)
 	if pricing, ok := providerPricing[modelType]; ok {
@@ -152,6 +166,22 @@ func GetPricingForVoice(provider, voiceID string) TTSModelPricing {
 	}
 
 	return TTSModelPricing{0, "Unknown model", 0}
+}
+
+// extractOpenAIModel extracts the model from an OpenAI voice ID
+// e.g., "tts-1:alloy" -> "tts-1", "tts-1-hd:nova" -> "tts-1-hd"
+func extractOpenAIModel(voiceID string) string {
+	for i, r := range voiceID {
+		if r == ':' {
+			return voiceID[:i]
+		}
+	}
+	// No colon found, check if it's a model name directly
+	if voiceID == "tts-1" || voiceID == "tts-1-hd" {
+		return voiceID
+	}
+	// Default to tts-1
+	return "tts-1"
 }
 
 // extractModelTypeFromVoice extracts the model type from a voice ID

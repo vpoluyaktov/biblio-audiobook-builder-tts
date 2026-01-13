@@ -643,9 +643,50 @@ class App {
     }
 
     async confirmConvert() {
-        if (!this.selectedFile) return;
+        if (!this.selectedFile && !this.currentPreview?.id) return;
+        
         this.closePreview();
-        await this.uploadFile();
+        
+        // If we have a preview ID (from OPDS download), use the convert API
+        if (this.currentPreview?.id && !this.selectedFile) {
+            await this.convertOPDSBook();
+        } else {
+            await this.uploadFile();
+        }
+    }
+
+    async convertOPDSBook() {
+        if (!this.currentPreview?.id) return;
+
+        this.confirmConvertBtn.disabled = true;
+        this.confirmConvertBtn.innerHTML = '<span class="spinner">⏳</span> Starting...';
+
+        try {
+            const response = await fetch('/api/opds/convert', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    preview_id: this.currentPreview.id,
+                    provider: this.providerSelect.value,
+                    voice: this.voiceSelect.value,
+                    speed: parseFloat(this.speedInput.value),
+                    pitch: parseFloat(this.pitchInput.value)
+                })
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Conversion failed');
+            }
+
+            this.showToast('Conversion job started!', 'success');
+            this.clearSelectedFile();
+        } catch (e) {
+            this.showToast('Conversion failed: ' + e.message, 'error');
+        } finally {
+            this.confirmConvertBtn.disabled = false;
+            this.confirmConvertBtn.innerHTML = '✅ Confirm & Start Conversion';
+        }
     }
 
     formatNumber(num) {
@@ -1014,6 +1055,7 @@ class App {
         document.getElementById('cfg-max-file-size').value = s.max_file_size_mb || 2000;
         
         // Cloud TTS tab
+        document.getElementById('cfg-openai-api-key').value = s.openai_api_key || '';
         document.getElementById('cfg-google-api-key').value = s.google_api_key || '';
         
         // OpenTTS tab
@@ -1051,6 +1093,7 @@ class App {
             max_file_size_mb: parseInt(document.getElementById('cfg-max-file-size').value),
             
             // Cloud TTS
+            openai_api_key: document.getElementById('cfg-openai-api-key').value,
             google_api_key: document.getElementById('cfg-google-api-key').value,
             
             // OpenTTS
