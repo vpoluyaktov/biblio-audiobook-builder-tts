@@ -145,6 +145,8 @@ func TestCreateConcatFile(t *testing.T) {
 		"/path/to/chapter1.wav",
 		"/path/to/chapter2.wav",
 		"/path/to/file with spaces.wav",
+		"/path/to/За секунду до взрыва/chapter1.wav",
+		"/path/to/file's quote.wav",
 	}
 
 	concatFile := builder.tempDir + "/concat.txt"
@@ -169,6 +171,14 @@ func TestCreateConcatFile(t *testing.T) {
 	}
 	if !containsString(contentStr, "file '/path/to/file with spaces.wav'") {
 		t.Error("Concat file should contain file with spaces")
+	}
+	// Cyrillic characters should be preserved as-is
+	if !containsString(contentStr, "file '/path/to/За секунду до взрыва/chapter1.wav'") {
+		t.Error("Concat file should contain Cyrillic path")
+	}
+	// Single quotes should be escaped with backslash
+	if !containsString(contentStr, "file '/path/to/file\\'s quote.wav'") {
+		t.Error("Concat file should escape single quotes with backslash")
 	}
 }
 

@@ -398,6 +398,7 @@ func (w *Worker) uploadToAudiobookshelf(job *Job, book *parser.Book) error {
 // sanitizeFileName removes or replaces characters that are invalid in file names
 func sanitizeFileName(name string) string {
 	// Replace common problematic characters
+	// Note: single quotes can cause issues with shell commands and ffmpeg concat files
 	replacer := strings.NewReplacer(
 		"/", "_",
 		"\\", "_",
@@ -408,6 +409,8 @@ func sanitizeFileName(name string) string {
 		"<", "_",
 		">", "_",
 		"|", "_",
+		"'", "'", // Replace curly apostrophe with straight single quote (safe)
+		"'", "'", // Keep straight single quote (handled by concat escaping)
 		"\n", " ",
 		"\r", " ",
 		"\t", " ",
