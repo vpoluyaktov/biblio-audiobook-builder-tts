@@ -1614,6 +1614,61 @@ h1 .icon {
     border-top: 1px solid var(--border);
 }
 
+/* Worker Progress Bars */
+.worker-progress-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-top: 0.75rem;
+    padding: 0.5rem;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+}
+
+.worker-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+}
+
+.worker-progress.idle {
+    opacity: 0.5;
+}
+
+.worker-label {
+    width: 24px;
+    font-weight: 600;
+    color: var(--accent);
+}
+
+.worker-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--bg-primary);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.worker-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--success));
+    border-radius: 4px;
+    transition: width 0.2s ease;
+}
+
+.worker-progress.idle .worker-fill {
+    background: var(--text-muted);
+}
+
+.worker-info {
+    width: 90px;
+    text-align: right;
+    color: var(--text-secondary);
+    font-family: monospace;
+    font-size: 0.7rem;
+}
+
 @media (max-width: 768px) {
     .main-tabs {
         flex-direction: column;

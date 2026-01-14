@@ -23,6 +23,17 @@ const (
 	JobStatusCancelled  JobStatus = "cancelled"
 )
 
+// WorkerProgress represents the progress of a single parallel worker
+type WorkerProgress struct {
+	WorkerID       int     `json:"worker_id"`
+	ChapterIndex   int     `json:"chapter_index"`
+	ChapterTitle   string  `json:"chapter_title"`
+	Progress       float64 `json:"progress"` // 0.0 to 1.0
+	ChunksTotal    int     `json:"chunks_total"`
+	ChunksComplete int     `json:"chunks_complete"`
+	Active         bool    `json:"active"`
+}
+
 // Job represents a book-to-audiobook conversion job
 type Job struct {
 	ID                string    `json:"id"`
@@ -33,6 +44,10 @@ type Job struct {
 	CurrentChapter    string    `json:"current_chapter"` // Currently processing chapter
 	TotalChapters     int       `json:"total_chapters"`
 	CurrentChapterNum int       `json:"current_chapter_num"`
+
+	// Parallel processing progress
+	WorkerProgress []WorkerProgress `json:"worker_progress,omitempty"`
+	NumWorkers     int              `json:"num_workers,omitempty"`
 
 	// TTS settings
 	Provider string  `json:"provider"`
@@ -103,6 +118,51 @@ func (j *Job) SetProgress(progress float64, currentChapter string, chapterNum in
 	j.Progress = progress
 	j.CurrentChapter = currentChapter
 	j.CurrentChapterNum = chapterNum
+}
+
+// InitWorkerProgress initializes the worker progress array
+func (j *Job) InitWorkerProgress(numWorkers int) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	j.NumWorkers = numWorkers
+	j.WorkerProgress = make([]WorkerProgress, numWorkers)
+	for i := 0; i < numWorkers; i++ {
+		j.WorkerProgress[i] = WorkerProgress{
+			WorkerID: i,
+			Active:   false,
+		}
+	}
+}
+
+// SetWorkerProgress updates a specific worker's progress
+func (j *Job) SetWorkerProgress(workerID int, chapterIndex int, chapterTitle string, chunksComplete, chunksTotal int) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	if workerID >= 0 && workerID < len(j.WorkerProgress) {
+		progress := 0.0
+		if chunksTotal > 0 {
+			progress = float64(chunksComplete) / float64(chunksTotal)
+		}
+		j.WorkerProgress[workerID] = WorkerProgress{
+			WorkerID:       workerID,
+			ChapterIndex:   chapterIndex,
+			ChapterTitle:   chapterTitle,
+			Progress:       progress,
+			ChunksTotal:    chunksTotal,
+			ChunksComplete: chunksComplete,
+			Active:         true,
+		}
+	}
+}
+
+// ClearWorkerProgress marks a worker as inactive (finished its chapter)
+func (j *Job) ClearWorkerProgress(workerID int) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	if workerID >= 0 && workerID < len(j.WorkerProgress) {
+		j.WorkerProgress[workerID].Active = false
+		j.WorkerProgress[workerID].Progress = 1.0
+	}
 }
 
 // SetBook sets the parsed book data

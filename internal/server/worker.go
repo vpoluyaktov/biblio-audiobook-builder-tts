@@ -220,6 +220,15 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 	var resultsMu sync.Mutex
 	var completedCount int32
 
+	// Worker ID assignment using a pool
+	workerPool := make(chan int, numWorkers)
+	for i := 0; i < numWorkers; i++ {
+		workerPool <- i
+	}
+
+	// Initialize worker progress tracking
+	job.InitWorkerProgress(numWorkers)
+
 	// Create job dispatcher
 	jd := utils.NewJobDispatcher(numWorkers)
 
@@ -229,6 +238,10 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 		chapter := book.Chapters[i]
 
 		jd.AddJob(i, func(idx int, ch parser.Chapter) {
+			// Get a worker ID from the pool
+			workerID := <-workerPool
+			defer func() { workerPool <- workerID }()
+
 			// Check for cancellation
 			select {
 			case <-w.ctx.Done():
@@ -239,7 +252,7 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 			default:
 			}
 
-			result := w.convertSingleChapter(job, ch, idx, outputDir)
+			result := w.convertSingleChapter(job, ch, idx, outputDir, workerID)
 
 			resultsMu.Lock()
 			results[idx] = result
@@ -252,7 +265,7 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 			job.SetProgress(progress, ch.Title, int(currentCompleted))
 			w.broadcastJobProgress(job)
 
-			logger.Debug("Converted chapter %d/%d: %s", currentCompleted, totalChapters, ch.Title)
+			logger.Debug("Converted chapter %d/%d: %s (worker %d)", currentCompleted, totalChapters, ch.Title, workerID)
 		}, chapterIndex, chapter)
 	}
 
@@ -287,7 +300,7 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 }
 
 // convertSingleChapter converts a single chapter to audio
-func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index int, outputDir string) ChapterResult {
+func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index int, outputDir string, workerID int) ChapterResult {
 	result := ChapterResult{Index: index}
 
 	// Apply pronunciation rules to chapter content
@@ -303,13 +316,19 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		logger.Warn("Failed to save chapter text file '%s': %v", textFileName, err)
 	}
 
-	// Convert chapter
-	reader, err := w.ttsService.ConvertToSpeech(content, &tts.ConversionOptions{
+	// Progress callback for per-chunk updates
+	progressCb := func(chunkIndex, totalChunks int, chunkText string) {
+		job.SetWorkerProgress(workerID, index, chapter.Title, chunkIndex+1, totalChunks)
+		w.broadcastJobProgress(job)
+	}
+
+	// Convert chapter with progress tracking
+	reader, err := w.ttsService.ConvertToSpeechWithProgress(content, &tts.ConversionOptions{
 		Voice:    job.Voice,
 		Provider: job.Provider,
 		Speed:    job.Speed,
 		Pitch:    job.Pitch,
-	})
+	}, progressCb)
 	if err != nil {
 		result.Error = fmt.Errorf("TTS conversion failed: %v", err)
 		return result
@@ -330,6 +349,9 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		result.Error = fmt.Errorf("failed to write audio: %v", err)
 		return result
 	}
+
+	// Mark worker as done with this chapter
+	job.ClearWorkerProgress(workerID)
 
 	result.OutputPath = outputPath
 	return result
