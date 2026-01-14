@@ -185,12 +185,18 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 	}
 	if v, ok := dbConfig["max_file_size_mb"].(float64); ok {
 		cfg.MaxFileSizeMB = int(v)
+	} else if v, ok := dbConfig["max_file_size_mb"].(int); ok {
+		cfg.MaxFileSizeMB = v
 	}
 	if v, ok := dbConfig["concurrent_tts_workers"].(float64); ok {
 		cfg.ConcurrentTTSWorkers = int(v)
+	} else if v, ok := dbConfig["concurrent_tts_workers"].(int); ok {
+		cfg.ConcurrentTTSWorkers = v
 	}
 	if v, ok := dbConfig["concurrent_encoders"].(float64); ok {
 		cfg.ConcurrentEncoders = int(v)
+	} else if v, ok := dbConfig["concurrent_encoders"].(int); ok {
+		cfg.ConcurrentEncoders = v
 	}
 	if v, ok := dbConfig["cloud_api_key"].(string); ok {
 		cfg.CloudAPIKey = v
