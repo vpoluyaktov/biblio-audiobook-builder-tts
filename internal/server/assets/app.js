@@ -180,6 +180,36 @@ class App {
             this.testOpenTTSBtn.addEventListener('click', () => this.testOpenTTSConnection());
         }
 
+        // Test Voice Modal events
+        this.testVoiceBtn = document.getElementById('test-voice-btn');
+        this.testVoiceModal = document.getElementById('test-voice-modal');
+        this.testVoiceClose = document.getElementById('test-voice-close');
+        this.testVoiceDone = document.getElementById('test-voice-done');
+        this.testVoiceGenerateBtn = document.getElementById('test-voice-generate-btn');
+        this.testVoiceText = document.getElementById('test-voice-text');
+        this.testVoiceStatus = document.getElementById('test-voice-status');
+        this.testVoiceAudio = document.getElementById('test-voice-audio');
+        this.testVoiceProviderDisplay = document.getElementById('test-voice-provider-display');
+        this.testVoiceVoiceDisplay = document.getElementById('test-voice-voice-display');
+        this.testVoiceSpeedDisplay = document.getElementById('test-voice-speed-display');
+        this.testVoicePitchDisplay = document.getElementById('test-voice-pitch-display');
+
+        if (this.testVoiceBtn) {
+            this.testVoiceBtn.addEventListener('click', () => this.openTestVoiceModal());
+        }
+        if (this.testVoiceClose) {
+            this.testVoiceClose.addEventListener('click', () => this.closeTestVoiceModal());
+        }
+        if (this.testVoiceDone) {
+            this.testVoiceDone.addEventListener('click', () => this.closeTestVoiceModal());
+        }
+        if (this.testVoiceModal) {
+            this.testVoiceModal.querySelector('.modal-overlay').addEventListener('click', () => this.closeTestVoiceModal());
+        }
+        if (this.testVoiceGenerateBtn) {
+            this.testVoiceGenerateBtn.addEventListener('click', () => this.generateTestVoice());
+        }
+
         // Main tab navigation
         this.mainTabs.forEach(tab => {
             tab.addEventListener('click', () => this.switchMainTab(tab.dataset.tab));
@@ -1204,6 +1234,91 @@ class App {
         } catch (e) {
             this.openTTSConnectionResult.textContent = '❌ ' + e.message;
             this.openTTSConnectionResult.className = 'connection-result error';
+        }
+    }
+
+    // Test Voice Modal Methods
+    openTestVoiceModal() {
+        const provider = this.providerSelect.value;
+        const voice = this.voiceSelect.value;
+        const voiceName = this.voiceSelect.options[this.voiceSelect.selectedIndex]?.text || voice;
+        const speed = this.speedInput.value;
+        const pitch = this.pitchInput.value;
+
+        if (!provider || !voice) {
+            this.showToast('Please select a provider and voice first', 'error');
+            return;
+        }
+
+        // Update display values
+        this.testVoiceProviderDisplay.textContent = provider;
+        this.testVoiceVoiceDisplay.textContent = voiceName;
+        this.testVoiceSpeedDisplay.textContent = speed + 'x';
+        this.testVoicePitchDisplay.textContent = pitch + 'x';
+
+        // Reset audio player and status
+        this.testVoiceAudio.src = '';
+        this.testVoiceAudio.style.display = 'none';
+        this.testVoiceStatus.textContent = '';
+        this.testVoiceStatus.className = 'test-voice-status';
+
+        // Show modal
+        this.testVoiceModal.classList.add('active');
+    }
+
+    closeTestVoiceModal() {
+        this.testVoiceModal.classList.remove('active');
+        // Stop audio if playing
+        if (this.testVoiceAudio) {
+            this.testVoiceAudio.pause();
+        }
+    }
+
+    async generateTestVoice() {
+        const provider = this.providerSelect.value;
+        const voice = this.voiceSelect.value;
+        const text = this.testVoiceText?.value || 'Hello, this is a test of the text to speech voice.';
+        const speed = parseFloat(this.speedInput.value || '1.0');
+        const pitch = parseFloat(this.pitchInput.value || '1.0');
+
+        if (!provider || !voice) {
+            this.showToast('Please select a provider and voice first', 'error');
+            return;
+        }
+
+        this.testVoiceGenerateBtn.disabled = true;
+        this.testVoiceGenerateBtn.innerHTML = '<span class="spinner">⏳</span> Generating...';
+        this.testVoiceStatus.textContent = '';
+        this.testVoiceStatus.className = 'test-voice-status';
+        this.testVoiceAudio.style.display = 'none';
+
+        try {
+            const response = await fetch('/api/test-voice', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider, voice, text, speed, pitch })
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to generate audio');
+            }
+
+            const audioBlob = await response.blob();
+            const audioUrl = URL.createObjectURL(audioBlob);
+            
+            this.testVoiceAudio.src = audioUrl;
+            this.testVoiceAudio.style.display = 'block';
+            this.testVoiceAudio.play();
+            
+            this.testVoiceStatus.textContent = '✅ Audio generated successfully';
+            this.testVoiceStatus.className = 'test-voice-status success';
+        } catch (e) {
+            this.testVoiceStatus.textContent = '❌ ' + e.message;
+            this.testVoiceStatus.className = 'test-voice-status error';
+        } finally {
+            this.testVoiceGenerateBtn.disabled = false;
+            this.testVoiceGenerateBtn.innerHTML = '🔊 Generate Audio';
         }
     }
 

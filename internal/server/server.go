@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"abb_tts/internal/config"
+	"abb_tts/internal/logger"
 	"abb_tts/internal/parser"
 	"abb_tts/internal/tts"
 )
@@ -95,6 +95,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/settings", s.handleSettings)
 	mux.HandleFunc("/api/settings/test-audiobookshelf", s.handleTestAudiobookshelf)
 	mux.HandleFunc("/api/settings/test-opentts", s.handleTestOpenTTS)
+	mux.HandleFunc("/api/test-voice", s.handleTestVoice)
 	mux.HandleFunc("/api/ws", func(w http.ResponseWriter, r *http.Request) {
 		ServeWS(s.hub, w, r)
 	})
@@ -116,7 +117,7 @@ func (s *Server) Start() error {
 		Handler: mux,
 	}
 
-	log.Printf("Server starting on %s", s.addr)
+	logger.Info("Server starting on %s", s.addr)
 	return s.httpServer.ListenAndServe()
 }
 
@@ -136,7 +137,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	data, err := templatesFS.ReadFile("templates/index.html")
 	if err != nil {
 		http.Error(w, "Error loading page", http.StatusInternalServerError)
-		log.Printf("Template error: %v", err)
+		logger.Error("Template error: %v", err)
 		return
 	}
 
@@ -397,7 +398,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		Payload: job.Clone(),
 	})
 
-	log.Printf("Created job %s for file %s", job.ID, header.Filename)
+	logger.Info("Created job %s for file %s", job.ID, header.Filename)
 
 	s.jsonResponse(w, http.StatusCreated, job.Clone())
 }
@@ -644,7 +645,7 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 	// Create preview
 	preview := s.previewStore.CreatePreview(book, header.Filename)
 
-	log.Printf("Created preview %s for %s (%d chapters, %d words)",
+	logger.Info("Created preview %s for %s (%d chapters, %d words)",
 		preview.ID, preview.BookTitle, preview.TotalChapters, preview.TotalWords)
 
 	s.jsonResponse(w, http.StatusOK, preview)
@@ -721,4 +722,96 @@ func (s *Server) GetPreviewStore() *PreviewStore {
 // GetAddr returns the server address
 func (s *Server) GetAddr() string {
 	return s.addr
+}
+
+// TestVoiceRequest represents the request body for voice testing
+type TestVoiceRequest struct {
+	Provider string  `json:"provider"`
+	Voice    string  `json:"voice"`
+	Text     string  `json:"text"`
+	Speed    float64 `json:"speed"`
+	Pitch    float64 `json:"pitch"`
+}
+
+// handleTestVoice generates a short audio sample for voice testing
+func (s *Server) handleTestVoice(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.handleCORS(w)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req TestVoiceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// Validate and set defaults
+	if req.Provider == "" {
+		req.Provider = s.cfg.DefaultProvider
+	}
+	if req.Voice == "" {
+		req.Voice = s.cfg.DefaultVoice
+	}
+	if req.Text == "" {
+		req.Text = "Hello, this is a test of the text to speech voice."
+	}
+	if req.Speed == 0 {
+		req.Speed = 1.0
+	}
+	if req.Pitch == 0 {
+		req.Pitch = 1.0
+	}
+
+	// Limit text length to 500 characters
+	if len(req.Text) > 500 {
+		req.Text = req.Text[:500]
+	}
+
+	// Get the TTS adapter for the provider
+	adapter, err := s.ttsService.GetAdapter(req.Provider)
+	if err != nil {
+		s.jsonError(w, http.StatusBadRequest, fmt.Sprintf("Provider not available: %v", err))
+		return
+	}
+
+	// Convert text to speech
+	options := &tts.ConversionOptions{
+		Voice:    req.Voice,
+		Provider: req.Provider,
+		Speed:    req.Speed,
+		Pitch:    req.Pitch,
+	}
+
+	audioReader, err := adapter.ConvertToSpeech(req.Text, req.Voice, options, nil)
+	if err != nil {
+		logger.Error("TTS conversion failed: %v", err)
+		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("TTS conversion failed: %v", err))
+		return
+	}
+
+	// Read audio data
+	audioData, err := io.ReadAll(audioReader)
+	if err != nil {
+		s.jsonError(w, http.StatusInternalServerError, "Failed to read audio data")
+		return
+	}
+
+	// Determine content type based on provider
+	contentType := "audio/wav"
+	if req.Provider == "google" || req.Provider == "openai" || req.Provider == "azure" {
+		contentType = "audio/mpeg"
+	}
+
+	// Set headers and write audio data
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(audioData)))
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.WriteHeader(http.StatusOK)
+	w.Write(audioData)
 }

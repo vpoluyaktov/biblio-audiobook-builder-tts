@@ -1,10 +1,10 @@
 package tts
 
 import (
+	"abb_tts/internal/logger"
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 )
 
 // Adapter wraps a TTS provider with chunking and audio concatenation
@@ -38,7 +38,7 @@ func (a *Adapter) ConvertToSpeech(text string, voice string, options *Conversion
 	// Merge very small chunks to reduce API calls (min 100 chars)
 	chunks = a.chunker.MergeSmallChunks(chunks, 100)
 
-	log.Printf("Converting text in %d chunks", len(chunks))
+	logger.Debug("Converting text in %d chunks", len(chunks))
 
 	// Process each chunk and collect audio
 	var audioBuffers [][]byte

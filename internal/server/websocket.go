@@ -1,8 +1,8 @@
 package server
 
 import (
+	"abb_tts/internal/logger"
 	"encoding/json"
-	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -86,7 +86,7 @@ func (h *Hub) Run() {
 			h.mu.Lock()
 			h.clients[client] = true
 			h.mu.Unlock()
-			log.Printf("WebSocket client connected. Total clients: %d", len(h.clients))
+			logger.Debug("WebSocket client connected. Total clients: %d", len(h.clients))
 
 		case client := <-h.unregister:
 			h.mu.Lock()
@@ -95,7 +95,7 @@ func (h *Hub) Run() {
 				close(client.send)
 			}
 			h.mu.Unlock()
-			log.Printf("WebSocket client disconnected. Total clients: %d", len(h.clients))
+			logger.Debug("WebSocket client disconnected. Total clients: %d", len(h.clients))
 
 		case message := <-h.broadcast:
 			h.mu.RLock()
@@ -117,14 +117,14 @@ func (h *Hub) Run() {
 func (h *Hub) Broadcast(msg WSMessage) {
 	data, err := json.Marshal(msg)
 	if err != nil {
-		log.Printf("Error marshaling WebSocket message: %v", err)
+		logger.Error("Error marshaling WebSocket message: %v", err)
 		return
 	}
 
 	select {
 	case h.broadcast <- data:
 	default:
-		log.Println("Broadcast channel full, message dropped")
+		logger.Warn("Broadcast channel full, message dropped")
 	}
 }
 
@@ -153,7 +153,7 @@ func (c *Client) readPump() {
 		_, _, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("WebSocket error: %v", err)
+				logger.Debug("WebSocket error: %v", err)
 			}
 			break
 		}
@@ -209,7 +209,7 @@ func (c *Client) writePump() {
 func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("WebSocket upgrade error: %v", err)
+		logger.Error("WebSocket upgrade error: %v", err)
 		return
 	}
 

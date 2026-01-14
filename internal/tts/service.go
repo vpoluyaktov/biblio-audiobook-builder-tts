@@ -3,9 +3,9 @@ package tts
 import (
 	"fmt"
 	"io"
-	"log"
 
 	"abb_tts/internal/config"
+	"abb_tts/internal/logger"
 )
 
 // Service interface defines methods for text-to-speech conversion
@@ -60,26 +60,26 @@ func NewService(cfg *config.Config) Service {
 
 	// Initialize OpenTTS if URL is configured
 	if cfg.OpenTTSURL != "" {
-		log.Printf("Initializing OpenTTS provider with URL: %s", cfg.OpenTTSURL)
+		logger.Debug("Initializing OpenTTS provider with URL: %s", cfg.OpenTTSURL)
 		s.providers["opentts"] = NewOpenTTSProvider(cfg.OpenTTSURL)
 	} else {
-		log.Printf("OpenTTS URL not configured, skipping OpenTTS provider")
+		logger.Debug("OpenTTS URL not configured, skipping OpenTTS provider")
 	}
 
 	// Initialize OpenAI TTS if API key is configured
 	if cfg.OpenAIAPIKey != "" {
-		log.Printf("Initializing OpenAI TTS provider")
+		logger.Debug("Initializing OpenAI TTS provider")
 		s.providers["openai"] = NewOpenAIProvider(cfg.OpenAIAPIKey)
 	} else {
-		log.Printf("OpenAI API key not configured, skipping OpenAI provider")
+		logger.Debug("OpenAI API key not configured, skipping OpenAI provider")
 	}
 
 	// Initialize Azure TTS if subscription key and region are configured
 	if cfg.AzureTTSKey != "" && cfg.AzureTTSRegion != "" {
-		log.Printf("Initializing Azure TTS provider with region: %s", cfg.AzureTTSRegion)
+		logger.Debug("Initializing Azure TTS provider with region: %s", cfg.AzureTTSRegion)
 		s.providers["azure"] = NewAzureProvider(cfg.AzureTTSKey, cfg.AzureTTSRegion)
 	} else {
-		log.Printf("Azure TTS key or region not configured, skipping Azure provider")
+		logger.Debug("Azure TTS key or region not configured, skipping Azure provider")
 	}
 
 	// If no providers are available, add espeak as default

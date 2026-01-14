@@ -1506,6 +1506,104 @@ h1 .icon {
     font-size: 1rem;
 }
 
+/* Form Actions */
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.form-actions .btn {
+    flex: 1;
+    min-width: 150px;
+}
+
+/* Test Voice Modal */
+.test-voice-modal {
+    max-width: 500px;
+}
+
+.test-voice-body {
+    padding: 1.5rem;
+}
+
+.test-voice-info {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+}
+
+.test-voice-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.test-voice-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.test-voice-value {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.test-voice-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.test-voice-status {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.test-voice-status.success {
+    color: var(--success);
+}
+
+.test-voice-status.error {
+    color: var(--error);
+}
+
+.test-voice-player {
+    margin-top: 1rem;
+}
+
+.test-voice-player audio {
+    width: 100%;
+    display: none;
+}
+
+.test-voice-player audio[src]:not([src=""]) {
+    display: block;
+}
+
+.test-voice-body textarea {
+    width: 100%;
+    padding: 0.75rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    resize: vertical;
+    font-family: inherit;
+}
+
+.test-voice-body textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
 /* Pagination */
 .opds-pagination {
     display: flex;

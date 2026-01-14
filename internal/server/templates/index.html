@@ -94,12 +94,17 @@
                     </div>
                 </div>
 
-                <button class="btn btn-secondary" id="preview-btn" disabled>
-                    👁️ Preview Book
-                </button>
-                <button class="btn btn-primary" id="upload-btn" disabled>
-                    📤 Start Conversion
-                </button>
+                <div class="form-actions">
+                    <button class="btn btn-secondary" id="test-voice-btn" title="Test how the selected voice sounds">
+                        🔊 Test Voice
+                    </button>
+                    <button class="btn btn-secondary" id="preview-btn" disabled>
+                        👁️ Preview Book
+                    </button>
+                    <button class="btn btn-primary" id="upload-btn" disabled>
+                        📤 Start Conversion
+                    </button>
+                </div>
             </div>
         </section>
 
@@ -242,6 +247,54 @@
     </div>
 
     <div class="toast-container" id="toast-container"></div>
+
+    <!-- Test Voice Modal -->
+    <div class="modal" id="test-voice-modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-content test-voice-modal">
+            <div class="modal-header">
+                <h2>🔊 Test Voice</h2>
+                <button class="modal-close" id="test-voice-close">×</button>
+            </div>
+            <div class="test-voice-body">
+                <div class="test-voice-info">
+                    <div class="test-voice-detail">
+                        <span class="test-voice-label">Provider:</span>
+                        <span class="test-voice-value" id="test-voice-provider-display">-</span>
+                    </div>
+                    <div class="test-voice-detail">
+                        <span class="test-voice-label">Voice:</span>
+                        <span class="test-voice-value" id="test-voice-voice-display">-</span>
+                    </div>
+                    <div class="test-voice-detail">
+                        <span class="test-voice-label">Speed:</span>
+                        <span class="test-voice-value" id="test-voice-speed-display">1.0x</span>
+                    </div>
+                    <div class="test-voice-detail">
+                        <span class="test-voice-label">Pitch:</span>
+                        <span class="test-voice-value" id="test-voice-pitch-display">1.0x</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="test-voice-text">Test Text</label>
+                    <textarea id="test-voice-text" rows="3" maxlength="500" placeholder="Hello, this is a test of the text to speech voice. You can change this text to hear how different phrases sound."></textarea>
+                    <small>Maximum 500 characters</small>
+                </div>
+                <div class="test-voice-controls">
+                    <button class="btn btn-primary" id="test-voice-generate-btn">
+                        🔊 Generate Audio
+                    </button>
+                    <span class="test-voice-status" id="test-voice-status"></span>
+                </div>
+                <div class="test-voice-player">
+                    <audio id="test-voice-audio" controls></audio>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="test-voice-done">Done</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Settings Modal -->
     <div class="modal" id="settings-modal">

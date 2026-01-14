@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 
 	"abb_tts/internal/audiobookshelf"
+	"abb_tts/internal/logger"
 )
 
 // SettingsRequest represents the settings form data
@@ -265,7 +265,7 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 		for key, cfg := range configs {
 			if cfg.provided {
 				if err := s.db.SetConfig(key, cfg.value); err != nil {
-					log.Printf("Warning: Failed to save config %s: %v", key, err)
+					logger.Warn("Failed to save config %s: %v", key, err)
 				}
 			}
 		}

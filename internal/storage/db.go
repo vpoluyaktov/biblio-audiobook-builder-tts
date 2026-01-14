@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"abb_tts/internal/logger"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -723,7 +724,7 @@ func (db *DB) InitializeDefaultOPDSSources() error {
 
 	for _, source := range defaults {
 		if err := db.CreateOPDSSource(&source); err != nil {
-			log.Printf("Failed to create default OPDS source %s: %v", source.Name, err)
+			logger.Warn("Failed to create default OPDS source %s: %v", source.Name, err)
 		}
 	}
 
@@ -735,7 +736,7 @@ func (db *DB) InitializeDefaults() error {
 	// Check if config is empty (all defaults)
 	existingValue, _ := db.GetConfig("server_port")
 	if existingValue == "" {
-		log.Println("Initializing database with default configuration")
+		logger.Info("Initializing database with default configuration")
 		cfg := DefaultConfig()
 		if err := db.SaveAllConfig(cfg); err != nil {
 			return err
@@ -744,7 +745,7 @@ func (db *DB) InitializeDefaults() error {
 
 	// Initialize default OPDS sources
 	if err := db.InitializeDefaultOPDSSources(); err != nil {
-		log.Printf("Warning: failed to initialize OPDS sources: %v", err)
+		logger.Warn("Failed to initialize OPDS sources: %v", err)
 	}
 
 	return nil

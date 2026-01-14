@@ -1,11 +1,11 @@
 package tts
 
 import (
+	"abb_tts/internal/logger"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"sort"
@@ -50,9 +50,9 @@ func NewOpenTTSProvider(serverURL string) *OpenTTSProvider {
 
 	// Load voices on initialization
 	if err := p.loadVoices(); err != nil {
-		log.Printf("Warning: Failed to load OpenTTS voices: %v", err)
+		logger.Warn("Failed to load OpenTTS voices: %v", err)
 	} else {
-		log.Printf("Loaded %d voices from OpenTTS server at %s", len(p.voices), serverURL)
+		logger.Debug("Loaded %d voices from OpenTTS server at %s", len(p.voices), serverURL)
 	}
 
 	return p
