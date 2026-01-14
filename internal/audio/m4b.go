@@ -146,8 +146,11 @@ func (b *M4BBuilder) buildChapterList(audioFiles []string) ([]Chapter, error) {
 func (b *M4BBuilder) createConcatFile(audioFiles []string, outputPath string) error {
 	var lines []string
 	for _, file := range audioFiles {
-		// Escape single quotes in file paths
-		escaped := strings.ReplaceAll(file, "'", "'\\''")
+		// FFmpeg concat demuxer requires escaping of special characters:
+		// - backslash must be escaped first (\ -> \\)
+		// - single quote must be escaped (' -> \')
+		escaped := strings.ReplaceAll(file, "\\", "\\\\")
+		escaped = strings.ReplaceAll(escaped, "'", "\\'")
 		lines = append(lines, fmt.Sprintf("file '%s'", escaped))
 	}
 	content := strings.Join(lines, "\n")
