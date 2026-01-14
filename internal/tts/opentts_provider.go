@@ -196,8 +196,8 @@ func (p *OpenTTSProvider) ConvertToSpeech(text string, voice string, options *Co
 
 	reqURL := fmt.Sprintf("%s/api/tts?%s", p.serverURL, params.Encode())
 
-	// Create request with context timeout for watchdog
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	// Create request with context timeout for watchdog (30s to fail fast)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
@@ -206,11 +206,11 @@ func (p *OpenTTSProvider) ConvertToSpeech(text string, voice string, options *Co
 	}
 
 	// Use a dedicated client with strict timeout for this request
-	client := &http.Client{Timeout: 60 * time.Second}
+	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return nil, fmt.Errorf("TTS request timed out after 60s")
+			return nil, fmt.Errorf("TTS request timed out after 30s")
 		}
 		return nil, fmt.Errorf("TTS request failed: %w", err)
 	}
