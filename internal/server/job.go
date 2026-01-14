@@ -34,6 +34,32 @@ type WorkerProgress struct {
 	Active         bool    `json:"active"`
 }
 
+// JobDTO is a data transfer object for Job without mutex (safe for JSON serialization)
+type JobDTO struct {
+	ID                string           `json:"id"`
+	FileName          string           `json:"file_name"`
+	Status            JobStatus        `json:"status"`
+	Progress          float64          `json:"progress"`
+	CurrentChapter    string           `json:"current_chapter"`
+	TotalChapters     int              `json:"total_chapters"`
+	CurrentChapterNum int              `json:"current_chapter_num"`
+	WorkerProgress    []WorkerProgress `json:"worker_progress,omitempty"`
+	NumWorkers        int              `json:"num_workers,omitempty"`
+	Provider          string           `json:"provider"`
+	Voice             string           `json:"voice"`
+	Speed             float64          `json:"speed"`
+	Pitch             float64          `json:"pitch"`
+	BookTitle         string           `json:"book_title"`
+	BookAuthor        string           `json:"book_author"`
+	OutputPath        string           `json:"output_path,omitempty"`
+	M4BFile           string           `json:"m4b_file,omitempty"`
+	M4BFiles          []string         `json:"m4b_files,omitempty"`
+	CreatedAt         time.Time        `json:"created_at"`
+	StartedAt         *time.Time       `json:"started_at,omitempty"`
+	CompletedAt       *time.Time       `json:"completed_at,omitempty"`
+	Error             string           `json:"error,omitempty"`
+}
+
 // Job represents a book-to-audiobook conversion job
 type Job struct {
 	ID                string    `json:"id"`
@@ -202,15 +228,14 @@ func (j *Job) SetOutputPath(path string) {
 }
 
 // Clone returns a copy of the job safe for JSON serialization
-func (j *Job) Clone() Job {
+func (j *Job) Clone() JobDTO {
 	j.mu.RLock()
 	defer j.mu.RUnlock()
 
-	// Create a new Job with copied fields (avoid copying the mutex)
-	clone := Job{
+	// Create a JobDTO with copied fields (no mutex)
+	clone := JobDTO{
 		ID:                j.ID,
 		FileName:          j.FileName,
-		FilePath:          j.FilePath,
 		Status:            j.Status,
 		Progress:          j.Progress,
 		CurrentChapter:    j.CurrentChapter,
@@ -239,10 +264,6 @@ func (j *Job) Clone() Job {
 	if j.M4BFiles != nil {
 		clone.M4BFiles = make([]string, len(j.M4BFiles))
 		copy(clone.M4BFiles, j.M4BFiles)
-	}
-	if j.ChapterFiles != nil {
-		clone.ChapterFiles = make([]string, len(j.ChapterFiles))
-		copy(clone.ChapterFiles, j.ChapterFiles)
 	}
 
 	return clone
@@ -288,11 +309,11 @@ func (s *JobStore) Delete(id string) bool {
 }
 
 // List returns all jobs (cloned for safe serialization)
-func (s *JobStore) List() []Job {
+func (s *JobStore) List() []JobDTO {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	jobs := make([]Job, 0, len(s.jobs))
+	jobs := make([]JobDTO, 0, len(s.jobs))
 	for _, job := range s.jobs {
 		jobs = append(jobs, job.Clone())
 	}
