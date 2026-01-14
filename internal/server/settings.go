@@ -34,6 +34,10 @@ type SettingsRequest struct {
 	ChapterGapSeconds int `json:"chapter_gap_seconds"`
 	MaxFileSizeMB     int `json:"max_file_size_mb"`
 
+	// Performance
+	ConcurrentTTSWorkers int `json:"concurrent_tts_workers"`
+	ConcurrentEncoders   int `json:"concurrent_encoders"`
+
 	// Cloud TTS
 	OpenAIAPIKey   string `json:"openai_api_key"`
 	GoogleAPIKey   string `json:"google_api_key"`
@@ -71,7 +75,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 // getSettings returns all configuration settings
-func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
+func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
 	settings := SettingsRequest{
 		// General
 		ServerHost:  s.cfg.ServerHost,
@@ -94,6 +98,10 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 		SampleRateHz:      s.cfg.SampleRateHz,
 		ChapterGapSeconds: s.cfg.ChapterGapSeconds,
 		MaxFileSizeMB:     s.cfg.MaxFileSizeMB,
+
+		// Performance
+		ConcurrentTTSWorkers: s.cfg.ConcurrentTTSWorkers,
+		ConcurrentEncoders:   s.cfg.ConcurrentEncoders,
 
 		// Cloud TTS
 		OpenAIAPIKey:   s.cfg.OpenAIAPIKey,
@@ -202,6 +210,14 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 		s.cfg.MaxFileSizeMB = req.MaxFileSizeMB
 	}
 
+	// Performance
+	if wasProvided("concurrent_tts_workers") {
+		s.cfg.ConcurrentTTSWorkers = req.ConcurrentTTSWorkers
+	}
+	if wasProvided("concurrent_encoders") {
+		s.cfg.ConcurrentEncoders = req.ConcurrentEncoders
+	}
+
 	// Cloud TTS
 	if wasProvided("openai_api_key") {
 		s.cfg.OpenAIAPIKey = req.OpenAIAPIKey
@@ -262,6 +278,8 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 			"pronunciation_dict_file":   {req.PronunciationDictFile, wasProvided("pronunciation_dict_file")},
 			"use_default_pronunciation": {fmt.Sprintf("%t", req.UseDefaultPronunciation), wasProvided("use_default_pronunciation")},
 			"max_file_size_mb":          {fmt.Sprintf("%d", req.MaxFileSizeMB), wasProvided("max_file_size_mb")},
+			"concurrent_tts_workers":    {fmt.Sprintf("%d", req.ConcurrentTTSWorkers), wasProvided("concurrent_tts_workers")},
+			"concurrent_encoders":       {fmt.Sprintf("%d", req.ConcurrentEncoders), wasProvided("concurrent_encoders")},
 			"audiobookshelf_url":        {req.AudiobookshelfURL, wasProvided("audiobookshelf_url")},
 			"audiobookshelf_user":       {req.AudiobookshelfUser, wasProvided("audiobookshelf_user")},
 			"audiobookshelf_password":   {req.AudiobookshelfPassword, wasProvided("audiobookshelf_password")},

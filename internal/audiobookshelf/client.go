@@ -130,12 +130,14 @@ func (c *Client) ScanLibrary(libraryID string) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusForbidden {
+	switch resp.StatusCode {
+	case http.StatusForbidden:
 		return fmt.Errorf("an admin user is required to start a scan")
-	} else if resp.StatusCode == http.StatusNotFound {
+	case http.StatusNotFound:
 		return fmt.Errorf("the user cannot access the library or no library with the provided ID exists")
+	default:
+		return nil
 	}
-	return nil
 }
 
 // UploadBook uploads an audiobook to the server

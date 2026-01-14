@@ -165,7 +165,8 @@ func (p *epubParser) ParseEpub(r io.Reader) (*Book, error) {
 		return book, nil
 	}
 
-	if tocType == "ncx" {
+	switch tocType {
+	case "ncx":
 		chapters, _ := parseNCXChapters(tocBytes)
 		for i, ch := range chapters {
 			// Get next chapter href to determine end boundary (if in same file)
@@ -179,7 +180,7 @@ func (p *epubParser) ParseEpub(r io.Reader) (*Book, error) {
 				Content: chapterText,
 			})
 		}
-	} else if tocType == "nav" {
+	case "nav":
 		chapters, _ := parseNavChapters(tocBytes)
 		for i, ch := range chapters {
 			// Get next chapter href to determine end boundary (if in same file)

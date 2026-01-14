@@ -30,6 +30,8 @@ type Config struct {
 	PronunciationDictFile   string  `mapstructure:"pronunciation_dict_file"`   // Path to pronunciation dictionary
 	UseDefaultPronunciation bool    `mapstructure:"use_default_pronunciation"` // Use built-in pronunciation rules
 	MaxFileSizeMB           int     `mapstructure:"max_file_size_mb"`          // Max M4B file size before splitting
+	ConcurrentTTSWorkers    int     `mapstructure:"concurrent_tts_workers"`    // Number of parallel TTS workers
+	ConcurrentEncoders      int     `mapstructure:"concurrent_encoders"`       // Number of parallel M4B encoders
 
 	// Cloud provider settings
 	CloudAPIKey       string `mapstructure:"cloud_api_key"`
@@ -82,6 +84,8 @@ func Load(configFile string) (*Config, error) {
 	viper.SetDefault("pronunciation_dict_file", "")     // Custom pronunciation dictionary
 	viper.SetDefault("use_default_pronunciation", true) // Use built-in pronunciation rules
 	viper.SetDefault("max_file_size_mb", 2000)          // 2GB max file size before splitting
+	viper.SetDefault("concurrent_tts_workers", 3)       // 3 parallel TTS workers
+	viper.SetDefault("concurrent_encoders", 2)          // 2 parallel M4B encoders
 
 	// Cloud provider settings
 	viper.SetDefault("cloud_api_key", "")
@@ -158,11 +162,11 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 	if v, ok := dbConfig["open_browser"].(bool); ok {
 		cfg.OpenBrowser = v
 	}
-	if v, ok := dbConfig["bit_rate_kbs"].(int); ok {
-		cfg.BitRateKbs = v
+	if v, ok := dbConfig["bit_rate_kbs"].(float64); ok {
+		cfg.BitRateKbs = int(v)
 	}
-	if v, ok := dbConfig["sample_rate_hz"].(int); ok {
-		cfg.SampleRateHz = v
+	if v, ok := dbConfig["sample_rate_hz"].(float64); ok {
+		cfg.SampleRateHz = int(v)
 	}
 	if v, ok := dbConfig["default_speed"].(float64); ok {
 		cfg.DefaultSpeed = v
@@ -170,8 +174,8 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 	if v, ok := dbConfig["default_pitch"].(float64); ok {
 		cfg.DefaultPitch = v
 	}
-	if v, ok := dbConfig["chapter_gap_seconds"].(int); ok {
-		cfg.ChapterGapSeconds = v
+	if v, ok := dbConfig["chapter_gap_seconds"].(float64); ok {
+		cfg.ChapterGapSeconds = int(v)
 	}
 	if v, ok := dbConfig["pronunciation_dict_file"].(string); ok {
 		cfg.PronunciationDictFile = v
@@ -179,8 +183,20 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 	if v, ok := dbConfig["use_default_pronunciation"].(bool); ok {
 		cfg.UseDefaultPronunciation = v
 	}
-	if v, ok := dbConfig["max_file_size_mb"].(int); ok {
+	if v, ok := dbConfig["max_file_size_mb"].(float64); ok {
+		cfg.MaxFileSizeMB = int(v)
+	} else if v, ok := dbConfig["max_file_size_mb"].(int); ok {
 		cfg.MaxFileSizeMB = v
+	}
+	if v, ok := dbConfig["concurrent_tts_workers"].(float64); ok {
+		cfg.ConcurrentTTSWorkers = int(v)
+	} else if v, ok := dbConfig["concurrent_tts_workers"].(int); ok {
+		cfg.ConcurrentTTSWorkers = v
+	}
+	if v, ok := dbConfig["concurrent_encoders"].(float64); ok {
+		cfg.ConcurrentEncoders = int(v)
+	} else if v, ok := dbConfig["concurrent_encoders"].(int); ok {
+		cfg.ConcurrentEncoders = v
 	}
 	if v, ok := dbConfig["cloud_api_key"].(string); ok {
 		cfg.CloudAPIKey = v

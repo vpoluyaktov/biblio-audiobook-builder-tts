@@ -321,7 +321,7 @@ func (m *Model) refreshJobs() {
 		return jobs[i].CreatedAt.After(jobs[j].CreatedAt)
 	})
 
-	rows := make([]table.Row, 0, len(jobs))
+	rows := make([]table.Row, 0, len(jobs)*2) // Extra space for worker rows
 	for i, job := range jobs {
 		progress := fmt.Sprintf("%d%%", int(job.Progress*100))
 		progressBar := renderProgressBar(job.Progress, 8)
@@ -349,6 +349,35 @@ func (m *Model) refreshJobs() {
 			chapter,
 			job.Provider,
 		})
+
+		// Add worker/encoder progress rows for converting and building jobs
+		if (job.Status == server.JobStatusConverting || job.Status == server.JobStatusBuilding) && len(job.WorkerProgress) > 0 {
+			for _, wp := range job.WorkerProgress {
+				workerStatus := "idle"
+				workerProgress := ""
+				label := "W" // Worker for converting
+				if job.Status == server.JobStatusBuilding {
+					label = "E" // Encoder for building
+					if wp.Active {
+						workerStatus = wp.ChapterTitle
+						workerProgress = renderProgressBar(wp.Progress, 6) + fmt.Sprintf(" %d%%", wp.ChunksComplete)
+					}
+				} else {
+					if wp.Active {
+						workerStatus = fmt.Sprintf("Ch.%d", wp.ChapterIndex+1)
+						workerProgress = renderProgressBar(wp.Progress, 6) + fmt.Sprintf(" %d/%d", wp.ChunksComplete, wp.ChunksTotal)
+					}
+				}
+				rows = append(rows, table.Row{
+					"",
+					fmt.Sprintf("  └─ %s%d", label, wp.WorkerID+1),
+					workerStatus,
+					workerProgress,
+					"",
+					"",
+				})
+			}
+		}
 	}
 
 	m.jobsTable.SetRows(rows)

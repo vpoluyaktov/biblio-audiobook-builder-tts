@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"abb_tts/internal/logger"
 	"abb_tts/internal/parser"
 	"abb_tts/internal/tts"
+	"abb_tts/internal/utils"
 )
 
 // Worker processes conversion jobs from the queue
@@ -180,7 +182,14 @@ func (w *Worker) parseBook(filePath string) (*parser.Book, error) {
 	}
 }
 
-// convertBook converts the book to audio files
+// ChapterResult holds the result of converting a single chapter
+type ChapterResult struct {
+	Index      int
+	OutputPath string
+	Error      error
+}
+
+// convertBook converts the book to audio files using parallel processing
 func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, error) {
 	// Create output directory (use absolute path)
 	outputDir := filepath.Join(w.cfg.OutputDir, sanitizeFileName(book.Title))
@@ -194,70 +203,158 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 	}
 
 	totalChapters := len(book.Chapters)
-	chapterFiles := make([]string, 0, totalChapters)
 
-	for i, chapter := range book.Chapters {
-		// Check for cancellation
-		select {
-		case <-w.ctx.Done():
-			return "", nil, fmt.Errorf("conversion cancelled")
-		default:
-		}
-
-		// Update progress
-		progress := float64(i) / float64(totalChapters)
-		job.SetProgress(progress, chapter.Title, i+1)
-		w.broadcastJobProgress(job)
-
-		// Apply pronunciation rules to chapter content
-		content := chapter.Content
-		if w.pronunciation != nil && w.pronunciation.RuleCount() > 0 {
-			content = w.pronunciation.Apply(content)
-		}
-
-		// Save chapter text file for debugging
-		textFileName := fmt.Sprintf("%02d_%s.txt", i+1, sanitizeFileName(chapter.Title))
-		textFilePath := filepath.Join(outputDir, textFileName)
-		if err := os.WriteFile(textFilePath, []byte(content), 0644); err != nil {
-			logger.Warn("Failed to save chapter text file '%s': %v", textFileName, err)
-		} else {
-			logger.Debug("Saved chapter text: %s", textFileName)
-		}
-
-		// Convert chapter
-		reader, err := w.ttsService.ConvertToSpeech(content, &tts.ConversionOptions{
-			Voice:    job.Voice,
-			Provider: job.Provider,
-			Speed:    job.Speed,
-			Pitch:    job.Pitch,
-		})
-		if err != nil {
-			logger.Warn("Failed to convert chapter '%s': %v", chapter.Title, err)
-			continue // Skip failed chapters but continue with others
-		}
-
-		// Save audio file (use .wav for intermediate files, will be converted to AAC for M4B)
-		chapterFileName := fmt.Sprintf("%02d_%s.wav", i+1, sanitizeFileName(chapter.Title))
-		outputPath := filepath.Join(outputDir, chapterFileName)
-
-		outputFile, err := os.Create(outputPath)
-		if err != nil {
-			logger.Warn("Failed to create output file for chapter '%s': %v", chapter.Title, err)
-			continue
-		}
-
-		if _, err := outputFile.ReadFrom(reader); err != nil {
-			outputFile.Close()
-			logger.Warn("Failed to write audio for chapter '%s': %v", chapter.Title, err)
-			continue
-		}
-		outputFile.Close()
-
-		chapterFiles = append(chapterFiles, outputPath)
-		logger.Debug("Converted chapter %d/%d: %s", i+1, totalChapters, chapter.Title)
+	// Determine number of workers
+	numWorkers := w.cfg.ConcurrentTTSWorkers
+	if numWorkers <= 0 {
+		numWorkers = 3 // Default
+	}
+	if numWorkers > totalChapters {
+		numWorkers = totalChapters
 	}
 
+	logger.Info("Converting %d chapters using %d parallel workers", totalChapters, numWorkers)
+
+	// Results channel and slice
+	results := make([]ChapterResult, totalChapters)
+	var resultsMu sync.Mutex
+	var completedCount int32
+
+	// Worker ID assignment using a pool
+	workerPool := make(chan int, numWorkers)
+	for i := 0; i < numWorkers; i++ {
+		workerPool <- i
+	}
+
+	// Initialize worker progress tracking
+	job.InitWorkerProgress(numWorkers)
+
+	// Create job dispatcher
+	jd := utils.NewJobDispatcher(numWorkers)
+
+	// Add all chapters as jobs
+	for i := range book.Chapters {
+		chapterIndex := i
+		chapter := book.Chapters[i]
+
+		jd.AddJob(i, func(idx int, ch parser.Chapter) {
+			// Get a worker ID from the pool
+			workerID := <-workerPool
+			defer func() { workerPool <- workerID }()
+
+			// Check for cancellation
+			select {
+			case <-w.ctx.Done():
+				resultsMu.Lock()
+				results[idx] = ChapterResult{Index: idx, Error: fmt.Errorf("cancelled")}
+				resultsMu.Unlock()
+				return
+			default:
+			}
+
+			result := w.convertSingleChapter(job, ch, idx, outputDir, workerID)
+
+			resultsMu.Lock()
+			results[idx] = result
+			completedCount++
+			currentCompleted := completedCount
+			resultsMu.Unlock()
+
+			// Update progress
+			progress := float64(currentCompleted) / float64(totalChapters)
+			job.SetProgress(progress, ch.Title, int(currentCompleted))
+			w.broadcastJobProgress(job)
+
+			logger.Debug("Converted chapter %d/%d: %s (worker %d)", currentCompleted, totalChapters, ch.Title, workerID)
+		}, chapterIndex, chapter)
+	}
+
+	// Start parallel processing
+	jd.Start()
+
+	// Check for cancellation
+	select {
+	case <-w.ctx.Done():
+		return "", nil, fmt.Errorf("conversion cancelled")
+	default:
+	}
+
+	// Collect successful results in order
+	var chapterFiles []string
+	for i := 0; i < totalChapters; i++ {
+		if results[i].Error != nil {
+			logger.Warn("Chapter %d failed: %v", i+1, results[i].Error)
+			continue
+		}
+		if results[i].OutputPath != "" {
+			chapterFiles = append(chapterFiles, results[i].OutputPath)
+		}
+	}
+
+	// Sort by index to maintain chapter order
+	sort.Slice(chapterFiles, func(i, j int) bool {
+		return chapterFiles[i] < chapterFiles[j]
+	})
+
 	return outputDir, chapterFiles, nil
+}
+
+// convertSingleChapter converts a single chapter to audio
+func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index int, outputDir string, workerID int) ChapterResult {
+	result := ChapterResult{Index: index}
+
+	// Apply pronunciation rules to chapter content
+	content := chapter.Content
+	if w.pronunciation != nil && w.pronunciation.RuleCount() > 0 {
+		content = w.pronunciation.Apply(content)
+	}
+
+	// Save chapter text file for debugging
+	textFileName := fmt.Sprintf("%02d_%s.txt", index+1, sanitizeFileName(chapter.Title))
+	textFilePath := filepath.Join(outputDir, textFileName)
+	if err := os.WriteFile(textFilePath, []byte(content), 0644); err != nil {
+		logger.Warn("Failed to save chapter text file '%s': %v", textFileName, err)
+	}
+
+	// Progress callback for per-chunk updates
+	progressCb := func(chunkIndex, totalChunks int, chunkText string) {
+		job.SetWorkerProgress(workerID, index, chapter.Title, chunkIndex+1, totalChunks)
+		w.broadcastJobProgress(job)
+	}
+
+	// Convert chapter with progress tracking
+	reader, err := w.ttsService.ConvertToSpeechWithProgress(content, &tts.ConversionOptions{
+		Voice:    job.Voice,
+		Provider: job.Provider,
+		Speed:    job.Speed,
+		Pitch:    job.Pitch,
+	}, progressCb)
+	if err != nil {
+		result.Error = fmt.Errorf("TTS conversion failed: %v", err)
+		return result
+	}
+
+	// Save audio file
+	chapterFileName := fmt.Sprintf("%02d_%s.wav", index+1, sanitizeFileName(chapter.Title))
+	outputPath := filepath.Join(outputDir, chapterFileName)
+
+	outputFile, err := os.Create(outputPath)
+	if err != nil {
+		result.Error = fmt.Errorf("failed to create output file: %v", err)
+		return result
+	}
+	defer outputFile.Close()
+
+	if _, err := outputFile.ReadFrom(reader); err != nil {
+		result.Error = fmt.Errorf("failed to write audio: %v", err)
+		return result
+	}
+
+	// Mark worker as done with this chapter
+	job.ClearWorkerProgress(workerID)
+
+	result.OutputPath = outputPath
+	return result
 }
 
 // buildM4B creates M4B audiobook file(s) from chapter audio files
@@ -307,9 +404,48 @@ func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (s
 		options.CoverImageType = book.CoverImageType
 	}
 
-	// Build M4B file(s)
+	// Determine number of encoder workers
+	numEncoders := w.cfg.ConcurrentEncoders
+	if numEncoders <= 0 {
+		numEncoders = 2 // Default
+	}
+
+	if len(parts) > 1 {
+		logger.Info("Building %d M4B parts using %d parallel encoders", len(parts), numEncoders)
+	}
+
+	// Reset progress for building phase and initialize encoder progress
+	job.SetProgress(0, "Building M4B...", 0)
+	job.InitWorkerProgress(numEncoders) // Reuse worker progress for encoders
+	w.broadcastJobProgress(job)
+
+	// Per-encoder progress callback for M4B building
+	encoderCb := func(encoderID int, partNum int, totalParts int, progress float64) {
+		// Update encoder-specific progress
+		job.SetWorkerProgress(encoderID, partNum-1, fmt.Sprintf("Part %d", partNum), int(progress*100), 100)
+
+		// Calculate overall progress across all parts
+		// Sum up progress from all active encoders
+		job.mu.RLock()
+		var totalProgress float64
+		activeCount := 0
+		for _, wp := range job.WorkerProgress {
+			if wp.Active {
+				totalProgress += wp.Progress
+				activeCount++
+			}
+		}
+		job.mu.RUnlock()
+
+		// Overall progress is based on completed parts + current encoder progress
+		overallProgress := totalProgress / float64(len(parts))
+		job.SetProgress(overallProgress, fmt.Sprintf("Building %d parts", len(parts)), 0)
+		w.broadcastJobProgress(job)
+	}
+
+	// Build M4B file(s) in parallel with per-encoder progress tracking
 	baseFileName := sanitizeFileName(book.Author + " - " + book.Title)
-	m4bFiles, err := audio.BuildMultiPartM4B(parts, job.OutputPath, baseFileName, options)
+	m4bFiles, err := audio.BuildMultiPartM4BWithEncoderProgress(parts, job.OutputPath, baseFileName, options, numEncoders, encoderCb)
 	if err != nil {
 		return "", fmt.Errorf("failed to build M4B: %v", err)
 	}
@@ -377,9 +513,9 @@ func (w *Worker) uploadToAudiobookshelf(job *Job, book *parser.Book) error {
 		Files:  filesToUpload,
 	}
 
-	// Upload with progress callback
+	// Upload with progress callback (no logging to avoid log spam)
 	progressCallback := func(fileID int, fileName string, size int64, pos int64, percent int) {
-		logger.Debug("Upload progress: %s - %d%%", fileName, percent)
+		// Progress is tracked via job status, no need to log each update
 	}
 
 	if err := client.UploadBook(ab, libraryID, folderID, progressCallback); err != nil {

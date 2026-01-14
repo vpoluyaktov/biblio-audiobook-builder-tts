@@ -875,11 +875,11 @@ class App {
         
         let progressText = '';
         if (job.status === 'converting' && job.current_chapter) {
-            progressText = `Chapter ${job.current_chapter_num}/${job.total_chapters}: ${job.current_chapter}`;
+            progressText = `${job.current_chapter_num}/${job.total_chapters} chapters converted`;
         } else if (job.status === 'parsing') {
             progressText = 'Parsing book...';
         } else if (job.status === 'building') {
-            progressText = 'Building M4B audiobook...';
+            progressText = job.current_chapter || 'Building M4B audiobook...';
         } else if (job.status === 'uploading') {
             progressText = 'Uploading to Audiobookshelf...';
         } else if (job.status === 'pending') {
@@ -905,10 +905,23 @@ class App {
             ${job.status === 'converting' || job.status === 'parsing' || job.status === 'building' || job.status === 'uploading' ? `
             <div class="job-progress">
                 <div class="progress-bar">
-                    <div class="progress-fill" style="width: ${(job.status === 'building' || job.status === 'uploading') ? 100 : progress}%"></div>
+                    <div class="progress-fill" style="width: ${job.status === 'uploading' ? 100 : progress}%"></div>
                 </div>
-                <div class="progress-text">${progressText}${(job.status !== 'building' && job.status !== 'uploading') ? ` (${progress}%)` : ''}</div>
+                <div class="progress-text">${progressText}${job.status !== 'uploading' ? ` (${progress}%)` : ''}</div>
             </div>
+            ${(job.status === 'converting' || job.status === 'building') && job.worker_progress && job.worker_progress.length > 0 ? `
+            <div class="worker-progress-container">
+                ${job.worker_progress.map((wp, idx) => `
+                    <div class="worker-progress ${wp.active ? 'active' : 'idle'}">
+                        <div class="worker-label">${job.status === 'building' ? 'E' : 'W'}${idx + 1}</div>
+                        <div class="worker-bar">
+                            <div class="worker-fill" style="width: ${Math.round(wp.progress * 100)}%"></div>
+                        </div>
+                        <div class="worker-info">${wp.active ? (job.status === 'building' ? `${wp.chapter_title} ${wp.chunks_complete}%` : `Ch.${wp.chapter_index + 1} ${wp.chunks_complete}/${wp.chunks_total}`) : 'idle'}</div>
+                    </div>
+                `).join('')}
+            </div>
+            ` : ''}
             ` : ''}
             
             <div class="job-details">
@@ -1091,6 +1104,10 @@ class App {
         document.getElementById('cfg-chapter-gap').value = s.chapter_gap_seconds || 2;
         document.getElementById('cfg-max-file-size').value = s.max_file_size_mb || 2000;
         
+        // Performance tab
+        document.getElementById('cfg-concurrent-tts-workers').value = s.concurrent_tts_workers || 3;
+        document.getElementById('cfg-concurrent-encoders').value = s.concurrent_encoders || 2;
+        
         // Cloud TTS tab
         document.getElementById('cfg-openai-api-key').value = s.openai_api_key || '';
         document.getElementById('cfg-google-api-key').value = s.google_api_key || '';
@@ -1133,6 +1150,10 @@ class App {
             sample_rate_hz: parseInt(document.getElementById('cfg-sample-rate').value),
             chapter_gap_seconds: parseInt(document.getElementById('cfg-chapter-gap').value),
             max_file_size_mb: parseInt(document.getElementById('cfg-max-file-size').value),
+            
+            // Performance
+            concurrent_tts_workers: parseInt(document.getElementById('cfg-concurrent-tts-workers').value),
+            concurrent_encoders: parseInt(document.getElementById('cfg-concurrent-encoders').value),
             
             // Cloud TTS
             openai_api_key: document.getElementById('cfg-openai-api-key').value,

@@ -1,14 +1,21 @@
 package audio
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
+
+// FFmpegProgressCallback is called with progress updates during ffmpeg encoding
+// progress is 0.0 to 1.0
+type FFmpegProgressCallback func(progress float64)
 
 // Chapter represents a chapter in the audiobook
 type Chapter struct {
@@ -35,8 +42,15 @@ type M4BOptions struct {
 
 // M4BBuilder builds M4B audiobook files from audio segments
 type M4BBuilder struct {
-	tempDir string
-	options M4BOptions
+	tempDir       string
+	options       M4BOptions
+	progressCb    FFmpegProgressCallback
+	totalDuration time.Duration
+}
+
+// SetProgressCallback sets a callback for ffmpeg progress updates
+func (b *M4BBuilder) SetProgressCallback(cb FFmpegProgressCallback) {
+	b.progressCb = cb
 }
 
 // NewM4BBuilder creates a new M4B builder
@@ -139,6 +153,9 @@ func (b *M4BBuilder) buildChapterList(audioFiles []string) ([]Chapter, error) {
 		}
 	}
 
+	// Store total duration for progress calculation
+	b.totalDuration = currentTime
+
 	return chapters, nil
 }
 
@@ -239,6 +256,9 @@ func (b *M4BBuilder) runFFmpeg(concatFile, metadataFile, coverPath, outputPath s
 		"-ac", "2", // Stereo
 	)
 
+	// Add progress output to stderr
+	args = append(args, "-progress", "pipe:2")
+
 	// Output format
 	args = append(args,
 		"-f", "mp4",
@@ -246,12 +266,56 @@ func (b *M4BBuilder) runFFmpeg(concatFile, metadataFile, coverPath, outputPath s
 	)
 
 	cmd := exec.Command("ffmpeg", args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("ffmpeg error: %w\nOutput: %s", err, string(output))
+
+	// If we have a progress callback and know total duration, parse progress
+	if b.progressCb != nil && b.totalDuration > 0 {
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			return fmt.Errorf("failed to get stderr pipe: %w", err)
+		}
+
+		if err := cmd.Start(); err != nil {
+			return fmt.Errorf("failed to start ffmpeg: %w", err)
+		}
+
+		// Parse progress from stderr
+		b.parseFFmpegProgress(stderr)
+
+		if err := cmd.Wait(); err != nil {
+			return fmt.Errorf("ffmpeg error: %w", err)
+		}
+	} else {
+		// No progress tracking, just run normally
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("ffmpeg error: %w\nOutput: %s", err, string(output))
+		}
 	}
 
 	return nil
+}
+
+// parseFFmpegProgress reads ffmpeg progress output and calls the callback
+func (b *M4BBuilder) parseFFmpegProgress(r io.Reader) {
+	scanner := bufio.NewScanner(r)
+	totalMicros := float64(b.totalDuration.Microseconds())
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		// ffmpeg progress output format: out_time_us=123456789
+		if strings.HasPrefix(line, "out_time_us=") {
+			timeStr := strings.TrimPrefix(line, "out_time_us=")
+			if micros, err := strconv.ParseInt(timeStr, 10, 64); err == nil && micros > 0 {
+				progress := float64(micros) / totalMicros
+				if progress > 1.0 {
+					progress = 1.0
+				}
+				if b.progressCb != nil {
+					b.progressCb(progress)
+				}
+			}
+		}
+	}
 }
 
 // getAudioDuration uses ffprobe to get the duration of an audio file

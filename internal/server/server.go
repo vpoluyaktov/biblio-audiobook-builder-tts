@@ -182,11 +182,12 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		if action == "download" {
+		switch action {
+		case "download":
 			s.downloadJobZip(w, r, jobID)
-		} else if action == "files" {
+		case "files":
 			s.listJobFiles(w, r, jobID)
-		} else {
+		default:
 			s.getJob(w, r, jobID)
 		}
 	case http.MethodDelete:
@@ -199,13 +200,13 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 }
 
 // listJobs returns all jobs
-func (s *Server) listJobs(w http.ResponseWriter, r *http.Request) {
+func (s *Server) listJobs(w http.ResponseWriter, _ *http.Request) {
 	jobs := s.store.List()
 	s.jsonResponse(w, http.StatusOK, jobs)
 }
 
 // getJob returns a specific job
-func (s *Server) getJob(w http.ResponseWriter, r *http.Request, id string) {
+func (s *Server) getJob(w http.ResponseWriter, _ *http.Request, id string) {
 	job, exists := s.store.Get(id)
 	if !exists {
 		s.jsonError(w, http.StatusNotFound, "Job not found")
@@ -215,7 +216,7 @@ func (s *Server) getJob(w http.ResponseWriter, r *http.Request, id string) {
 }
 
 // deleteJob cancels/deletes a job
-func (s *Server) deleteJob(w http.ResponseWriter, r *http.Request, id string) {
+func (s *Server) deleteJob(w http.ResponseWriter, _ *http.Request, id string) {
 	job, exists := s.store.Get(id)
 	if !exists {
 		s.jsonError(w, http.StatusNotFound, "Job not found")
@@ -282,7 +283,7 @@ func (s *Server) downloadJobZip(w http.ResponseWriter, r *http.Request, id strin
 }
 
 // listJobFiles returns a list of files in the job output directory
-func (s *Server) listJobFiles(w http.ResponseWriter, r *http.Request, id string) {
+func (s *Server) listJobFiles(w http.ResponseWriter, _ *http.Request, id string) {
 	job, exists := s.store.Get(id)
 	if !exists {
 		s.jsonError(w, http.StatusNotFound, "Job not found")
@@ -688,7 +689,7 @@ func (s *Server) handlePreviewByID(w http.ResponseWriter, r *http.Request) {
 }
 
 // servePreviewCover serves the cover image for a preview
-func (s *Server) servePreviewCover(w http.ResponseWriter, r *http.Request, id string) {
+func (s *Server) servePreviewCover(w http.ResponseWriter, _ *http.Request, id string) {
 	cover, exists := s.previewStore.GetCover(id)
 	if !exists {
 		http.Error(w, "Cover not found", http.StatusNotFound)

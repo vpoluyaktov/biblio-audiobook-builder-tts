@@ -23,6 +23,43 @@ const (
 	JobStatusCancelled  JobStatus = "cancelled"
 )
 
+// WorkerProgress represents the progress of a single parallel worker
+type WorkerProgress struct {
+	WorkerID       int     `json:"worker_id"`
+	ChapterIndex   int     `json:"chapter_index"`
+	ChapterTitle   string  `json:"chapter_title"`
+	Progress       float64 `json:"progress"` // 0.0 to 1.0
+	ChunksTotal    int     `json:"chunks_total"`
+	ChunksComplete int     `json:"chunks_complete"`
+	Active         bool    `json:"active"`
+}
+
+// JobDTO is a data transfer object for Job without mutex (safe for JSON serialization)
+type JobDTO struct {
+	ID                string           `json:"id"`
+	FileName          string           `json:"file_name"`
+	Status            JobStatus        `json:"status"`
+	Progress          float64          `json:"progress"`
+	CurrentChapter    string           `json:"current_chapter"`
+	TotalChapters     int              `json:"total_chapters"`
+	CurrentChapterNum int              `json:"current_chapter_num"`
+	WorkerProgress    []WorkerProgress `json:"worker_progress,omitempty"`
+	NumWorkers        int              `json:"num_workers,omitempty"`
+	Provider          string           `json:"provider"`
+	Voice             string           `json:"voice"`
+	Speed             float64          `json:"speed"`
+	Pitch             float64          `json:"pitch"`
+	BookTitle         string           `json:"book_title"`
+	BookAuthor        string           `json:"book_author"`
+	OutputPath        string           `json:"output_path,omitempty"`
+	M4BFile           string           `json:"m4b_file,omitempty"`
+	M4BFiles          []string         `json:"m4b_files,omitempty"`
+	CreatedAt         time.Time        `json:"created_at"`
+	StartedAt         *time.Time       `json:"started_at,omitempty"`
+	CompletedAt       *time.Time       `json:"completed_at,omitempty"`
+	Error             string           `json:"error,omitempty"`
+}
+
 // Job represents a book-to-audiobook conversion job
 type Job struct {
 	ID                string    `json:"id"`
@@ -33,6 +70,10 @@ type Job struct {
 	CurrentChapter    string    `json:"current_chapter"` // Currently processing chapter
 	TotalChapters     int       `json:"total_chapters"`
 	CurrentChapterNum int       `json:"current_chapter_num"`
+
+	// Parallel processing progress
+	WorkerProgress []WorkerProgress `json:"worker_progress,omitempty"`
+	NumWorkers     int              `json:"num_workers,omitempty"`
 
 	// TTS settings
 	Provider string  `json:"provider"`
@@ -105,6 +146,51 @@ func (j *Job) SetProgress(progress float64, currentChapter string, chapterNum in
 	j.CurrentChapterNum = chapterNum
 }
 
+// InitWorkerProgress initializes the worker progress array
+func (j *Job) InitWorkerProgress(numWorkers int) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	j.NumWorkers = numWorkers
+	j.WorkerProgress = make([]WorkerProgress, numWorkers)
+	for i := 0; i < numWorkers; i++ {
+		j.WorkerProgress[i] = WorkerProgress{
+			WorkerID: i,
+			Active:   false,
+		}
+	}
+}
+
+// SetWorkerProgress updates a specific worker's progress
+func (j *Job) SetWorkerProgress(workerID int, chapterIndex int, chapterTitle string, chunksComplete, chunksTotal int) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	if workerID >= 0 && workerID < len(j.WorkerProgress) {
+		progress := 0.0
+		if chunksTotal > 0 {
+			progress = float64(chunksComplete) / float64(chunksTotal)
+		}
+		j.WorkerProgress[workerID] = WorkerProgress{
+			WorkerID:       workerID,
+			ChapterIndex:   chapterIndex,
+			ChapterTitle:   chapterTitle,
+			Progress:       progress,
+			ChunksTotal:    chunksTotal,
+			ChunksComplete: chunksComplete,
+			Active:         true,
+		}
+	}
+}
+
+// ClearWorkerProgress marks a worker as inactive (finished its chapter)
+func (j *Job) ClearWorkerProgress(workerID int) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	if workerID >= 0 && workerID < len(j.WorkerProgress) {
+		j.WorkerProgress[workerID].Active = false
+		j.WorkerProgress[workerID].Progress = 1.0
+	}
+}
+
 // SetBook sets the parsed book data
 func (j *Job) SetBook(book *parser.Book) {
 	j.mu.Lock()
@@ -142,12 +228,44 @@ func (j *Job) SetOutputPath(path string) {
 }
 
 // Clone returns a copy of the job safe for JSON serialization
-func (j *Job) Clone() Job {
+func (j *Job) Clone() JobDTO {
 	j.mu.RLock()
 	defer j.mu.RUnlock()
 
-	clone := *j
-	clone.mu = sync.RWMutex{} // Reset mutex in clone
+	// Create a JobDTO with copied fields (no mutex)
+	clone := JobDTO{
+		ID:                j.ID,
+		FileName:          j.FileName,
+		Status:            j.Status,
+		Progress:          j.Progress,
+		CurrentChapter:    j.CurrentChapter,
+		TotalChapters:     j.TotalChapters,
+		CurrentChapterNum: j.CurrentChapterNum,
+		NumWorkers:        j.NumWorkers,
+		Provider:          j.Provider,
+		Voice:             j.Voice,
+		Speed:             j.Speed,
+		Pitch:             j.Pitch,
+		BookTitle:         j.BookTitle,
+		BookAuthor:        j.BookAuthor,
+		OutputPath:        j.OutputPath,
+		M4BFile:           j.M4BFile,
+		CreatedAt:         j.CreatedAt,
+		StartedAt:         j.StartedAt,
+		CompletedAt:       j.CompletedAt,
+		Error:             j.Error,
+	}
+
+	// Copy slices
+	if j.WorkerProgress != nil {
+		clone.WorkerProgress = make([]WorkerProgress, len(j.WorkerProgress))
+		copy(clone.WorkerProgress, j.WorkerProgress)
+	}
+	if j.M4BFiles != nil {
+		clone.M4BFiles = make([]string, len(j.M4BFiles))
+		copy(clone.M4BFiles, j.M4BFiles)
+	}
+
 	return clone
 }
 
@@ -191,11 +309,11 @@ func (s *JobStore) Delete(id string) bool {
 }
 
 // List returns all jobs (cloned for safe serialization)
-func (s *JobStore) List() []Job {
+func (s *JobStore) List() []JobDTO {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	jobs := make([]Job, 0, len(s.jobs))
+	jobs := make([]JobDTO, 0, len(s.jobs))
 	for _, job := range s.jobs {
 		jobs = append(jobs, job.Clone())
 	}

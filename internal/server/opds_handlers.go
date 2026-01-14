@@ -156,7 +156,7 @@ func (s *Server) createOPDSSource(w http.ResponseWriter, r *http.Request, db OPD
 }
 
 // getOPDSSource returns a specific OPDS source
-func (s *Server) getOPDSSource(w http.ResponseWriter, r *http.Request, db OPDSDB, id string) {
+func (s *Server) getOPDSSource(w http.ResponseWriter, _ *http.Request, db OPDSDB, id string) {
 	source, err := db.GetOPDSSource(id)
 	if err != nil {
 		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get source: %v", err))
@@ -226,7 +226,7 @@ func (s *Server) updateOPDSSource(w http.ResponseWriter, r *http.Request, db OPD
 }
 
 // deleteOPDSSource deletes an OPDS source
-func (s *Server) deleteOPDSSource(w http.ResponseWriter, r *http.Request, db OPDSDB, id string) {
+func (s *Server) deleteOPDSSource(w http.ResponseWriter, _ *http.Request, db OPDSDB, id string) {
 	source, err := db.GetOPDSSource(id)
 	if err != nil {
 		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get source: %v", err))
