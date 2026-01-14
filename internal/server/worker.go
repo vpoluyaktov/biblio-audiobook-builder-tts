@@ -220,6 +220,12 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 	var resultsMu sync.Mutex
 	var completedCount int32
 
+	// Fail-fast: cancel all workers when any chunk fails
+	failFast := make(chan struct{})
+	var failFastOnce sync.Once
+	var firstError error
+	var firstErrorChapter int
+
 	// Worker ID assignment using a pool
 	workerPool := make(chan int, numWorkers)
 	for i := 0; i < numWorkers; i++ {
@@ -242,11 +248,16 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 			workerID := <-workerPool
 			defer func() { workerPool <- workerID }()
 
-			// Check for cancellation
+			// Check for cancellation or fail-fast
 			select {
 			case <-w.ctx.Done():
 				resultsMu.Lock()
 				results[idx] = ChapterResult{Index: idx, Error: fmt.Errorf("cancelled")}
+				resultsMu.Unlock()
+				return
+			case <-failFast:
+				resultsMu.Lock()
+				results[idx] = ChapterResult{Index: idx, Error: fmt.Errorf("cancelled due to earlier failure")}
 				resultsMu.Unlock()
 				return
 			default:
@@ -256,6 +267,16 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 
 			resultsMu.Lock()
 			results[idx] = result
+
+			// If this chapter failed, trigger fail-fast to stop all other workers
+			if result.Error != nil {
+				failFastOnce.Do(func() {
+					firstError = result.Error
+					firstErrorChapter = idx + 1
+					close(failFast)
+				})
+			}
+
 			completedCount++
 			currentCompleted := completedCount
 			resultsMu.Unlock()
@@ -279,19 +300,16 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 	default:
 	}
 
-	// Check for any failed chapters - fail the entire job if any chapter failed
-	for i := 0; i < totalChapters; i++ {
-		if results[i].Error != nil {
-			chapterTitle := ""
-			if i < len(book.Chapters) {
-				chapterTitle = book.Chapters[i].Title
-			}
-			// Record the failed chapter
-			job.AddFailedChapter(i+1, chapterTitle, results[i].Error)
-
-			// Fail immediately - incomplete audiobook is useless
-			return "", nil, fmt.Errorf("chapter %d (%s) failed after retries: %v", i+1, chapterTitle, results[i].Error)
+	// Check if fail-fast was triggered (any chunk failed after retries)
+	select {
+	case <-failFast:
+		chapterTitle := ""
+		if firstErrorChapter > 0 && firstErrorChapter <= len(book.Chapters) {
+			chapterTitle = book.Chapters[firstErrorChapter-1].Title
 		}
+		job.AddFailedChapter(firstErrorChapter, chapterTitle, firstError)
+		return "", nil, fmt.Errorf("chapter %d (%s) failed: %v", firstErrorChapter, chapterTitle, firstError)
+	default:
 	}
 
 	// Collect successful results in order
