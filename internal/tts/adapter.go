@@ -5,7 +5,43 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strings"
+	"time"
 )
+
+const (
+	// maxRetries is the maximum number of retry attempts for transient TTS failures
+	maxRetries = 3
+	// baseRetryDelay is the initial delay between retries
+	baseRetryDelay = 500 * time.Millisecond
+)
+
+// isRetryableError checks if an error is transient and worth retrying
+func isRetryableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	// Retry on server errors (5xx), tensor errors, and connection issues
+	retryablePatterns := []string{
+		"status 500",
+		"status 502",
+		"status 503",
+		"status 504",
+		"tensor",
+		"RuntimeError",
+		"connection refused",
+		"connection reset",
+		"timeout",
+		"EOF",
+	}
+	for _, pattern := range retryablePatterns {
+		if strings.Contains(errStr, pattern) {
+			return true
+		}
+	}
+	return false
+}
 
 // Adapter wraps a TTS provider with chunking and audio concatenation
 type Adapter struct {
@@ -48,16 +84,41 @@ func (a *Adapter) ConvertToSpeech(text string, voice string, options *Conversion
 			progressCb(i, len(chunks), chunk)
 		}
 
-		// Convert this chunk
-		reader, err := a.provider.ConvertToSpeech(chunk, voice, options)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert chunk %d/%d: %w", i+1, len(chunks), err)
+		// Convert this chunk with retry logic for transient failures
+		var audioData []byte
+		var lastErr error
+		for retry := 0; retry <= maxRetries; retry++ {
+			if retry > 0 {
+				delay := baseRetryDelay * time.Duration(1<<(retry-1)) // Exponential backoff
+				logger.Warn("Retrying chunk %d/%d (attempt %d/%d) after %v: %v", i+1, len(chunks), retry+1, maxRetries+1, delay, lastErr)
+				time.Sleep(delay)
+			}
+
+			reader, err := a.provider.ConvertToSpeech(chunk, voice, options)
+			if err != nil {
+				lastErr = err
+				// Check if this is a retryable error (server errors, tensor errors, etc.)
+				if isRetryableError(err) {
+					continue
+				}
+				// Non-retryable error, fail immediately
+				return nil, fmt.Errorf("failed to convert chunk %d/%d: %w", i+1, len(chunks), err)
+			}
+
+			// Read the audio data
+			audioData, err = io.ReadAll(reader)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+
+			// Success
+			lastErr = nil
+			break
 		}
 
-		// Read the audio data
-		audioData, err := io.ReadAll(reader)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read audio for chunk %d/%d: %w", i+1, len(chunks), err)
+		if lastErr != nil {
+			return nil, fmt.Errorf("failed to convert chunk %d/%d after %d retries: %w", i+1, len(chunks), maxRetries+1, lastErr)
 		}
 
 		audioBuffers = append(audioBuffers, audioData)
@@ -85,9 +146,31 @@ func (a *Adapter) ConvertToSpeechWithChunks(text string, voice string, options *
 			progressCb(i, len(chunks), chunk)
 		}
 
-		reader, err := a.provider.ConvertToSpeech(chunk, voice, options)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert chunk %d/%d: %w", i+1, len(chunks), err)
+		// Convert this chunk with retry logic for transient failures
+		var reader io.Reader
+		var lastErr error
+		for retry := 0; retry <= maxRetries; retry++ {
+			if retry > 0 {
+				delay := baseRetryDelay * time.Duration(1<<(retry-1))
+				logger.Warn("Retrying chunk %d/%d (attempt %d/%d) after %v: %v", i+1, len(chunks), retry+1, maxRetries+1, delay, lastErr)
+				time.Sleep(delay)
+			}
+
+			var err error
+			reader, err = a.provider.ConvertToSpeech(chunk, voice, options)
+			if err != nil {
+				lastErr = err
+				if isRetryableError(err) {
+					continue
+				}
+				return nil, fmt.Errorf("failed to convert chunk %d/%d: %w", i+1, len(chunks), err)
+			}
+			lastErr = nil
+			break
+		}
+
+		if lastErr != nil {
+			return nil, fmt.Errorf("failed to convert chunk %d/%d after %d retries: %w", i+1, len(chunks), maxRetries+1, lastErr)
 		}
 
 		readers = append(readers, reader)
