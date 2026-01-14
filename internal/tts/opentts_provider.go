@@ -43,7 +43,7 @@ func NewOpenTTSProvider(serverURL string) *OpenTTSProvider {
 		BaseProvider: BaseProvider{name: "opentts"},
 		serverURL:    serverURL,
 		httpClient: &http.Client{
-			Timeout: 120 * time.Second, // TTS can take a while for long text
+			Timeout: 30 * time.Second, // Reduced timeout - retries handle transient failures
 		},
 		voicesMap: make(map[string]openTTSVoice),
 	}
