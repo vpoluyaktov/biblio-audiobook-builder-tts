@@ -160,12 +160,34 @@ func (w *Worker) processJob(job *Job) {
 		}
 	}
 
+	// Check if job should be marked as failed due to chapter failures
+	failedCount := len(job.FailedChapters)
+	totalChapters := len(book.Chapters)
+	successCount := totalChapters - failedCount
+
+	if successCount == 0 {
+		// All chapters failed - mark job as failed
+		job.SetError(fmt.Sprintf("All %d chapters failed to convert", totalChapters))
+		w.broadcastJobFailed(job)
+		logger.Info("Job %s failed: all %d chapters failed", job.ID, totalChapters)
+		return
+	}
+
+	if failedCount > 0 {
+		// Some chapters failed - mark as completed but with warning in error field
+		job.SetError(fmt.Sprintf("%d of %d chapters failed to convert", failedCount, totalChapters))
+	}
+
 	// Mark as completed
 	job.SetStatus(JobStatusCompleted)
-	job.SetProgress(1.0, "", len(book.Chapters))
+	job.SetProgress(1.0, "", totalChapters)
 	w.broadcastJobCompleted(job)
 
-	logger.Info("Job %s completed: %s", job.ID, outputDir)
+	if failedCount > 0 {
+		logger.Info("Job %s completed with errors: %d/%d chapters failed, output: %s", job.ID, failedCount, totalChapters, outputDir)
+	} else {
+		logger.Info("Job %s completed: %s", job.ID, outputDir)
+	}
 }
 
 // parseBook parses the ebook file
