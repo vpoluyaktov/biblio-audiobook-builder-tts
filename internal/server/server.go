@@ -42,6 +42,7 @@ type Server struct {
 // ConfigDB defines the database operations needed for config persistence
 type ConfigDB interface {
 	SetConfig(key, value string) error
+	DeleteJob(id string) error
 }
 
 // New creates a new server instance
@@ -219,6 +220,19 @@ func (s *Server) getJob(w http.ResponseWriter, _ *http.Request, id string) {
 func (s *Server) deleteJob(w http.ResponseWriter, _ *http.Request, id string) {
 	job, exists := s.store.Get(id)
 	if !exists {
+		// Job not in memory store, try to delete from database directly
+		if s.db != nil {
+			if err := s.db.DeleteJob(id); err != nil {
+				s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to delete job: %v", err))
+				return
+			}
+			s.hub.Broadcast(WSMessage{
+				Type:    WSTypeJobDeleted,
+				Payload: map[string]string{"id": id},
+			})
+			s.jsonResponse(w, http.StatusOK, map[string]string{"status": "deleted"})
+			return
+		}
 		s.jsonError(w, http.StatusNotFound, "Job not found")
 		return
 	}
@@ -226,14 +240,22 @@ func (s *Server) deleteJob(w http.ResponseWriter, _ *http.Request, id string) {
 	// If job is pending or in progress, mark as cancelled
 	if job.Status == JobStatusPending || job.Status == JobStatusParsing || job.Status == JobStatusConverting {
 		job.SetStatus(JobStatusCancelled)
-		s.hub.Broadcast(WSMessage{
-			Type:    WSTypeJobDeleted,
-			Payload: map[string]string{"id": id},
-		})
 	}
 
-	// Remove from store
+	// Remove from memory store
 	s.store.Delete(id)
+
+	// Remove from database
+	if s.db != nil {
+		if err := s.db.DeleteJob(id); err != nil {
+			logger.Warn("Failed to delete job from database: %v", err)
+		}
+	}
+
+	s.hub.Broadcast(WSMessage{
+		Type:    WSTypeJobDeleted,
+		Payload: map[string]string{"id": id},
+	})
 
 	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
