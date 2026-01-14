@@ -76,10 +76,19 @@ func SplitIntoParts(chapterFiles []string, chapterTitles []string, maxSizeMB int
 	return parts, nil
 }
 
+// M4BProgressCallback is called with progress updates during M4B building
+// partNum is 1-indexed, progress is 0.0 to 1.0
+type M4BProgressCallback func(partNum int, totalParts int, progress float64)
+
 // BuildMultiPartM4B builds multiple M4B files from parts (sequential version)
 // Deprecated: Use BuildMultiPartM4BParallel for better performance
 func BuildMultiPartM4B(parts []Part, outputDir string, baseFileName string, options M4BOptions) ([]string, error) {
 	return BuildMultiPartM4BParallel(parts, outputDir, baseFileName, options, 1)
+}
+
+// BuildMultiPartM4BWithProgress builds M4B files with progress callback
+func BuildMultiPartM4BWithProgress(parts []Part, outputDir string, baseFileName string, options M4BOptions, numWorkers int, progressCb M4BProgressCallback) ([]string, error) {
+	return buildMultiPartM4BInternal(parts, outputDir, baseFileName, options, numWorkers, progressCb)
 }
 
 // PartBuildResult holds the result of building a single M4B part
@@ -91,6 +100,11 @@ type PartBuildResult struct {
 
 // BuildMultiPartM4BParallel builds multiple M4B files from parts using parallel workers
 func BuildMultiPartM4BParallel(parts []Part, outputDir string, baseFileName string, options M4BOptions, numWorkers int) ([]string, error) {
+	return buildMultiPartM4BInternal(parts, outputDir, baseFileName, options, numWorkers, nil)
+}
+
+// buildMultiPartM4BInternal is the internal implementation with optional progress callback
+func buildMultiPartM4BInternal(parts []Part, outputDir string, baseFileName string, options M4BOptions, numWorkers int, progressCb M4BProgressCallback) ([]string, error) {
 	if len(parts) == 0 {
 		return nil, fmt.Errorf("no parts to build")
 	}
@@ -123,7 +137,7 @@ func BuildMultiPartM4BParallel(parts []Part, outputDir string, baseFileName stri
 			defer wg.Done()
 			for partIdx := range partsChan {
 				part := parts[partIdx]
-				result := buildSinglePart(part, parts, outputDir, baseFileName, options)
+				result := buildSinglePartWithProgress(part, parts, outputDir, baseFileName, options, progressCb)
 				results[partIdx] = result
 			}
 		}()
@@ -144,8 +158,13 @@ func BuildMultiPartM4BParallel(parts []Part, outputDir string, baseFileName stri
 	return m4bFiles, nil
 }
 
-// buildSinglePart builds a single M4B part
+// buildSinglePart builds a single M4B part (without progress callback)
 func buildSinglePart(part Part, allParts []Part, outputDir string, baseFileName string, options M4BOptions) PartBuildResult {
+	return buildSinglePartWithProgress(part, allParts, outputDir, baseFileName, options, nil)
+}
+
+// buildSinglePartWithProgress builds a single M4B part with optional progress callback
+func buildSinglePartWithProgress(part Part, allParts []Part, outputDir string, baseFileName string, options M4BOptions, progressCb M4BProgressCallback) PartBuildResult {
 	result := PartBuildResult{PartNumber: part.Number}
 
 	// Create part-specific options
@@ -165,6 +184,13 @@ func buildSinglePart(part Part, allParts []Part, outputDir string, baseFileName 
 		return result
 	}
 	defer builder.Cleanup()
+
+	// Set progress callback if provided
+	if progressCb != nil {
+		builder.SetProgressCallback(func(progress float64) {
+			progressCb(part.Number, len(allParts), progress)
+		})
+	}
 
 	// Build M4B file
 	var m4bFileName string

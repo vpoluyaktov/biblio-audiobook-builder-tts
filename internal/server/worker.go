@@ -414,9 +414,22 @@ func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (s
 		logger.Info("Building %d M4B parts using %d parallel encoders", len(parts), numEncoders)
 	}
 
-	// Build M4B file(s) in parallel
+	// Reset progress for building phase
+	job.SetProgress(0, "Building M4B...", 0)
+	job.WorkerProgress = nil // Clear TTS worker progress
+	w.broadcastJobProgress(job)
+
+	// Progress callback for M4B building
+	progressCb := func(partNum, totalParts int, progress float64) {
+		// Calculate overall progress across all parts
+		partProgress := (float64(partNum-1) + progress) / float64(totalParts)
+		job.SetProgress(partProgress, fmt.Sprintf("Building Part %d/%d", partNum, totalParts), partNum)
+		w.broadcastJobProgress(job)
+	}
+
+	// Build M4B file(s) in parallel with progress tracking
 	baseFileName := sanitizeFileName(book.Author + " - " + book.Title)
-	m4bFiles, err := audio.BuildMultiPartM4BParallel(parts, job.OutputPath, baseFileName, options, numEncoders)
+	m4bFiles, err := audio.BuildMultiPartM4BWithProgress(parts, job.OutputPath, baseFileName, options, numEncoders, progressCb)
 	if err != nil {
 		return "", fmt.Errorf("failed to build M4B: %v", err)
 	}
