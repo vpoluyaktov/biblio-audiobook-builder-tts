@@ -137,27 +137,46 @@ func concatenateAudio(buffers [][]byte) io.Reader {
 	return bytes.NewReader(result)
 }
 
+// findDataChunkOffset finds the offset where the "data" chunk's audio data begins in a WAV file
+// Returns the offset to the audio data (after "data" + size bytes) and the header to use
+func findDataChunkOffset(buf []byte) int {
+	// Minimum WAV: RIFF(4) + size(4) + WAVE(4) + fmt (4) + fmtSize(4) + fmtData(16+) + data(4) + dataSize(4)
+	if len(buf) < 44 {
+		return -1
+	}
+
+	// Verify RIFF header
+	if string(buf[0:4]) != "RIFF" || string(buf[8:12]) != "WAVE" {
+		return -1
+	}
+
+	// Search for "data" chunk starting after RIFF header (12 bytes)
+	offset := 12
+	for offset < len(buf)-8 {
+		chunkID := string(buf[offset : offset+4])
+		chunkSize := int(buf[offset+4]) | int(buf[offset+5])<<8 | int(buf[offset+6])<<16 | int(buf[offset+7])<<24
+
+		if chunkID == "data" {
+			// Return offset to actual audio data (after "data" + size)
+			return offset + 8
+		}
+
+		// Move to next chunk (chunk header is 8 bytes + chunk data)
+		offset += 8 + chunkSize
+	}
+
+	return -1
+}
+
 // concatenateWAV properly concatenates WAV files by handling headers
 func concatenateWAV(buffers [][]byte) io.Reader {
 	if len(buffers) == 0 {
 		return bytes.NewReader(nil)
 	}
 
-	// WAV file structure:
-	// Bytes 0-3: "RIFF"
-	// Bytes 4-7: File size - 8
-	// Bytes 8-11: "WAVE"
-	// Bytes 12-15: "fmt "
-	// Bytes 16-19: fmt chunk size (16 for PCM)
-	// Bytes 20-35: fmt data
-	// Bytes 36-39: "data"
-	// Bytes 40-43: data size
-	// Bytes 44+: audio data
-
-	const headerSize = 44
-
-	// Use the first file's header as template
-	if len(buffers[0]) < headerSize {
+	// Find data offset for first buffer to use as template
+	firstDataOffset := findDataChunkOffset(buffers[0])
+	if firstDataOffset < 0 {
 		// Not a valid WAV, just concatenate
 		var result []byte
 		for _, buf := range buffers {
@@ -166,40 +185,42 @@ func concatenateWAV(buffers [][]byte) io.Reader {
 		return bytes.NewReader(result)
 	}
 
-	// Calculate total data size
+	// Calculate total data size by finding data offset in each buffer
 	var totalDataSize int
-	for _, buf := range buffers {
-		if len(buf) > headerSize {
-			totalDataSize += len(buf) - headerSize
+	dataOffsets := make([]int, len(buffers))
+	for i, buf := range buffers {
+		dataOffsets[i] = findDataChunkOffset(buf)
+		if dataOffsets[i] > 0 && len(buf) > dataOffsets[i] {
+			totalDataSize += len(buf) - dataOffsets[i]
 		}
 	}
 
-	// Create result buffer
-	result := make([]byte, headerSize+totalDataSize)
+	// Create result buffer: use first file's header up to data chunk + all audio data
+	result := make([]byte, firstDataOffset+totalDataSize)
 
-	// Copy header from first file
-	copy(result[:headerSize], buffers[0][:headerSize])
+	// Copy header from first file (everything up to and including "data" + size)
+	copy(result[:firstDataOffset], buffers[0][:firstDataOffset])
 
-	// Update file size (bytes 4-7): total size - 8
-	fileSize := uint32(headerSize + totalDataSize - 8)
+	// Update RIFF file size (bytes 4-7): total size - 8
+	fileSize := uint32(firstDataOffset + totalDataSize - 8)
 	result[4] = byte(fileSize)
 	result[5] = byte(fileSize >> 8)
 	result[6] = byte(fileSize >> 16)
 	result[7] = byte(fileSize >> 24)
 
-	// Update data size (bytes 40-43)
-	dataSize := uint32(totalDataSize)
-	result[40] = byte(dataSize)
-	result[41] = byte(dataSize >> 8)
-	result[42] = byte(dataSize >> 16)
-	result[43] = byte(dataSize >> 24)
+	// Update data chunk size (4 bytes before firstDataOffset)
+	dataSizeOffset := firstDataOffset - 4
+	result[dataSizeOffset] = byte(totalDataSize)
+	result[dataSizeOffset+1] = byte(totalDataSize >> 8)
+	result[dataSizeOffset+2] = byte(totalDataSize >> 16)
+	result[dataSizeOffset+3] = byte(totalDataSize >> 24)
 
 	// Copy audio data from all buffers
-	offset := headerSize
-	for _, buf := range buffers {
-		if len(buf) > headerSize {
-			copy(result[offset:], buf[headerSize:])
-			offset += len(buf) - headerSize
+	offset := firstDataOffset
+	for i, buf := range buffers {
+		if dataOffsets[i] > 0 && len(buf) > dataOffsets[i] {
+			copy(result[offset:], buf[dataOffsets[i]:])
+			offset += len(buf) - dataOffsets[i]
 		}
 	}
 

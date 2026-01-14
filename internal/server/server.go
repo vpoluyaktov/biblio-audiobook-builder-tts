@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"abb_tts/internal/config"
 	"abb_tts/internal/logger"
@@ -95,6 +96,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/settings", s.handleSettings)
 	mux.HandleFunc("/api/settings/test-audiobookshelf", s.handleTestAudiobookshelf)
 	mux.HandleFunc("/api/settings/test-opentts", s.handleTestOpenTTS)
+	mux.HandleFunc("/api/settings/test-rhvoice", s.handleTestRHVoice)
 	mux.HandleFunc("/api/test-voice", s.handleTestVoice)
 	mux.HandleFunc("/api/ws", func(w http.ResponseWriter, r *http.Request) {
 		ServeWS(s.hub, w, r)
@@ -768,9 +770,10 @@ func (s *Server) handleTestVoice(w http.ResponseWriter, r *http.Request) {
 		req.Pitch = 1.0
 	}
 
-	// Limit text length to 500 characters
-	if len(req.Text) > 500 {
-		req.Text = req.Text[:500]
+	// Limit text length to 500 characters (using rune count for proper Unicode support)
+	if utf8.RuneCountInString(req.Text) > 500 {
+		runes := []rune(req.Text)
+		req.Text = string(runes[:500])
 	}
 
 	// Get the TTS adapter for the provider

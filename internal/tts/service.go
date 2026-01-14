@@ -66,6 +66,14 @@ func NewService(cfg *config.Config) Service {
 		logger.Debug("OpenTTS URL not configured, skipping OpenTTS provider")
 	}
 
+	// Initialize RHVoice if URL is configured
+	if cfg.RHVoiceURL != "" {
+		logger.Debug("Initializing RHVoice provider with URL: %s", cfg.RHVoiceURL)
+		s.providers["rhvoice"] = NewRHVoiceProvider(cfg.RHVoiceURL)
+	} else {
+		logger.Debug("RHVoice URL not configured, skipping RHVoice provider")
+	}
+
 	// Initialize OpenAI TTS if API key is configured
 	if cfg.OpenAIAPIKey != "" {
 		logger.Debug("Initializing OpenAI TTS provider")
@@ -170,6 +178,11 @@ func (s *service) GetVoicesFiltered(providerName, language, model string) []Voic
 			return ap.GetVoicesFiltered(language, model)
 		}
 
+		// Check if provider supports filtering (RHVoiceProvider does)
+		if rp, ok := provider.(*RHVoiceProvider); ok {
+			return rp.GetVoicesFiltered(language, model)
+		}
+
 		// For other providers, get all voices and filter manually
 		allVoices := provider.GetAvailableVoices()
 		for _, v := range allVoices {
@@ -230,6 +243,11 @@ func (s *service) GetAvailableLanguages(providerName string) []string {
 			return ap.GetAvailableLanguages()
 		}
 
+		// Check if provider has GetAvailableLanguages method (RHVoice)
+		if rp, ok := provider.(*RHVoiceProvider); ok {
+			return rp.GetAvailableLanguages()
+		}
+
 		// For other providers, extract from voices
 		for _, v := range provider.GetAvailableVoices() {
 			langMap[v.Language] = true
@@ -280,6 +298,11 @@ func (s *service) GetAvailableModels(providerName string) []string {
 			return ap.GetAvailableModels()
 		}
 
+		// Check if provider is RHVoice - use models
+		if rp, ok := provider.(*RHVoiceProvider); ok {
+			return rp.GetAvailableModels()
+		}
+
 		// For other providers, extract from voices
 		for _, v := range provider.GetAvailableVoices() {
 			model := extractModelType(v.ID)
@@ -321,6 +344,11 @@ func (s *service) ReloadProviders() {
 	// Initialize OpenTTS if URL is configured
 	if s.cfg.OpenTTSURL != "" {
 		s.providers["opentts"] = NewOpenTTSProvider(s.cfg.OpenTTSURL)
+	}
+
+	// Initialize RHVoice if URL is configured
+	if s.cfg.RHVoiceURL != "" {
+		s.providers["rhvoice"] = NewRHVoiceProvider(s.cfg.RHVoiceURL)
 	}
 
 	// Initialize OpenAI TTS if API key is configured

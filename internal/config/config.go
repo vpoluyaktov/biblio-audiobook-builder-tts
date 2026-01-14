@@ -40,6 +40,9 @@ type Config struct {
 	// OpenTTS settings
 	OpenTTSURL string `mapstructure:"opentts_url"` // OpenTTS server URL (e.g., http://localhost:5500)
 
+	// RHVoice settings
+	RHVoiceURL string `mapstructure:"rhvoice_url"` // RHVoice REST server URL (e.g., http://localhost:8080)
+
 	// OpenAI TTS settings
 	OpenAIAPIKey string `mapstructure:"openai_api_key"` // OpenAI API key for TTS
 
@@ -88,6 +91,9 @@ func Load(configFile string) (*Config, error) {
 
 	// OpenTTS settings
 	viper.SetDefault("opentts_url", "")
+
+	// RHVoice settings
+	viper.SetDefault("rhvoice_url", "")
 
 	// OpenAI TTS settings
 	viper.SetDefault("openai_api_key", "")
@@ -190,6 +196,9 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 	}
 	if v, ok := dbConfig["opentts_url"].(string); ok {
 		cfg.OpenTTSURL = v
+	}
+	if v, ok := dbConfig["rhvoice_url"].(string); ok {
+		cfg.RHVoiceURL = v
 	}
 	if v, ok := dbConfig["openai_api_key"].(string); ok {
 		cfg.OpenAIAPIKey = v
