@@ -513,9 +513,9 @@ func (w *Worker) uploadToAudiobookshelf(job *Job, book *parser.Book) error {
 		Files:  filesToUpload,
 	}
 
-	// Upload with progress callback
+	// Upload with progress callback (no logging to avoid log spam)
 	progressCallback := func(fileID int, fileName string, size int64, pos int64, percent int) {
-		logger.Debug("Upload progress: %s - %d%%", fileName, percent)
+		// Progress is tracked via job status, no need to log each update
 	}
 
 	if err := client.UploadBook(ab, libraryID, folderID, progressCallback); err != nil {
