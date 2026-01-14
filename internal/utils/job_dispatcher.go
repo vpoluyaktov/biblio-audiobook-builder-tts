@@ -139,6 +139,7 @@ func (d *JobDispatcher) runJob(w *worker, j *job) {
 	defer func() {
 		d.mu.Lock()
 		j.complete = true
+		w.job = nil
 		d.mu.Unlock()
 		w.busy.Store(false)
 		d.completed.Add(1)
@@ -148,7 +149,9 @@ func (d *JobDispatcher) runJob(w *worker, j *job) {
 		return
 	}
 
+	d.mu.Lock()
 	w.job = j
+	d.mu.Unlock()
 
 	f := reflect.ValueOf(j.jobFn)
 	if len(j.params) != f.Type().NumIn() {
@@ -197,6 +200,9 @@ func (d *JobDispatcher) GetProgress() (completed int, total int) {
 
 // GetActiveWorkers returns information about currently active workers
 func (d *JobDispatcher) GetActiveWorkers() []WorkerStatus {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
 	var active []WorkerStatus
 	for i := range d.workers {
 		w := &d.workers[i]

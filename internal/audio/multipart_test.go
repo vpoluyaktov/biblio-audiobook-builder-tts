@@ -150,3 +150,153 @@ func createTestFiles(t *testing.T, dir string, count int, sizeBytes int) []strin
 	}
 	return files
 }
+
+func TestBuildMultiPartM4BParallel_EmptyParts(t *testing.T) {
+	_, err := BuildMultiPartM4BParallel([]Part{}, "/tmp", "test", M4BOptions{}, 2)
+	if err == nil {
+		t.Error("Expected error for empty parts")
+	}
+}
+
+func TestBuildMultiPartM4BParallel_WorkerLimits(t *testing.T) {
+	// Test that worker count is properly limited
+	parts := []Part{
+		{Number: 1, ChapterFiles: []string{"/fake/file1.wav"}},
+		{Number: 2, ChapterFiles: []string{"/fake/file2.wav"}},
+	}
+
+	// This will fail because files don't exist, but we're testing the worker limiting logic
+	// The function should limit workers to number of parts (2)
+	_, _ = BuildMultiPartM4BParallel(parts, "/tmp", "test", M4BOptions{}, 10)
+	// No assertion needed - just verifying it doesn't panic with more workers than parts
+}
+
+func TestBuildMultiPartM4BParallel_ZeroWorkers(t *testing.T) {
+	parts := []Part{
+		{Number: 1, ChapterFiles: []string{"/fake/file1.wav"}},
+	}
+
+	// Zero workers should default to 1
+	_, _ = BuildMultiPartM4BParallel(parts, "/tmp", "test", M4BOptions{}, 0)
+	// No assertion needed - just verifying it doesn't panic
+}
+
+func TestBuildMultiPartM4BParallel_NegativeWorkers(t *testing.T) {
+	parts := []Part{
+		{Number: 1, ChapterFiles: []string{"/fake/file1.wav"}},
+	}
+
+	// Negative workers should default to 1
+	_, _ = BuildMultiPartM4BParallel(parts, "/tmp", "test", M4BOptions{}, -5)
+	// No assertion needed - just verifying it doesn't panic
+}
+
+func TestPartBuildResult(t *testing.T) {
+	result := PartBuildResult{
+		PartNumber: 1,
+		FilePath:   "/path/to/file.m4b",
+		Error:      nil,
+	}
+
+	if result.PartNumber != 1 {
+		t.Errorf("Expected PartNumber 1, got %d", result.PartNumber)
+	}
+	if result.FilePath != "/path/to/file.m4b" {
+		t.Errorf("Expected FilePath '/path/to/file.m4b', got '%s'", result.FilePath)
+	}
+	if result.Error != nil {
+		t.Errorf("Expected nil error, got %v", result.Error)
+	}
+}
+
+func TestBuildMultiPartM4B_CallsParallel(t *testing.T) {
+	// Verify that BuildMultiPartM4B delegates to BuildMultiPartM4BParallel
+	parts := []Part{
+		{Number: 1, ChapterFiles: []string{"/fake/file1.wav"}},
+	}
+
+	// Both should fail the same way (file doesn't exist)
+	_, err1 := BuildMultiPartM4B(parts, "/tmp", "test", M4BOptions{})
+	_, err2 := BuildMultiPartM4BParallel(parts, "/tmp", "test", M4BOptions{}, 1)
+
+	// Both should return errors (files don't exist)
+	if (err1 == nil) != (err2 == nil) {
+		t.Error("BuildMultiPartM4B and BuildMultiPartM4BParallel should behave the same")
+	}
+}
+
+func TestSplitIntoParts_ChapterTitles(t *testing.T) {
+	tmpDir := t.TempDir()
+	files := createTestFiles(t, tmpDir, 3, 1024)
+
+	// Test with matching titles
+	titles := []string{"Chapter 1", "Chapter 2", "Chapter 3"}
+	parts, err := SplitIntoParts(files, titles, 0)
+	if err != nil {
+		t.Fatalf("SplitIntoParts failed: %v", err)
+	}
+
+	if len(parts[0].Chapters) != 3 {
+		t.Errorf("Expected 3 chapters, got %d", len(parts[0].Chapters))
+	}
+
+	for i, ch := range parts[0].Chapters {
+		if ch.Title != titles[i] {
+			t.Errorf("Chapter %d title = '%s', expected '%s'", i, ch.Title, titles[i])
+		}
+	}
+}
+
+func TestSplitIntoParts_FewerTitlesThanFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Create 5 files with 300KB each - will need splitting at 1MB
+	files := createTestFiles(t, tmpDir, 5, 300*1024)
+
+	// Fewer titles than files - function should use default titles for missing ones
+	titles := []string{"Chapter 1", "Chapter 2"}
+	// Use maxSizeMB=1 to trigger the splitting code path which handles default titles
+	parts, err := SplitIntoParts(files, titles, 1)
+	if err != nil {
+		t.Fatalf("SplitIntoParts failed: %v", err)
+	}
+
+	// Count total chapters across all parts
+	totalChapters := 0
+	for _, part := range parts {
+		totalChapters += len(part.Chapters)
+	}
+
+	if totalChapters != 5 {
+		t.Errorf("Expected 5 total chapters, got %d", totalChapters)
+	}
+
+	// Verify first part has correct titles
+	if len(parts) > 0 && len(parts[0].Chapters) > 0 {
+		if parts[0].Chapters[0].Title != "Chapter 1" {
+			t.Errorf("Expected 'Chapter 1', got '%s'", parts[0].Chapters[0].Title)
+		}
+	}
+}
+
+func TestSplitIntoParts_TotalSize(t *testing.T) {
+	tmpDir := t.TempDir()
+	fileSize := 1024
+	files := createTestFiles(t, tmpDir, 3, fileSize)
+
+	titles := []string{"A", "B", "C"}
+	// Use maxSizeMB=10 to trigger the code path that calculates TotalSize
+	// (maxSizeMB=0 returns early without calculating sizes)
+	parts, err := SplitIntoParts(files, titles, 10)
+	if err != nil {
+		t.Fatalf("SplitIntoParts failed: %v", err)
+	}
+
+	if len(parts) != 1 {
+		t.Fatalf("Expected 1 part, got %d", len(parts))
+	}
+
+	expectedTotalSize := int64(3 * fileSize)
+	if parts[0].TotalSize != expectedTotalSize {
+		t.Errorf("Expected TotalSize %d, got %d", expectedTotalSize, parts[0].TotalSize)
+	}
+}
