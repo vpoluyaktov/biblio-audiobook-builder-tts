@@ -160,34 +160,12 @@ func (w *Worker) processJob(job *Job) {
 		}
 	}
 
-	// Check if job should be marked as failed due to chapter failures
-	failedCount := len(job.FailedChapters)
-	totalChapters := len(book.Chapters)
-	successCount := totalChapters - failedCount
-
-	if successCount == 0 {
-		// All chapters failed - mark job as failed
-		job.SetError(fmt.Sprintf("All %d chapters failed to convert", totalChapters))
-		w.broadcastJobFailed(job)
-		logger.Info("Job %s failed: all %d chapters failed", job.ID, totalChapters)
-		return
-	}
-
-	if failedCount > 0 {
-		// Some chapters failed - mark as completed but with warning in error field
-		job.SetError(fmt.Sprintf("%d of %d chapters failed to convert", failedCount, totalChapters))
-	}
-
-	// Mark as completed
+	// Mark as completed (if we got here, all chapters succeeded)
 	job.SetStatus(JobStatusCompleted)
-	job.SetProgress(1.0, "", totalChapters)
+	job.SetProgress(1.0, "", len(book.Chapters))
 	w.broadcastJobCompleted(job)
 
-	if failedCount > 0 {
-		logger.Info("Job %s completed with errors: %d/%d chapters failed, output: %s", job.ID, failedCount, totalChapters, outputDir)
-	} else {
-		logger.Info("Job %s completed: %s", job.ID, outputDir)
-	}
+	logger.Info("Job %s completed: %s", job.ID, outputDir)
 }
 
 // parseBook parses the ebook file
@@ -301,20 +279,24 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 	default:
 	}
 
-	// Collect successful results in order and track failures
-	var chapterFiles []string
+	// Check for any failed chapters - fail the entire job if any chapter failed
 	for i := 0; i < totalChapters; i++ {
 		if results[i].Error != nil {
-			logger.Warn("Chapter %d failed: %v", i+1, results[i].Error)
-			// Record the failed chapter so user can see it
 			chapterTitle := ""
 			if i < len(book.Chapters) {
 				chapterTitle = book.Chapters[i].Title
 			}
+			// Record the failed chapter
 			job.AddFailedChapter(i+1, chapterTitle, results[i].Error)
-			w.broadcastJobProgress(job)
-			continue
+
+			// Fail immediately - incomplete audiobook is useless
+			return "", nil, fmt.Errorf("chapter %d (%s) failed after retries: %v", i+1, chapterTitle, results[i].Error)
 		}
+	}
+
+	// Collect successful results in order
+	var chapterFiles []string
+	for i := 0; i < totalChapters; i++ {
 		if results[i].OutputPath != "" {
 			chapterFiles = append(chapterFiles, results[i].OutputPath)
 		}
