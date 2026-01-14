@@ -205,7 +205,9 @@ func (p *OpenTTSProvider) ConvertToSpeech(text string, voice string, options *Co
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	resp, err := p.httpClient.Do(req)
+	// Use a dedicated client with strict timeout for this request
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return nil, fmt.Errorf("TTS request timed out after 60s")
