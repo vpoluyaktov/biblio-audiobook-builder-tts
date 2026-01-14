@@ -408,8 +408,16 @@ func sanitizeFileName(name string) string {
 		"<", "_",
 		">", "_",
 		"|", "_",
+		"\n", " ",
+		"\r", " ",
+		"\t", " ",
 	)
 	result := replacer.Replace(name)
+
+	// Collapse multiple spaces into one
+	for strings.Contains(result, "  ") {
+		result = strings.ReplaceAll(result, "  ", " ")
+	}
 
 	// Trim spaces and dots from ends
 	result = strings.TrimSpace(result)
