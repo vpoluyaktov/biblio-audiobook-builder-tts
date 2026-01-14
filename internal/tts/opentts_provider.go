@@ -3,6 +3,7 @@ package tts
 import (
 	"abb_tts/internal/logger"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -195,8 +196,20 @@ func (p *OpenTTSProvider) ConvertToSpeech(text string, voice string, options *Co
 
 	reqURL := fmt.Sprintf("%s/api/tts?%s", p.serverURL, params.Encode())
 
-	resp, err := p.httpClient.Get(reqURL)
+	// Create request with context timeout for watchdog
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := p.httpClient.Do(req)
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("TTS request timed out after 60s")
+		}
 		return nil, fmt.Errorf("TTS request failed: %w", err)
 	}
 	defer resp.Body.Close()
