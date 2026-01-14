@@ -1091,6 +1091,10 @@ class App {
         document.getElementById('cfg-chapter-gap').value = s.chapter_gap_seconds || 2;
         document.getElementById('cfg-max-file-size').value = s.max_file_size_mb || 2000;
         
+        // Performance tab
+        document.getElementById('cfg-concurrent-tts-workers').value = s.concurrent_tts_workers || 3;
+        document.getElementById('cfg-concurrent-encoders').value = s.concurrent_encoders || 2;
+        
         // Cloud TTS tab
         document.getElementById('cfg-openai-api-key').value = s.openai_api_key || '';
         document.getElementById('cfg-google-api-key').value = s.google_api_key || '';
@@ -1133,6 +1137,10 @@ class App {
             sample_rate_hz: parseInt(document.getElementById('cfg-sample-rate').value),
             chapter_gap_seconds: parseInt(document.getElementById('cfg-chapter-gap').value),
             max_file_size_mb: parseInt(document.getElementById('cfg-max-file-size').value),
+            
+            // Performance
+            concurrent_tts_workers: parseInt(document.getElementById('cfg-concurrent-tts-workers').value),
+            concurrent_encoders: parseInt(document.getElementById('cfg-concurrent-encoders').value),
             
             // Cloud TTS
             openai_api_key: document.getElementById('cfg-openai-api-key').value,

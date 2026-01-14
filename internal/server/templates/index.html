@@ -308,6 +308,7 @@
                 <button class="tab-btn active" data-tab="general">General</button>
                 <button class="tab-btn" data-tab="tts">TTS Settings</button>
                 <button class="tab-btn" data-tab="output">Output</button>
+                <button class="tab-btn" data-tab="performance">Performance</button>
                 <button class="tab-btn" data-tab="cloud">Cloud TTS</button>
                 <button class="tab-btn" data-tab="opentts">OpenTTS</button>
                 <button class="tab-btn" data-tab="rhvoice">RHVoice</button>
@@ -435,6 +436,52 @@
                             <input type="number" id="cfg-max-file-size" min="100" max="4000" value="2000">
                             <small>Books larger than this will be split into multiple parts</small>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Performance Tab -->
+                <div class="tab-content" id="tab-performance">
+                    <div class="settings-section">
+                        <h3>⚡ Parallel Processing</h3>
+                        <p class="section-description">
+                            Configure the number of concurrent workers for TTS conversion and M4B encoding.
+                            Higher values = faster processing but more CPU/memory usage.
+                        </p>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="cfg-concurrent-tts-workers">TTS Workers</label>
+                                <select id="cfg-concurrent-tts-workers">
+                                    <option value="1">1 (Sequential)</option>
+                                    <option value="2">2</option>
+                                    <option value="3" selected>3</option>
+                                    <option value="4">4</option>
+                                    <option value="5">5</option>
+                                    <option value="6">6</option>
+                                    <option value="8">8</option>
+                                    <option value="10">10</option>
+                                </select>
+                                <small>Number of chapters to convert simultaneously</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="cfg-concurrent-encoders">M4B Encoders</label>
+                                <select id="cfg-concurrent-encoders">
+                                    <option value="1">1 (Sequential)</option>
+                                    <option value="2" selected>2</option>
+                                    <option value="3">3</option>
+                                    <option value="4">4</option>
+                                    <option value="5">5</option>
+                                </select>
+                                <small>Number of M4B parts to build simultaneously</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h3>ℹ️ Performance Notes</h3>
+                        <ul class="info-list">
+                            <li><strong>Local TTS (espeak):</strong> Limited by CPU cores</li>
+                            <li><strong>Self-hosted (OpenTTS, RHVoice):</strong> Limited by server capacity</li>
+                            <li><strong>Cloud TTS (Google, Azure, OpenAI):</strong> May have API rate limits - reduce workers if you encounter errors</li>
+                        </ul>
                     </div>
                 </div>
 

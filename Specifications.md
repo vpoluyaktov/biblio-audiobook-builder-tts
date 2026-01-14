@@ -271,6 +271,7 @@ Flags:
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Test Voice UI | 🔄 In Progress | Allow users to test TTS voice before conversion |
+| Parallel Processing | 🔄 In Progress | Concurrent TTS encoding and M4B building |
 
 ### Not Started ❌
 
@@ -285,6 +286,259 @@ Flags:
 ---
 
 ## Future Enhancements
+
+### Phase -2: Parallel Processing (High Priority)
+
+**Goal**: Improve conversion speed by processing multiple chapters and M4B parts concurrently using configurable worker pools.
+
+#### -2.1 Feature Overview
+
+Currently, the application processes chapters sequentially:
+1. Chapter 1 → TTS → Save WAV
+2. Chapter 2 → TTS → Save WAV
+3. ...
+4. Build M4B Part 1
+5. Build M4B Part 2
+6. ...
+
+With parallel processing:
+1. Chapters 1-N processed concurrently (N = TTS workers)
+2. M4B Parts 1-M built concurrently (M = encoder workers)
+
+#### -2.2 Configuration Settings
+
+New configuration fields:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `concurrent_tts_workers` | int | 3 | Number of parallel TTS conversion workers |
+| `concurrent_encoders` | int | 2 | Number of parallel M4B encoding workers |
+
+**Per-Provider TTS Workers:**
+
+Different TTS providers have different rate limits and resource requirements:
+- **Local (espeak, festival)**: Limited by CPU cores
+- **Self-hosted (OpenTTS, RHVoice)**: Limited by server capacity
+- **Cloud (Google, Azure, OpenAI)**: Limited by API rate limits
+
+#### -2.3 JobDispatcher Utility
+
+Port the `JobDispatcher` from abb_ia project to manage worker pools:
+
+```go
+// internal/utils/job_dispatcher.go
+package utils
+
+type JobDispatcher struct {
+    workers []worker
+    jobs    []job
+    stopCh  chan struct{}
+}
+
+type worker struct {
+    id   int
+    busy bool
+    job  *job
+}
+
+type job struct {
+    id       int
+    jobFn    interface{}
+    params   []interface{}
+    assigned bool
+    complete bool
+}
+
+func NewJobDispatcher(numWorkers int) *JobDispatcher
+func (d *JobDispatcher) AddJob(id int, jobFn interface{}, params ...interface{})
+func (d *JobDispatcher) Start()
+func (d *JobDispatcher) Stop()
+func (d *JobDispatcher) IsComplete(jobId int) bool
+func (d *JobDispatcher) GetProgress() (completed int, total int)
+```
+
+#### -2.4 Parallel TTS Conversion
+
+```go
+// Worker.convertBook() changes:
+func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, error) {
+    // Initialize progress tracking for all chapters
+    chapterProgress := make([]ChapterProgress, len(book.Chapters))
+    
+    // Create job dispatcher with configured workers
+    jd := utils.NewJobDispatcher(w.cfg.ConcurrentTTSWorkers)
+    
+    // Add all chapters as jobs
+    for i, chapter := range book.Chapters {
+        jd.AddJob(i, w.convertChapter, job, i, chapter, &chapterProgress[i])
+    }
+    
+    // Start progress update goroutine
+    go w.updateChapterProgress(job, chapterProgress)
+    
+    // Process all chapters in parallel
+    jd.Start()
+    
+    // Collect results in order
+    return w.collectChapterFiles(chapterProgress)
+}
+```
+
+#### -2.5 Parallel M4B Building
+
+```go
+// Worker.buildM4B() changes:
+func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (string, error) {
+    parts, _ := audio.SplitIntoParts(chapterFiles, chapterTitles, w.cfg.MaxFileSizeMB)
+    
+    // Initialize progress tracking for all parts
+    partProgress := make([]PartProgress, len(parts))
+    
+    // Create job dispatcher for encoding
+    jd := utils.NewJobDispatcher(w.cfg.ConcurrentEncoders)
+    
+    // Add all parts as jobs
+    for i, part := range parts {
+        jd.AddJob(i, w.buildPart, job, i, part, &partProgress[i])
+    }
+    
+    // Start progress update goroutine
+    go w.updatePartProgress(job, partProgress)
+    
+    // Build all parts in parallel
+    jd.Start()
+    
+    return w.collectM4BFiles(partProgress)
+}
+```
+
+#### -2.6 Progress Tracking
+
+**ChapterProgress struct:**
+```go
+type ChapterProgress struct {
+    ChapterNum   int
+    ChapterTitle string
+    Status       string  // "pending", "converting", "complete", "error"
+    Progress     float64 // 0.0 - 1.0
+    OutputFile   string
+    Error        string
+}
+```
+
+**PartProgress struct:**
+```go
+type PartProgress struct {
+    PartNum      int
+    Status       string  // "pending", "encoding", "complete", "error"
+    Progress     float64 // 0.0 - 1.0
+    OutputFile   string
+    Error        string
+}
+```
+
+#### -2.7 UI Changes
+
+**Progress Display Updates:**
+
+Current UI shows single progress bar. New UI shows:
+
+```
+Converting: Pride and Prejudice
+├── Chapter Progress: 45/61 (73%)
+│   ├── Worker 1: Chapter 46 - "Elizabeth's Dilemma" [████░░░░░░] 42%
+│   ├── Worker 2: Chapter 47 - "Mr. Darcy Returns" [██████░░░░] 65%
+│   └── Worker 3: Chapter 48 - "The Letter" [████████░░] 81%
+│
+└── Overall: [████████████████░░░░░░░░░░░░░░] 73%
+```
+
+**Building M4B:**
+```
+Building M4B: Pride and Prejudice
+├── Part Progress: 1/3 complete
+│   ├── Encoder 1: Part 2 [████████░░░░░░░░░░░░] 40%
+│   └── Encoder 2: Part 3 [██░░░░░░░░░░░░░░░░░░] 10%
+│
+└── Overall: [██████████░░░░░░░░░░░░░░░░░░░░] 33%
+```
+
+**WebSocket Message Updates:**
+
+New message type for parallel progress:
+```json
+{
+  "type": "job_parallel_progress",
+  "payload": {
+    "job_id": "uuid",
+    "phase": "converting",  // "converting" or "building"
+    "workers": [
+      {
+        "worker_id": 0,
+        "item_num": 46,
+        "item_title": "Elizabeth's Dilemma",
+        "progress": 0.42,
+        "status": "active"
+      },
+      {
+        "worker_id": 1,
+        "item_num": 47,
+        "item_title": "Mr. Darcy Returns",
+        "progress": 0.65,
+        "status": "active"
+      }
+    ],
+    "completed": 45,
+    "total": 61,
+    "overall_progress": 0.73
+  }
+}
+```
+
+#### -2.8 Settings UI Changes
+
+Add new "Performance" section to Settings modal:
+
+**Performance Tab:**
+```
+┌─────────────────────────────────────────────────────────┐
+│  ⚡ Performance Settings                                │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  TTS Conversion Workers                                 │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │  Concurrent TTS Workers: [3    ] ▼              │   │
+│  │  (1-10, higher = faster but more CPU/memory)   │   │
+│  └─────────────────────────────────────────────────┘   │
+│                                                         │
+│  M4B Encoding Workers                                   │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │  Concurrent Encoders: [2    ] ▼                 │   │
+│  │  (1-5, higher = faster but more CPU/disk I/O)  │   │
+│  └─────────────────────────────────────────────────┘   │
+│                                                         │
+│  ℹ️ Note: Cloud TTS providers may have rate limits.    │
+│     Reduce workers if you encounter API errors.        │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### -2.9 Implementation Tasks
+
+- [ ] Port `JobDispatcher` from abb_ia to `internal/utils/job_dispatcher.go`
+- [ ] Add `concurrent_tts_workers` and `concurrent_encoders` to config
+- [ ] Add config fields to `LoadFromDB` function
+- [ ] Add Performance tab to Settings UI
+- [ ] Create `ChapterProgress` and `PartProgress` structs
+- [ ] Refactor `convertBook` for parallel chapter processing
+- [ ] Refactor `buildM4B` for parallel part encoding
+- [ ] Add progress tracking goroutines
+- [ ] Update WebSocket messages for parallel progress
+- [ ] Update frontend to display multi-worker progress
+- [ ] Add unit tests for JobDispatcher
+- [ ] Test with various worker counts and book sizes
+
+---
 
 ### Phase -1: Test Voice UI (High Priority)
 

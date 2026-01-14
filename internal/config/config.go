@@ -30,6 +30,8 @@ type Config struct {
 	PronunciationDictFile   string  `mapstructure:"pronunciation_dict_file"`   // Path to pronunciation dictionary
 	UseDefaultPronunciation bool    `mapstructure:"use_default_pronunciation"` // Use built-in pronunciation rules
 	MaxFileSizeMB           int     `mapstructure:"max_file_size_mb"`          // Max M4B file size before splitting
+	ConcurrentTTSWorkers    int     `mapstructure:"concurrent_tts_workers"`    // Number of parallel TTS workers
+	ConcurrentEncoders      int     `mapstructure:"concurrent_encoders"`       // Number of parallel M4B encoders
 
 	// Cloud provider settings
 	CloudAPIKey       string `mapstructure:"cloud_api_key"`
@@ -82,6 +84,8 @@ func Load(configFile string) (*Config, error) {
 	viper.SetDefault("pronunciation_dict_file", "")     // Custom pronunciation dictionary
 	viper.SetDefault("use_default_pronunciation", true) // Use built-in pronunciation rules
 	viper.SetDefault("max_file_size_mb", 2000)          // 2GB max file size before splitting
+	viper.SetDefault("concurrent_tts_workers", 3)       // 3 parallel TTS workers
+	viper.SetDefault("concurrent_encoders", 2)          // 2 parallel M4B encoders
 
 	// Cloud provider settings
 	viper.SetDefault("cloud_api_key", "")
@@ -181,6 +185,12 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 	}
 	if v, ok := dbConfig["max_file_size_mb"].(int); ok {
 		cfg.MaxFileSizeMB = v
+	}
+	if v, ok := dbConfig["concurrent_tts_workers"].(int); ok {
+		cfg.ConcurrentTTSWorkers = v
+	}
+	if v, ok := dbConfig["concurrent_encoders"].(int); ok {
+		cfg.ConcurrentEncoders = v
 	}
 	if v, ok := dbConfig["cloud_api_key"].(string); ok {
 		cfg.CloudAPIKey = v
