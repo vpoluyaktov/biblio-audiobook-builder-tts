@@ -20,7 +20,32 @@ const (
 	maxRetries = 3
 	// baseRetryDelay is the initial delay between retries
 	baseRetryDelay = 500 * time.Millisecond
+	// chunkTimeout is the maximum time allowed for a single chunk TTS conversion
+	chunkTimeout = 60 * time.Second
 )
+
+// ttsResult holds the result of a TTS conversion attempt
+type ttsResult struct {
+	reader io.Reader
+	err    error
+}
+
+// convertWithTimeout wraps a TTS conversion with a timeout watchdog
+func (a *Adapter) convertWithTimeout(chunk string, voice string, options *ConversionOptions) (io.Reader, error) {
+	resultCh := make(chan ttsResult, 1)
+
+	go func() {
+		reader, err := a.provider.ConvertToSpeech(chunk, voice, options)
+		resultCh <- ttsResult{reader: reader, err: err}
+	}()
+
+	select {
+	case result := <-resultCh:
+		return result.reader, result.err
+	case <-time.After(chunkTimeout):
+		return nil, fmt.Errorf("TTS conversion timed out after %v", chunkTimeout)
+	}
+}
 
 // sanitizeTextForTTS normalizes text to avoid TTS model errors caused by
 // special Unicode characters, em dashes, curly quotes, etc.
@@ -123,6 +148,7 @@ func isRetryableError(err error) bool {
 		"connection refused",
 		"connection reset",
 		"timeout",
+		"timed out",
 		"EOF",
 	}
 	for _, pattern := range retryablePatterns {
@@ -186,7 +212,8 @@ func (a *Adapter) ConvertToSpeech(text string, voice string, options *Conversion
 
 			// Sanitize chunk text to avoid TTS model errors from special characters
 			sanitizedChunk := sanitizeTextForTTS(chunk)
-			reader, err := a.provider.ConvertToSpeech(sanitizedChunk, voice, options)
+			// Use watchdog timeout to prevent hanging on stuck TTS backend
+			reader, err := a.convertWithTimeout(sanitizedChunk, voice, options)
 			if err != nil {
 				lastErr = err
 				// Check if this is a retryable error (server errors, tensor errors, etc.)
@@ -250,8 +277,9 @@ func (a *Adapter) ConvertToSpeechWithChunks(text string, voice string, options *
 
 			// Sanitize chunk text to avoid TTS model errors from special characters
 			sanitizedChunk := sanitizeTextForTTS(chunk)
+			// Use watchdog timeout to prevent hanging on stuck TTS backend
 			var err error
-			reader, err = a.provider.ConvertToSpeech(sanitizedChunk, voice, options)
+			reader, err = a.convertWithTimeout(sanitizedChunk, voice, options)
 			if err != nil {
 				lastErr = err
 				if isRetryableError(err) {
