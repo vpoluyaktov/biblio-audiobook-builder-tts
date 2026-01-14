@@ -786,6 +786,8 @@ func (c *Config) ToAppConfig() map[string]interface{} {
 		"pronunciation_dict_file":   c.PronunciationDictFile,
 		"use_default_pronunciation": c.UseDefaultPronunciation,
 		"max_file_size_mb":          c.MaxFileSizeMB,
+		"concurrent_tts_workers":    c.ConcurrentTTSWorkers,
+		"concurrent_encoders":       c.ConcurrentEncoders,
 		"cloud_api_key":             c.CloudAPIKey,
 		"google_tts_endpoint":       c.GoogleTTSEndpoint,
 		"azure_tts_endpoint":        c.AzureTTSEndpoint,
