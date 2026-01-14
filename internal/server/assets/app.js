@@ -875,7 +875,7 @@ class App {
         
         let progressText = '';
         if (job.status === 'converting' && job.current_chapter) {
-            progressText = `Chapter ${job.current_chapter_num}/${job.total_chapters}: ${job.current_chapter}`;
+            progressText = `${job.current_chapter_num}/${job.total_chapters} chapters converted`;
         } else if (job.status === 'parsing') {
             progressText = 'Parsing book...';
         } else if (job.status === 'building') {
