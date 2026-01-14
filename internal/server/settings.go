@@ -75,7 +75,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 // getSettings returns all configuration settings
-func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
+func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
 	settings := SettingsRequest{
 		// General
 		ServerHost:  s.cfg.ServerHost,
