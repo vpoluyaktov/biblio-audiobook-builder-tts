@@ -909,15 +909,15 @@ class App {
                 </div>
                 <div class="progress-text">${progressText}${job.status !== 'uploading' ? ` (${progress}%)` : ''}</div>
             </div>
-            ${job.status === 'converting' && job.worker_progress && job.worker_progress.length > 0 ? `
+            ${(job.status === 'converting' || job.status === 'building') && job.worker_progress && job.worker_progress.length > 0 ? `
             <div class="worker-progress-container">
                 ${job.worker_progress.map((wp, idx) => `
                     <div class="worker-progress ${wp.active ? 'active' : 'idle'}">
-                        <div class="worker-label">W${idx + 1}</div>
+                        <div class="worker-label">${job.status === 'building' ? 'E' : 'W'}${idx + 1}</div>
                         <div class="worker-bar">
                             <div class="worker-fill" style="width: ${Math.round(wp.progress * 100)}%"></div>
                         </div>
-                        <div class="worker-info">${wp.active ? `Ch.${wp.chapter_index + 1} ${wp.chunks_complete}/${wp.chunks_total}` : 'idle'}</div>
+                        <div class="worker-info">${wp.active ? (job.status === 'building' ? `${wp.chapter_title} ${wp.chunks_complete}%` : `Ch.${wp.chapter_index + 1} ${wp.chunks_complete}/${wp.chunks_total}`) : 'idle'}</div>
                     </div>
                 `).join('')}
             </div>

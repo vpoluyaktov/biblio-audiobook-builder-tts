@@ -80,6 +80,10 @@ func SplitIntoParts(chapterFiles []string, chapterTitles []string, maxSizeMB int
 // partNum is 1-indexed, progress is 0.0 to 1.0
 type M4BProgressCallback func(partNum int, totalParts int, progress float64)
 
+// EncoderProgressCallback is called with per-encoder progress updates
+// encoderID is 0-indexed, partNum is 1-indexed, progress is 0.0 to 1.0
+type EncoderProgressCallback func(encoderID int, partNum int, totalParts int, progress float64)
+
 // BuildMultiPartM4B builds multiple M4B files from parts (sequential version)
 // Deprecated: Use BuildMultiPartM4BParallel for better performance
 func BuildMultiPartM4B(parts []Part, outputDir string, baseFileName string, options M4BOptions) ([]string, error) {
@@ -88,7 +92,12 @@ func BuildMultiPartM4B(parts []Part, outputDir string, baseFileName string, opti
 
 // BuildMultiPartM4BWithProgress builds M4B files with progress callback
 func BuildMultiPartM4BWithProgress(parts []Part, outputDir string, baseFileName string, options M4BOptions, numWorkers int, progressCb M4BProgressCallback) ([]string, error) {
-	return buildMultiPartM4BInternal(parts, outputDir, baseFileName, options, numWorkers, progressCb)
+	return buildMultiPartM4BInternal(parts, outputDir, baseFileName, options, numWorkers, nil, progressCb)
+}
+
+// BuildMultiPartM4BWithEncoderProgress builds M4B files with per-encoder progress callback
+func BuildMultiPartM4BWithEncoderProgress(parts []Part, outputDir string, baseFileName string, options M4BOptions, numWorkers int, encoderCb EncoderProgressCallback) ([]string, error) {
+	return buildMultiPartM4BInternal(parts, outputDir, baseFileName, options, numWorkers, encoderCb, nil)
 }
 
 // PartBuildResult holds the result of building a single M4B part
@@ -100,11 +109,11 @@ type PartBuildResult struct {
 
 // BuildMultiPartM4BParallel builds multiple M4B files from parts using parallel workers
 func BuildMultiPartM4BParallel(parts []Part, outputDir string, baseFileName string, options M4BOptions, numWorkers int) ([]string, error) {
-	return buildMultiPartM4BInternal(parts, outputDir, baseFileName, options, numWorkers, nil)
+	return buildMultiPartM4BInternal(parts, outputDir, baseFileName, options, numWorkers, nil, nil)
 }
 
-// buildMultiPartM4BInternal is the internal implementation with optional progress callback
-func buildMultiPartM4BInternal(parts []Part, outputDir string, baseFileName string, options M4BOptions, numWorkers int, progressCb M4BProgressCallback) ([]string, error) {
+// buildMultiPartM4BInternal is the internal implementation with optional progress callbacks
+func buildMultiPartM4BInternal(parts []Part, outputDir string, baseFileName string, options M4BOptions, numWorkers int, encoderCb EncoderProgressCallback, progressCb M4BProgressCallback) ([]string, error) {
 	if len(parts) == 0 {
 		return nil, fmt.Errorf("no parts to build")
 	}
@@ -127,6 +136,12 @@ func buildMultiPartM4BInternal(parts []Part, outputDir string, baseFileName stri
 	}
 	close(partsChan)
 
+	// Encoder ID pool for tracking which encoder is working on which part
+	encoderPool := make(chan int, numWorkers)
+	for i := 0; i < numWorkers; i++ {
+		encoderPool <- i
+	}
+
 	// WaitGroup for workers
 	var wg sync.WaitGroup
 
@@ -136,8 +151,12 @@ func buildMultiPartM4BInternal(parts []Part, outputDir string, baseFileName stri
 		go func() {
 			defer wg.Done()
 			for partIdx := range partsChan {
+				// Get encoder ID from pool
+				encoderID := <-encoderPool
+				defer func() { encoderPool <- encoderID }()
+
 				part := parts[partIdx]
-				result := buildSinglePartWithProgress(part, parts, outputDir, baseFileName, options, progressCb)
+				result := buildSinglePartWithEncoderProgress(part, parts, outputDir, baseFileName, options, encoderID, encoderCb, progressCb)
 				results[partIdx] = result
 			}
 		}()
@@ -160,11 +179,16 @@ func buildMultiPartM4BInternal(parts []Part, outputDir string, baseFileName stri
 
 // buildSinglePart builds a single M4B part (without progress callback)
 func buildSinglePart(part Part, allParts []Part, outputDir string, baseFileName string, options M4BOptions) PartBuildResult {
-	return buildSinglePartWithProgress(part, allParts, outputDir, baseFileName, options, nil)
+	return buildSinglePartWithEncoderProgress(part, allParts, outputDir, baseFileName, options, 0, nil, nil)
 }
 
 // buildSinglePartWithProgress builds a single M4B part with optional progress callback
 func buildSinglePartWithProgress(part Part, allParts []Part, outputDir string, baseFileName string, options M4BOptions, progressCb M4BProgressCallback) PartBuildResult {
+	return buildSinglePartWithEncoderProgress(part, allParts, outputDir, baseFileName, options, 0, nil, progressCb)
+}
+
+// buildSinglePartWithEncoderProgress builds a single M4B part with optional encoder and progress callbacks
+func buildSinglePartWithEncoderProgress(part Part, allParts []Part, outputDir string, baseFileName string, options M4BOptions, encoderID int, encoderCb EncoderProgressCallback, progressCb M4BProgressCallback) PartBuildResult {
 	result := PartBuildResult{PartNumber: part.Number}
 
 	// Create part-specific options
@@ -186,7 +210,11 @@ func buildSinglePartWithProgress(part Part, allParts []Part, outputDir string, b
 	defer builder.Cleanup()
 
 	// Set progress callback if provided
-	if progressCb != nil {
+	if encoderCb != nil {
+		builder.SetProgressCallback(func(progress float64) {
+			encoderCb(encoderID, part.Number, len(allParts), progress)
+		})
+	} else if progressCb != nil {
 		builder.SetProgressCallback(func(progress float64) {
 			progressCb(part.Number, len(allParts), progress)
 		})

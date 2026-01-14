@@ -414,22 +414,38 @@ func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (s
 		logger.Info("Building %d M4B parts using %d parallel encoders", len(parts), numEncoders)
 	}
 
-	// Reset progress for building phase
+	// Reset progress for building phase and initialize encoder progress
 	job.SetProgress(0, "Building M4B...", 0)
-	job.WorkerProgress = nil // Clear TTS worker progress
+	job.InitWorkerProgress(numEncoders) // Reuse worker progress for encoders
 	w.broadcastJobProgress(job)
 
-	// Progress callback for M4B building
-	progressCb := func(partNum, totalParts int, progress float64) {
+	// Per-encoder progress callback for M4B building
+	encoderCb := func(encoderID int, partNum int, totalParts int, progress float64) {
+		// Update encoder-specific progress
+		job.SetWorkerProgress(encoderID, partNum-1, fmt.Sprintf("Part %d", partNum), int(progress*100), 100)
+
 		// Calculate overall progress across all parts
-		partProgress := (float64(partNum-1) + progress) / float64(totalParts)
-		job.SetProgress(partProgress, fmt.Sprintf("Building Part %d/%d", partNum, totalParts), partNum)
+		// Sum up progress from all active encoders
+		job.mu.RLock()
+		var totalProgress float64
+		activeCount := 0
+		for _, wp := range job.WorkerProgress {
+			if wp.Active {
+				totalProgress += wp.Progress
+				activeCount++
+			}
+		}
+		job.mu.RUnlock()
+
+		// Overall progress is based on completed parts + current encoder progress
+		overallProgress := totalProgress / float64(len(parts))
+		job.SetProgress(overallProgress, fmt.Sprintf("Building %d parts", len(parts)), 0)
 		w.broadcastJobProgress(job)
 	}
 
-	// Build M4B file(s) in parallel with progress tracking
+	// Build M4B file(s) in parallel with per-encoder progress tracking
 	baseFileName := sanitizeFileName(book.Author + " - " + book.Title)
-	m4bFiles, err := audio.BuildMultiPartM4BWithProgress(parts, job.OutputPath, baseFileName, options, numEncoders, progressCb)
+	m4bFiles, err := audio.BuildMultiPartM4BWithEncoderProgress(parts, job.OutputPath, baseFileName, options, numEncoders, encoderCb)
 	if err != nil {
 		return "", fmt.Errorf("failed to build M4B: %v", err)
 	}
