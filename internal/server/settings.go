@@ -43,6 +43,9 @@ type SettingsRequest struct {
 	// OpenTTS
 	OpenTTSURL string `json:"opentts_url"`
 
+	// RHVoice
+	RHVoiceURL string `json:"rhvoice_url"`
+
 	// Audiobookshelf
 	AudiobookshelfURL      string `json:"audiobookshelf_url"`
 	AudiobookshelfUser     string `json:"audiobookshelf_user"`
@@ -100,6 +103,9 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 
 		// OpenTTS
 		OpenTTSURL: s.cfg.OpenTTSURL,
+
+		// RHVoice
+		RHVoiceURL: s.cfg.RHVoiceURL,
 
 		// Audiobookshelf
 		AudiobookshelfURL:      s.cfg.AudiobookshelfURL,
@@ -215,6 +221,11 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 		s.cfg.OpenTTSURL = req.OpenTTSURL
 	}
 
+	// RHVoice
+	if wasProvided("rhvoice_url") {
+		s.cfg.RHVoiceURL = req.RHVoiceURL
+	}
+
 	// Audiobookshelf
 	if wasProvided("audiobookshelf_url") {
 		s.cfg.AudiobookshelfURL = req.AudiobookshelfURL
@@ -260,6 +271,7 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 			"azure_tts_key":             {req.AzureTTSKey, wasProvided("azure_tts_key")},
 			"azure_tts_region":          {req.AzureTTSRegion, wasProvided("azure_tts_region")},
 			"opentts_url":               {req.OpenTTSURL, wasProvided("opentts_url")},
+			"rhvoice_url":               {req.RHVoiceURL, wasProvided("rhvoice_url")},
 		}
 
 		for key, cfg := range configs {
@@ -404,5 +416,71 @@ func (s *Server) handleTestOpenTTS(w http.ResponseWriter, r *http.Request) {
 	s.jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"success":     true,
 		"voice_count": len(voices),
+	})
+}
+
+// TestRHVoiceRequest represents the test connection request
+type TestRHVoiceRequest struct {
+	URL string `json:"url"`
+}
+
+// handleTestRHVoice tests connection to RHVoice server
+func (s *Server) handleTestRHVoice(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.handleCORS(w)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req TestRHVoiceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.URL == "" {
+		s.jsonError(w, http.StatusBadRequest, "Server URL is required")
+		return
+	}
+
+	// Test connection by fetching server info
+	client := &http.Client{}
+	resp, err := client.Get(req.URL + "/info")
+	if err != nil {
+		s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Connection failed: %v", err),
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Server returned status %d", resp.StatusCode),
+		})
+		return
+	}
+
+	// Parse server info to get voice count
+	var serverInfo struct {
+		SupportVoices []string `json:"SUPPORT_VOICES"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&serverInfo); err != nil {
+		s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+			"success":     true,
+			"voice_count": 0,
+		})
+		return
+	}
+
+	s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"success":     true,
+		"voice_count": len(serverInfo.SupportVoices),
 	})
 }

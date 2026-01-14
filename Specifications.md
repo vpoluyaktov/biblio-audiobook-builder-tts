@@ -264,6 +264,7 @@ Flags:
 | Settings UI | ✅ Done | Multi-tab configuration modal (General, TTS, Output, Audiobookshelf) |
 | OPDS Client | ✅ Done | Browse OPDS catalogs, download books for conversion |
 | OpenTTS Integration | ✅ Done | Self-hosted TTS server with multiple engines (Larynx, MaryTTS, NanoTTS, etc.) |
+| RHVoice Integration | ✅ Done | Self-hosted TTS server with high-quality voices for Russian, Ukrainian, English, Polish, and other languages |
 
 ### In Progress 🔄
 
@@ -352,6 +353,72 @@ The test voice feature is accessible from the **main upload form** via a "Test V
 - [x] Limit test text length (max 500 characters)
 - [x] Add loading state and error handling
 - [x] Add CSS styles for test voice modal
+
+---
+
+### Phase -0.5: RHVoice Integration (High Priority)
+
+**Goal**: Integrate RHVoice REST server as a TTS provider for high-quality speech synthesis in Russian, Ukrainian, English, Polish, and other languages.
+
+#### -0.5.1 RHVoice REST API
+
+RHVoice is a free and open-source speech synthesizer supporting multiple languages with natural-sounding voices.
+
+**Server Endpoints:**
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/info` | GET | Server info, supported voices, formats |
+| `/voices` | GET | List available voices grouped by language |
+| `/say?text=...&voice=...` | GET | Synthesize speech (text in URL) |
+| `/rhasspy?voice=...` | POST | Synthesize speech (text in body, WAV output) |
+
+**Query Parameters:**
+
+| Parameter | Description | Default | Range |
+|-----------|-------------|---------|-------|
+| `voice` | Voice name (e.g., alan, anna, aleksandr) | anna | See /voices |
+| `format` | Output format (wav, mp3, opus, flac) | mp3 | GET only |
+| `rate` | Speech rate | 50 | 0-100 |
+| `pitch` | Voice pitch | 50 | 0-100 |
+| `volume` | Voice volume | 50 | 0-100 |
+
+**POST Method (Recommended):**
+- Use `/rhasspy` endpoint for long text (avoids URL length limits)
+- Text sent in request body (plain text)
+- Always returns WAV format
+- Voice and other params via query string
+
+**Example:**
+```bash
+curl -X POST --data "Hello world" "http://server:8080/rhasspy?voice=alan&rate=50"
+```
+
+#### -0.5.2 Supported Languages & Voices
+
+| Language | Voices |
+|----------|--------|
+| English (US) | alan, bdl, clb, evgeniy-eng, lyubov, slt |
+| Russian | aleksandr, aleksandr-hq, anna, arina, artemiy, elena, evgeniy-rus, irina, mikhail, pavel, tatiana, timofey, umka, victoria, vitaliy, vitaliy-ng, vsevolod, yuriy |
+| Ukrainian | anatol, marianna, natalia, volodymyr |
+| Polish | alicja, cezary, magda, michal, natan |
+| And more | Czech, Slovak, Georgian, Kyrgyz, Macedonian, etc. |
+
+#### -0.5.3 Implementation Tasks
+
+- [x] Add `rhvoice_url` config field in config.go
+- [x] Add `rhvoice_url` to LoadFromDB in config.go
+- [x] Create `rhvoice_provider.go` with RHVoiceProvider struct
+- [x] Implement `/info` endpoint parsing for voices
+- [x] Implement `ConvertToSpeech` using POST to `/rhasspy`
+- [x] Implement `GetAvailableVoices`, `GetAvailableLanguages`
+- [x] Register provider in service.go
+- [x] Add RHVoice URL field to Settings UI (TTS tab)
+- [x] Add test connection button for RHVoice in Settings
+- [x] Fix WAV concatenation for RHVoice streaming format
+- [x] Fix test voice Unicode character limit
+- [ ] Add unit tests for RHVoice provider
+- [ ] Update README with RHVoice configuration
 
 ---
 

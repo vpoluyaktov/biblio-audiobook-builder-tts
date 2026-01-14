@@ -53,6 +53,9 @@ type Config struct {
 	// OpenTTS settings
 	OpenTTSURL string `json:"opentts_url"`
 
+	// RHVoice settings
+	RHVoiceURL string `json:"rhvoice_url"`
+
 	// OpenAI TTS settings
 	OpenAIAPIKey string `json:"openai_api_key"`
 
@@ -286,6 +289,9 @@ func (db *DB) GetAllConfig() (*Config, error) {
 	}
 	if v, ok := configMap["opentts_url"]; ok {
 		cfg.OpenTTSURL = v
+	}
+	if v, ok := configMap["rhvoice_url"]; ok {
+		cfg.RHVoiceURL = v
 	}
 	if v, ok := configMap["openai_api_key"]; ok {
 		cfg.OpenAIAPIKey = v
@@ -775,6 +781,7 @@ func (c *Config) ToAppConfig() map[string]interface{} {
 		"azure_tts_endpoint":        c.AzureTTSEndpoint,
 		"google_api_key":            c.GoogleAPIKey,
 		"opentts_url":               c.OpenTTSURL,
+		"rhvoice_url":               c.RHVoiceURL,
 		"openai_api_key":            c.OpenAIAPIKey,
 		"azure_tts_key":             c.AzureTTSKey,
 		"azure_tts_region":          c.AzureTTSRegion,
