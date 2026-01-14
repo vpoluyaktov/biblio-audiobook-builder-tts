@@ -17,6 +17,7 @@ import (
 	"abb_tts/internal/config"
 	"abb_tts/internal/logger"
 	"abb_tts/internal/parser"
+	"abb_tts/internal/storage"
 	"abb_tts/internal/tts"
 )
 
@@ -39,10 +40,13 @@ type Server struct {
 	httpServer   *http.Server
 }
 
-// ConfigDB defines the database operations needed for config persistence
+// ConfigDB defines the database operations needed for config and job persistence
 type ConfigDB interface {
 	SetConfig(key, value string) error
 	DeleteJob(id string) error
+	ListJobs(status string, limit int) ([]*storage.Job, error)
+	CreateJob(job *storage.Job) error
+	UpdateJob(job *storage.Job) error
 }
 
 // New creates a new server instance
@@ -63,9 +67,81 @@ func New(addr string, cfg *config.Config, ttsService tts.Service) *Server {
 	}
 }
 
-// SetDB sets the database for config persistence
+// SetDB sets the database for config persistence and loads existing jobs
 func (s *Server) SetDB(db ConfigDB) {
 	s.db = db
+	// Load existing jobs from database
+	s.loadJobsFromDB()
+}
+
+// jobToStorageJob converts a server.Job to storage.Job for database persistence
+func (s *Server) jobToStorageJob(job *Job) *storage.Job {
+	return &storage.Job{
+		ID:                job.ID,
+		Status:            string(job.Status),
+		FileName:          job.FileName,
+		FilePath:          job.FilePath,
+		Provider:          job.Provider,
+		Voice:             job.Voice,
+		Speed:             job.Speed,
+		Pitch:             job.Pitch,
+		BookTitle:         job.BookTitle,
+		BookAuthor:        job.BookAuthor,
+		OutputPath:        job.OutputPath,
+		M4BFile:           job.M4BFile,
+		M4BFiles:          job.M4BFiles,
+		Progress:          job.Progress,
+		CurrentChapter:    job.CurrentChapter,
+		TotalChapters:     job.TotalChapters,
+		CurrentChapterNum: job.CurrentChapterNum,
+		Error:             job.Error,
+		CreatedAt:         job.CreatedAt,
+		StartedAt:         job.StartedAt,
+		CompletedAt:       job.CompletedAt,
+	}
+}
+
+// loadJobsFromDB loads jobs from the database into the in-memory store
+func (s *Server) loadJobsFromDB() {
+	if s.db == nil {
+		return
+	}
+
+	jobs, err := s.db.ListJobs("", 0) // Get all jobs
+	if err != nil {
+		logger.Warn("Failed to load jobs from database: %v", err)
+		return
+	}
+
+	for _, dbJob := range jobs {
+		// Convert storage.Job to server.Job
+		job := &Job{
+			ID:                dbJob.ID,
+			FileName:          dbJob.FileName,
+			FilePath:          dbJob.FilePath,
+			Status:            JobStatus(dbJob.Status),
+			Progress:          dbJob.Progress,
+			CurrentChapter:    dbJob.CurrentChapter,
+			TotalChapters:     dbJob.TotalChapters,
+			CurrentChapterNum: dbJob.CurrentChapterNum,
+			Provider:          dbJob.Provider,
+			Voice:             dbJob.Voice,
+			Speed:             dbJob.Speed,
+			Pitch:             dbJob.Pitch,
+			BookTitle:         dbJob.BookTitle,
+			BookAuthor:        dbJob.BookAuthor,
+			OutputPath:        dbJob.OutputPath,
+			M4BFile:           dbJob.M4BFile,
+			M4BFiles:          dbJob.M4BFiles,
+			CreatedAt:         dbJob.CreatedAt,
+			StartedAt:         dbJob.StartedAt,
+			CompletedAt:       dbJob.CompletedAt,
+			Error:             dbJob.Error,
+		}
+		s.store.Add(job)
+	}
+
+	logger.Info("Loaded %d jobs from database", len(jobs))
 }
 
 // Start starts the HTTP server
@@ -416,6 +492,14 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	// Create job
 	job := NewJob(header.Filename, tempPath, provider, voice, speed, pitch)
 	s.store.Add(job)
+
+	// Save to database for persistence
+	if s.db != nil {
+		dbJob := s.jobToStorageJob(job)
+		if err := s.db.CreateJob(dbJob); err != nil {
+			logger.Warn("Failed to save job to database: %v", err)
+		}
+	}
 
 	// Broadcast job creation
 	s.hub.Broadcast(WSMessage{
