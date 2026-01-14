@@ -21,7 +21,7 @@ const (
 	// baseRetryDelay is the initial delay between retries
 	baseRetryDelay = 500 * time.Millisecond
 	// chunkTimeout is the maximum time allowed for a single chunk TTS conversion
-	chunkTimeout = 60 * time.Second
+	chunkTimeout = 30 * time.Second
 )
 
 // ttsResult holds the result of a TTS conversion attempt
