@@ -44,6 +44,10 @@ type Config struct {
 	UseDefaultPronunciation bool    `json:"use_default_pronunciation"`
 	MaxFileSizeMB           int     `json:"max_file_size_mb"`
 
+	// Performance settings
+	ConcurrentTTSWorkers int `json:"concurrent_tts_workers"`
+	ConcurrentEncoders   int `json:"concurrent_encoders"`
+
 	// Cloud provider settings
 	CloudAPIKey       string `json:"cloud_api_key"`
 	GoogleTTSEndpoint string `json:"google_tts_endpoint"`
@@ -274,6 +278,12 @@ func (db *DB) GetAllConfig() (*Config, error) {
 	}
 	if v, ok := configMap["max_file_size_mb"]; ok {
 		fmt.Sscanf(v, "%d", &cfg.MaxFileSizeMB)
+	}
+	if v, ok := configMap["concurrent_tts_workers"]; ok {
+		fmt.Sscanf(v, "%d", &cfg.ConcurrentTTSWorkers)
+	}
+	if v, ok := configMap["concurrent_encoders"]; ok {
+		fmt.Sscanf(v, "%d", &cfg.ConcurrentEncoders)
 	}
 	if v, ok := configMap["cloud_api_key"]; ok {
 		cfg.CloudAPIKey = v
