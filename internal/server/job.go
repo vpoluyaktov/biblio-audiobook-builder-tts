@@ -34,6 +34,13 @@ type WorkerProgress struct {
 	Active         bool    `json:"active"`
 }
 
+// FailedChapter represents a chapter that failed to convert
+type FailedChapter struct {
+	Index int    `json:"index"`
+	Title string `json:"title"`
+	Error string `json:"error"`
+}
+
 // JobDTO is a data transfer object for Job without mutex (safe for JSON serialization)
 type JobDTO struct {
 	ID                string           `json:"id"`
@@ -54,6 +61,7 @@ type JobDTO struct {
 	OutputPath        string           `json:"output_path,omitempty"`
 	M4BFile           string           `json:"m4b_file,omitempty"`
 	M4BFiles          []string         `json:"m4b_files,omitempty"`
+	FailedChapters    []FailedChapter  `json:"failed_chapters,omitempty"`
 	CreatedAt         time.Time        `json:"created_at"`
 	StartedAt         *time.Time       `json:"started_at,omitempty"`
 	CompletedAt       *time.Time       `json:"completed_at,omitempty"`
@@ -86,10 +94,11 @@ type Job struct {
 	BookAuthor string `json:"book_author"`
 
 	// Output
-	OutputPath   string   `json:"output_path,omitempty"`
-	M4BFile      string   `json:"m4b_file,omitempty"`  // Primary M4B file (or first part)
-	M4BFiles     []string `json:"m4b_files,omitempty"` // All M4B files (for multi-part)
-	ChapterFiles []string `json:"-"`                   // Internal list of chapter audio files
+	OutputPath     string          `json:"output_path,omitempty"`
+	M4BFile        string          `json:"m4b_file,omitempty"`  // Primary M4B file (or first part)
+	M4BFiles       []string        `json:"m4b_files,omitempty"` // All M4B files (for multi-part)
+	ChapterFiles   []string        `json:"-"`                   // Internal list of chapter audio files
+	FailedChapters []FailedChapter `json:"failed_chapters,omitempty"`
 
 	// Timestamps
 	CreatedAt   time.Time  `json:"created_at"`
@@ -220,6 +229,17 @@ func (j *Job) SetError(err string) {
 	j.CompletedAt = &now
 }
 
+// AddFailedChapter records a chapter that failed to convert
+func (j *Job) AddFailedChapter(index int, title string, err error) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	j.FailedChapters = append(j.FailedChapters, FailedChapter{
+		Index: index,
+		Title: title,
+		Error: err.Error(),
+	})
+}
+
 // SetOutputPath sets the output path for the completed audiobook
 func (j *Job) SetOutputPath(path string) {
 	j.mu.Lock()
@@ -264,6 +284,10 @@ func (j *Job) Clone() JobDTO {
 	if j.M4BFiles != nil {
 		clone.M4BFiles = make([]string, len(j.M4BFiles))
 		copy(clone.M4BFiles, j.M4BFiles)
+	}
+	if j.FailedChapters != nil {
+		clone.FailedChapters = make([]FailedChapter, len(j.FailedChapters))
+		copy(clone.FailedChapters, j.FailedChapters)
 	}
 
 	return clone

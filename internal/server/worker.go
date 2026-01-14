@@ -279,11 +279,18 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 	default:
 	}
 
-	// Collect successful results in order
+	// Collect successful results in order and track failures
 	var chapterFiles []string
 	for i := 0; i < totalChapters; i++ {
 		if results[i].Error != nil {
 			logger.Warn("Chapter %d failed: %v", i+1, results[i].Error)
+			// Record the failed chapter so user can see it
+			chapterTitle := ""
+			if i < len(book.Chapters) {
+				chapterTitle = book.Chapters[i].Title
+			}
+			job.AddFailedChapter(i+1, chapterTitle, results[i].Error)
+			w.broadcastJobProgress(job)
 			continue
 		}
 		if results[i].OutputPath != "" {
