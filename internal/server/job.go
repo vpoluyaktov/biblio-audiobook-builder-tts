@@ -206,8 +206,45 @@ func (j *Job) Clone() Job {
 	j.mu.RLock()
 	defer j.mu.RUnlock()
 
-	clone := *j
-	clone.mu = sync.RWMutex{} // Reset mutex in clone
+	// Create a new Job with copied fields (avoid copying the mutex)
+	clone := Job{
+		ID:                j.ID,
+		FileName:          j.FileName,
+		FilePath:          j.FilePath,
+		Status:            j.Status,
+		Progress:          j.Progress,
+		CurrentChapter:    j.CurrentChapter,
+		TotalChapters:     j.TotalChapters,
+		CurrentChapterNum: j.CurrentChapterNum,
+		NumWorkers:        j.NumWorkers,
+		Provider:          j.Provider,
+		Voice:             j.Voice,
+		Speed:             j.Speed,
+		Pitch:             j.Pitch,
+		BookTitle:         j.BookTitle,
+		BookAuthor:        j.BookAuthor,
+		OutputPath:        j.OutputPath,
+		M4BFile:           j.M4BFile,
+		CreatedAt:         j.CreatedAt,
+		StartedAt:         j.StartedAt,
+		CompletedAt:       j.CompletedAt,
+		Error:             j.Error,
+	}
+
+	// Copy slices
+	if j.WorkerProgress != nil {
+		clone.WorkerProgress = make([]WorkerProgress, len(j.WorkerProgress))
+		copy(clone.WorkerProgress, j.WorkerProgress)
+	}
+	if j.M4BFiles != nil {
+		clone.M4BFiles = make([]string, len(j.M4BFiles))
+		copy(clone.M4BFiles, j.M4BFiles)
+	}
+	if j.ChapterFiles != nil {
+		clone.ChapterFiles = make([]string, len(j.ChapterFiles))
+		copy(clone.ChapterFiles, j.ChapterFiles)
+	}
+
 	return clone
 }
 

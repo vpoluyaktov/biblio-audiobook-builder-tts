@@ -177,16 +177,6 @@ func buildMultiPartM4BInternal(parts []Part, outputDir string, baseFileName stri
 	return m4bFiles, nil
 }
 
-// buildSinglePart builds a single M4B part (without progress callback)
-func buildSinglePart(part Part, allParts []Part, outputDir string, baseFileName string, options M4BOptions) PartBuildResult {
-	return buildSinglePartWithEncoderProgress(part, allParts, outputDir, baseFileName, options, 0, nil, nil)
-}
-
-// buildSinglePartWithProgress builds a single M4B part with optional progress callback
-func buildSinglePartWithProgress(part Part, allParts []Part, outputDir string, baseFileName string, options M4BOptions, progressCb M4BProgressCallback) PartBuildResult {
-	return buildSinglePartWithEncoderProgress(part, allParts, outputDir, baseFileName, options, 0, nil, progressCb)
-}
-
 // buildSinglePartWithEncoderProgress builds a single M4B part with optional encoder and progress callbacks
 func buildSinglePartWithEncoderProgress(part Part, allParts []Part, outputDir string, baseFileName string, options M4BOptions, encoderID int, encoderCb EncoderProgressCallback, progressCb M4BProgressCallback) PartBuildResult {
 	result := PartBuildResult{PartNumber: part.Number}
