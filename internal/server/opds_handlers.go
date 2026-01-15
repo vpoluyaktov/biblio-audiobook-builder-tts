@@ -500,13 +500,13 @@ func (s *Server) handleOPDSConvert(w http.ResponseWriter, r *http.Request) {
 
 	// Create job
 	job := NewJob(preview.FileName, preview.FilePath, provider, voice, speed, pitch)
-	s.store.Add(job)
 
-	// Save to database for persistence
+	// Save to database
 	if s.db != nil {
-		dbJob := s.jobToStorageJob(job)
+		dbJob := jobToStorageJob(job)
 		if err := s.db.CreateJob(dbJob); err != nil {
-			logger.Warn("Failed to save job to database: %v", err)
+			s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to create job: %v", err))
+			return
 		}
 	}
 

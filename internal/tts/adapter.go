@@ -43,6 +43,7 @@ func (a *Adapter) convertWithTimeout(chunk string, voice string, options *Conver
 	case result := <-resultCh:
 		return result.reader, result.err
 	case <-time.After(chunkTimeout):
+		logger.Warn("TTS conversion timed out after %v - TTS backend may be hanging", chunkTimeout)
 		return nil, fmt.Errorf("TTS conversion timed out after %v", chunkTimeout)
 	}
 }

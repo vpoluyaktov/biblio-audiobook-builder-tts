@@ -870,7 +870,9 @@ class App {
     }
 
     updateJobCard(card, job) {
-        const progress = Math.round(job.progress * 100);
+        // Use conversion_progress for converting, build_progress for building
+        const rawProgress = job.status === 'building' ? (job.build_progress || 0) : (job.conversion_progress || 0);
+        const progress = Math.round(rawProgress * 100);
         const statusClass = job.status.toLowerCase();
         
         let progressText = '';

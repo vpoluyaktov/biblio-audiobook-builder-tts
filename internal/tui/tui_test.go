@@ -4,8 +4,15 @@ import (
 	"testing"
 	"time"
 
-	"abb_tts/internal/server"
+	"abb_tts/internal/storage"
 )
+
+// mockJobDB is a mock implementation of JobDB for testing
+type mockJobDB struct{}
+
+func (m *mockJobDB) ListJobs(status string, limit int) ([]*storage.Job, error) {
+	return []*storage.Job{}, nil
+}
 
 func TestRenderProgressBar(t *testing.T) {
 	tests := []struct {
@@ -30,25 +37,25 @@ func TestRenderProgressBar(t *testing.T) {
 	}
 }
 
-func TestGetStatusIcon(t *testing.T) {
+func TestGetStatusIconFromString(t *testing.T) {
 	tests := []struct {
-		status   server.JobStatus
+		status   string
 		expected string
 	}{
-		{server.JobStatusPending, "⏳"},
-		{server.JobStatusParsing, "📖"},
-		{server.JobStatusConverting, "🔄"},
-		{server.JobStatusBuilding, "📦"},
-		{server.JobStatusUploading, "☁️"},
-		{server.JobStatusCompleted, "✅"},
-		{server.JobStatusFailed, "❌"},
-		{server.JobStatusCancelled, "🚫"},
+		{"pending", "⏳"},
+		{"parsing", "📖"},
+		{"converting", "🔄"},
+		{"building", "📦"},
+		{"uploading", "☁️"},
+		{"completed", "✅"},
+		{"failed", "❌"},
+		{"cancelled", "🚫"},
 	}
 
 	for _, tt := range tests {
-		result := getStatusIcon(tt.status)
+		result := getStatusIconFromString(tt.status)
 		if result != tt.expected {
-			t.Errorf("getStatusIcon(%s) = %q, want %q", tt.status, result, tt.expected)
+			t.Errorf("getStatusIconFromString(%s) = %q, want %q", tt.status, result, tt.expected)
 		}
 	}
 }
@@ -76,8 +83,8 @@ func TestCalculateHeights(t *testing.T) {
 }
 
 func TestInitialModel(t *testing.T) {
-	store := server.NewJobStore()
-	model := InitialModel("http://localhost:8080", store, nil, nil)
+	db := &mockJobDB{}
+	model := InitialModel("http://localhost:8080", db, nil, nil)
 
 	if model.serverURL != "http://localhost:8080" {
 		t.Errorf("Expected serverURL 'http://localhost:8080', got %q", model.serverURL)
@@ -97,8 +104,8 @@ func TestInitialModel(t *testing.T) {
 }
 
 func TestModelView(t *testing.T) {
-	store := server.NewJobStore()
-	model := InitialModel("http://localhost:8080", store, nil, nil)
+	db := &mockJobDB{}
+	model := InitialModel("http://localhost:8080", db, nil, nil)
 	model.width = 100
 	model.height = 30
 
@@ -121,8 +128,8 @@ func TestModelView(t *testing.T) {
 }
 
 func TestModelViewQuitting(t *testing.T) {
-	store := server.NewJobStore()
-	model := InitialModel("http://localhost:8080", store, nil, nil)
+	db := &mockJobDB{}
+	model := InitialModel("http://localhost:8080", db, nil, nil)
 	model.quitting = true
 
 	view := model.View()

@@ -32,7 +32,6 @@ type Server struct {
 	addr         string
 	cfg          *config.Config
 	db           ConfigDB
-	store        *JobStore
 	previewStore *PreviewStore
 	hub          *Hub
 	worker       *Worker
@@ -44,6 +43,8 @@ type Server struct {
 type ConfigDB interface {
 	SetConfig(key, value string) error
 	DeleteJob(id string) error
+	GetJob(id string) (*storage.Job, error)
+	GetPendingJob() (*storage.Job, error)
 	ListJobs(status string, limit int) ([]*storage.Job, error)
 	CreateJob(job *storage.Job) error
 	UpdateJob(job *storage.Job) error
@@ -51,97 +52,82 @@ type ConfigDB interface {
 
 // New creates a new server instance
 func New(addr string, cfg *config.Config, ttsService tts.Service) *Server {
-	store := NewJobStore()
 	previewStore := NewPreviewStore(30 * time.Minute) // 30 min TTL for previews
 	hub := NewHub()
-	worker := NewWorker(store, hub, ttsService, cfg)
 
-	return &Server{
+	s := &Server{
 		addr:         addr,
 		cfg:          cfg,
-		store:        store,
 		previewStore: previewStore,
 		hub:          hub,
-		worker:       worker,
 		ttsService:   ttsService,
 	}
+
+	// Worker will be initialized after database is set
+	return s
 }
 
-// SetDB sets the database for config persistence and loads existing jobs
+// SetDB sets the database for config persistence and initializes the worker
 func (s *Server) SetDB(db ConfigDB) {
 	s.db = db
-	// Load existing jobs from database
-	s.loadJobsFromDB()
+	// Initialize worker with database access
+	s.worker = NewWorker(db, s.hub, s.ttsService, s.cfg)
 }
 
 // jobToStorageJob converts a server.Job to storage.Job for database persistence
-func (s *Server) jobToStorageJob(job *Job) *storage.Job {
+func jobToStorageJob(job *Job) *storage.Job {
 	return &storage.Job{
-		ID:                job.ID,
-		Status:            string(job.Status),
-		FileName:          job.FileName,
-		FilePath:          job.FilePath,
-		Provider:          job.Provider,
-		Voice:             job.Voice,
-		Speed:             job.Speed,
-		Pitch:             job.Pitch,
-		BookTitle:         job.BookTitle,
-		BookAuthor:        job.BookAuthor,
-		OutputPath:        job.OutputPath,
-		M4BFile:           job.M4BFile,
-		M4BFiles:          job.M4BFiles,
-		Progress:          job.Progress,
-		CurrentChapter:    job.CurrentChapter,
-		TotalChapters:     job.TotalChapters,
-		CurrentChapterNum: job.CurrentChapterNum,
-		Error:             job.Error,
-		CreatedAt:         job.CreatedAt,
-		StartedAt:         job.StartedAt,
-		CompletedAt:       job.CompletedAt,
+		ID:                 job.ID,
+		Status:             string(job.Status),
+		FileName:           job.FileName,
+		FilePath:           job.FilePath,
+		Provider:           job.Provider,
+		Voice:              job.Voice,
+		Speed:              job.Speed,
+		Pitch:              job.Pitch,
+		BookTitle:          job.BookTitle,
+		BookAuthor:         job.BookAuthor,
+		OutputPath:         job.OutputPath,
+		M4BFile:            job.M4BFile,
+		M4BFiles:           job.M4BFiles,
+		ConversionProgress: job.ConversionProgress,
+		BuildProgress:      job.BuildProgress,
+		CurrentChapter:     job.CurrentChapter,
+		TotalChapters:      job.TotalChapters,
+		CurrentChapterNum:  job.CurrentChapterNum,
+		Error:              job.Error,
+		CreatedAt:          job.CreatedAt,
+		StartedAt:          job.StartedAt,
+		CompletedAt:        job.CompletedAt,
 	}
 }
 
-// loadJobsFromDB loads jobs from the database into the in-memory store
-func (s *Server) loadJobsFromDB() {
-	if s.db == nil {
-		return
+// storageJobToJob converts a storage.Job to server.Job
+func storageJobToJob(dbJob *storage.Job) *Job {
+	return &Job{
+		ID:                 dbJob.ID,
+		FileName:           dbJob.FileName,
+		FilePath:           dbJob.FilePath,
+		Status:             JobStatus(dbJob.Status),
+		ConversionProgress: dbJob.ConversionProgress,
+		BuildProgress:      dbJob.BuildProgress,
+		CurrentChapter:     dbJob.CurrentChapter,
+		TotalChapters:      dbJob.TotalChapters,
+		CurrentChapterNum:  dbJob.CurrentChapterNum,
+		Provider:           dbJob.Provider,
+		Voice:              dbJob.Voice,
+		Speed:              dbJob.Speed,
+		Pitch:              dbJob.Pitch,
+		BookTitle:          dbJob.BookTitle,
+		BookAuthor:         dbJob.BookAuthor,
+		OutputPath:         dbJob.OutputPath,
+		M4BFile:            dbJob.M4BFile,
+		M4BFiles:           dbJob.M4BFiles,
+		CreatedAt:          dbJob.CreatedAt,
+		StartedAt:          dbJob.StartedAt,
+		CompletedAt:        dbJob.CompletedAt,
+		Error:              dbJob.Error,
 	}
-
-	jobs, err := s.db.ListJobs("", 0) // Get all jobs
-	if err != nil {
-		logger.Warn("Failed to load jobs from database: %v", err)
-		return
-	}
-
-	for _, dbJob := range jobs {
-		// Convert storage.Job to server.Job
-		job := &Job{
-			ID:                dbJob.ID,
-			FileName:          dbJob.FileName,
-			FilePath:          dbJob.FilePath,
-			Status:            JobStatus(dbJob.Status),
-			Progress:          dbJob.Progress,
-			CurrentChapter:    dbJob.CurrentChapter,
-			TotalChapters:     dbJob.TotalChapters,
-			CurrentChapterNum: dbJob.CurrentChapterNum,
-			Provider:          dbJob.Provider,
-			Voice:             dbJob.Voice,
-			Speed:             dbJob.Speed,
-			Pitch:             dbJob.Pitch,
-			BookTitle:         dbJob.BookTitle,
-			BookAuthor:        dbJob.BookAuthor,
-			OutputPath:        dbJob.OutputPath,
-			M4BFile:           dbJob.M4BFile,
-			M4BFiles:          dbJob.M4BFiles,
-			CreatedAt:         dbJob.CreatedAt,
-			StartedAt:         dbJob.StartedAt,
-			CompletedAt:       dbJob.CompletedAt,
-			Error:             dbJob.Error,
-		}
-		s.store.Add(job)
-	}
-
-	logger.Info("Loaded %d jobs from database", len(jobs))
 }
 
 // Start starts the HTTP server
@@ -276,57 +262,77 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// listJobs returns all jobs
+// listJobs returns all jobs from database
 func (s *Server) listJobs(w http.ResponseWriter, _ *http.Request) {
-	jobs := s.store.List()
+	if s.db == nil {
+		s.jsonResponse(w, http.StatusOK, []JobDTO{})
+		return
+	}
+
+	dbJobs, err := s.db.ListJobs("", 0)
+	if err != nil {
+		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to list jobs: %v", err))
+		return
+	}
+
+	jobs := make([]JobDTO, 0, len(dbJobs))
+	for _, dbJob := range dbJobs {
+		job := storageJobToJob(dbJob)
+		jobs = append(jobs, job.Clone())
+	}
 	s.jsonResponse(w, http.StatusOK, jobs)
 }
 
-// getJob returns a specific job
+// getJob returns a specific job from database
 func (s *Server) getJob(w http.ResponseWriter, _ *http.Request, id string) {
-	job, exists := s.store.Get(id)
-	if !exists {
+	if s.db == nil {
 		s.jsonError(w, http.StatusNotFound, "Job not found")
 		return
 	}
+
+	dbJob, err := s.db.GetJob(id)
+	if err != nil {
+		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get job: %v", err))
+		return
+	}
+	if dbJob == nil {
+		s.jsonError(w, http.StatusNotFound, "Job not found")
+		return
+	}
+
+	job := storageJobToJob(dbJob)
 	s.jsonResponse(w, http.StatusOK, job.Clone())
 }
 
-// deleteJob cancels/deletes a job
+// deleteJob cancels/deletes a job and cleans up associated files
 func (s *Server) deleteJob(w http.ResponseWriter, _ *http.Request, id string) {
-	job, exists := s.store.Get(id)
-	if !exists {
-		// Job not in memory store, try to delete from database directly
-		if s.db != nil {
-			if err := s.db.DeleteJob(id); err != nil {
-				s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to delete job: %v", err))
-				return
-			}
-			s.hub.Broadcast(WSMessage{
-				Type:    WSTypeJobDeleted,
-				Payload: map[string]string{"id": id},
-			})
-			s.jsonResponse(w, http.StatusOK, map[string]string{"status": "deleted"})
-			return
-		}
+	if s.db == nil {
 		s.jsonError(w, http.StatusNotFound, "Job not found")
 		return
 	}
 
-	// If job is pending or in progress, mark as cancelled
-	if job.Status == JobStatusPending || job.Status == JobStatusParsing || job.Status == JobStatusConverting {
-		job.SetStatus(JobStatusCancelled)
+	// Get job info from database
+	dbJob, err := s.db.GetJob(id)
+	if err != nil {
+		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get job: %v", err))
+		return
+	}
+	if dbJob == nil {
+		s.jsonError(w, http.StatusNotFound, "Job not found")
+		return
 	}
 
-	// Remove from memory store
-	s.store.Delete(id)
+	filePath := dbJob.FilePath
+	outputPath := dbJob.OutputPath
 
-	// Remove from database
-	if s.db != nil {
-		if err := s.db.DeleteJob(id); err != nil {
-			logger.Warn("Failed to delete job from database: %v", err)
-		}
+	// Delete from database
+	if err := s.db.DeleteJob(id); err != nil {
+		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to delete job: %v", err))
+		return
 	}
+
+	// Clean up files
+	s.cleanupJobFiles(filePath, outputPath)
 
 	s.hub.Broadcast(WSMessage{
 		Type:    WSTypeJobDeleted,
@@ -336,26 +342,56 @@ func (s *Server) deleteJob(w http.ResponseWriter, _ *http.Request, id string) {
 	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
+// cleanupJobFiles removes the uploaded file and output directory for a job
+func (s *Server) cleanupJobFiles(filePath, outputPath string) {
+	// Delete the uploaded book file
+	if filePath != "" {
+		if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
+			logger.Warn("Failed to delete uploaded file %s: %v", filePath, err)
+		} else if err == nil {
+			logger.Debug("Deleted uploaded file: %s", filePath)
+		}
+	}
+
+	// Delete the output directory (contains chapter files and M4B)
+	if outputPath != "" {
+		if err := os.RemoveAll(outputPath); err != nil && !os.IsNotExist(err) {
+			logger.Warn("Failed to delete output directory %s: %v", outputPath, err)
+		} else if err == nil {
+			logger.Debug("Deleted output directory: %s", outputPath)
+		}
+	}
+}
+
 // downloadJobZip serves the M4B audiobook file for download
 func (s *Server) downloadJobZip(w http.ResponseWriter, r *http.Request, id string) {
-	job, exists := s.store.Get(id)
-	if !exists {
+	if s.db == nil {
 		s.jsonError(w, http.StatusNotFound, "Job not found")
 		return
 	}
 
-	if job.Status != JobStatusCompleted {
+	dbJob, err := s.db.GetJob(id)
+	if err != nil {
+		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get job: %v", err))
+		return
+	}
+	if dbJob == nil {
+		s.jsonError(w, http.StatusNotFound, "Job not found")
+		return
+	}
+
+	if dbJob.Status != string(JobStatusCompleted) {
 		s.jsonError(w, http.StatusBadRequest, "Job not completed")
 		return
 	}
 
-	if job.OutputPath == "" {
+	if dbJob.OutputPath == "" {
 		s.jsonError(w, http.StatusNotFound, "Output not available")
 		return
 	}
 
 	// Find the M4B file in the output directory
-	files, err := os.ReadDir(job.OutputPath)
+	files, err := os.ReadDir(dbJob.OutputPath)
 	if err != nil {
 		s.jsonError(w, http.StatusInternalServerError, "Failed to read output directory")
 		return
@@ -364,7 +400,7 @@ func (s *Server) downloadJobZip(w http.ResponseWriter, r *http.Request, id strin
 	var m4bFile string
 	for _, f := range files {
 		if !f.IsDir() && strings.HasSuffix(strings.ToLower(f.Name()), ".m4b") {
-			m4bFile = filepath.Join(job.OutputPath, f.Name())
+			m4bFile = filepath.Join(dbJob.OutputPath, f.Name())
 			break
 		}
 	}
@@ -382,23 +418,32 @@ func (s *Server) downloadJobZip(w http.ResponseWriter, r *http.Request, id strin
 
 // listJobFiles returns a list of files in the job output directory
 func (s *Server) listJobFiles(w http.ResponseWriter, _ *http.Request, id string) {
-	job, exists := s.store.Get(id)
-	if !exists {
+	if s.db == nil {
 		s.jsonError(w, http.StatusNotFound, "Job not found")
 		return
 	}
 
-	if job.Status != JobStatusCompleted {
+	dbJob, err := s.db.GetJob(id)
+	if err != nil {
+		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get job: %v", err))
+		return
+	}
+	if dbJob == nil {
+		s.jsonError(w, http.StatusNotFound, "Job not found")
+		return
+	}
+
+	if dbJob.Status != string(JobStatusCompleted) {
 		s.jsonError(w, http.StatusBadRequest, "Job not completed")
 		return
 	}
 
-	if job.OutputPath == "" {
+	if dbJob.OutputPath == "" {
 		s.jsonError(w, http.StatusNotFound, "Output not available")
 		return
 	}
 
-	files, err := os.ReadDir(job.OutputPath)
+	files, err := os.ReadDir(dbJob.OutputPath)
 	if err != nil {
 		s.jsonError(w, http.StatusInternalServerError, "Failed to read output directory")
 		return
@@ -417,7 +462,7 @@ func (s *Server) listJobFiles(w http.ResponseWriter, _ *http.Request, id string)
 
 	s.jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"job_id":      id,
-		"output_path": job.OutputPath,
+		"output_path": dbJob.OutputPath,
 		"files":       fileList,
 	})
 }
@@ -491,13 +536,13 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	// Create job
 	job := NewJob(header.Filename, tempPath, provider, voice, speed, pitch)
-	s.store.Add(job)
 
-	// Save to database for persistence
+	// Save to database
 	if s.db != nil {
-		dbJob := s.jobToStorageJob(job)
+		dbJob := jobToStorageJob(job)
 		if err := s.db.CreateJob(dbJob); err != nil {
-			logger.Warn("Failed to save job to database: %v", err)
+			s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to create job: %v", err))
+			return
 		}
 	}
 
@@ -818,9 +863,9 @@ func (s *Server) GetHub() *Hub {
 	return s.hub
 }
 
-// GetStore returns the job store
-func (s *Server) GetStore() *JobStore {
-	return s.store
+// GetDB returns the database
+func (s *Server) GetDB() ConfigDB {
+	return s.db
 }
 
 // GetPreviewStore returns the preview store

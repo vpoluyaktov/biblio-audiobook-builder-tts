@@ -16,13 +16,23 @@ import (
 	"abb_tts/internal/config"
 	"abb_tts/internal/logger"
 	"abb_tts/internal/parser"
+	"abb_tts/internal/storage"
 	"abb_tts/internal/tts"
 	"abb_tts/internal/utils"
 )
 
+// JobDB defines the database operations needed for job management
+type JobDB interface {
+	GetJob(id string) (*storage.Job, error)
+	GetPendingJob() (*storage.Job, error)
+	CreateJob(job *storage.Job) error
+	UpdateJob(job *storage.Job) error
+	DeleteJob(id string) error
+}
+
 // Worker processes conversion jobs from the queue
 type Worker struct {
-	store         *JobStore
+	db            JobDB
 	hub           *Hub
 	ttsService    tts.Service
 	cfg           *config.Config
@@ -33,7 +43,7 @@ type Worker struct {
 }
 
 // NewWorker creates a new job worker
-func NewWorker(store *JobStore, hub *Hub, ttsService tts.Service, cfg *config.Config) *Worker {
+func NewWorker(db JobDB, hub *Hub, ttsService tts.Service, cfg *config.Config) *Worker {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Initialize pronunciation dictionary
@@ -57,7 +67,7 @@ func NewWorker(store *JobStore, hub *Hub, ttsService tts.Service, cfg *config.Co
 	}
 
 	return &Worker{
-		store:         store,
+		db:            db,
 		hub:           hub,
 		ttsService:    ttsService,
 		cfg:           cfg,
@@ -93,11 +103,26 @@ func (w *Worker) processLoop() {
 		case <-w.ctx.Done():
 			return
 		case <-ticker.C:
-			// Check for pending jobs
-			job := w.store.GetPending()
-			if job != nil {
+			// Check for pending jobs from database
+			dbJob, err := w.db.GetPendingJob()
+			if err != nil {
+				logger.Warn("Failed to get pending job: %v", err)
+				continue
+			}
+			if dbJob != nil {
+				job := storageJobToJob(dbJob)
 				w.processJob(job)
 			}
+		}
+	}
+}
+
+// saveJob persists job state to the database
+func (w *Worker) saveJob(job *Job) {
+	if w.db != nil {
+		dbJob := jobToStorageJob(job)
+		if err := w.db.UpdateJob(dbJob); err != nil {
+			logger.Warn("Failed to save job to database: %v", err)
 		}
 	}
 }
@@ -108,34 +133,41 @@ func (w *Worker) processJob(job *Job) {
 
 	// Parse the book
 	job.SetStatus(JobStatusParsing)
+	w.saveJob(job)
 	w.broadcastJobUpdate(job)
 
 	book, err := w.parseBook(job.FilePath)
 	if err != nil {
 		job.SetError(fmt.Sprintf("Failed to parse book: %v", err))
+		w.saveJob(job)
 		w.broadcastJobFailed(job)
 		return
 	}
 
 	job.SetBook(book)
+	w.saveJob(job)
 	w.broadcastJobUpdate(job)
 
 	// Start conversion
 	job.SetStatus(JobStatusConverting)
+	w.saveJob(job)
 	w.broadcastJobUpdate(job)
 
 	outputDir, chapterFiles, err := w.convertBook(job, book)
 	if err != nil {
 		job.SetError(fmt.Sprintf("Conversion failed: %v", err))
+		w.saveJob(job)
 		w.broadcastJobFailed(job)
 		return
 	}
 
 	job.SetOutputPath(outputDir)
 	job.ChapterFiles = chapterFiles
+	w.saveJob(job)
 
 	// Build M4B file
 	job.SetStatus(JobStatusBuilding)
+	w.saveJob(job)
 	w.broadcastJobUpdate(job)
 
 	m4bFile, err := w.buildM4B(job, book, chapterFiles)
@@ -149,6 +181,7 @@ func (w *Worker) processJob(job *Job) {
 		// Upload to Audiobookshelf if configured
 		if w.cfg.AudiobookshelfURL != "" && m4bFile != "" {
 			job.SetStatus(JobStatusUploading)
+			w.saveJob(job)
 			w.broadcastJobUpdate(job)
 
 			if err := w.uploadToAudiobookshelf(job, book); err != nil {
@@ -162,7 +195,9 @@ func (w *Worker) processJob(job *Job) {
 
 	// Mark as completed (if we got here, all chapters succeeded)
 	job.SetStatus(JobStatusCompleted)
-	job.SetProgress(1.0, "", len(book.Chapters))
+	job.SetConversionProgress(1.0, "", len(book.Chapters))
+	job.SetBuildProgress(1.0)
+	w.saveJob(job)
 	w.broadcastJobCompleted(job)
 
 	logger.Info("Job %s completed: %s", job.ID, outputDir)
@@ -201,6 +236,9 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return "", nil, fmt.Errorf("failed to create output directory: %v", err)
 	}
+
+	// Set output path early so it can be cleaned up if job is cancelled
+	job.SetOutputPath(outputDir)
 
 	totalChapters := len(book.Chapters)
 
@@ -283,8 +321,13 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 
 			// Update progress
 			progress := float64(currentCompleted) / float64(totalChapters)
-			job.SetProgress(progress, ch.Title, int(currentCompleted))
+			job.SetConversionProgress(progress, ch.Title, int(currentCompleted))
 			w.broadcastJobProgress(job)
+
+			// Save to database periodically (every 5 chapters or 10% progress)
+			if currentCompleted%5 == 0 || progress >= 0.1 && int(progress*10) > int((progress-0.1)*10) {
+				w.saveJob(job)
+			}
 
 			logger.Debug("Converted chapter %d/%d: %s (worker %d)", currentCompleted, totalChapters, ch.Title, workerID)
 		}, chapterIndex, chapter)
@@ -444,9 +487,13 @@ func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (s
 	}
 
 	// Reset progress for building phase and initialize encoder progress
-	job.SetProgress(0, "Building M4B...", 0)
+	job.SetBuildProgress(0)
 	job.InitWorkerProgress(numEncoders) // Reuse worker progress for encoders
+	w.saveJob(job)                      // Save initial build state to database
 	w.broadcastJobProgress(job)
+
+	// Track last saved progress to avoid too many DB writes
+	var lastSavedBuildProgress float64
 
 	// Per-encoder progress callback for M4B building
 	encoderCb := func(encoderID int, partNum int, totalParts int, progress float64) {
@@ -468,8 +515,14 @@ func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (s
 
 		// Overall progress is based on completed parts + current encoder progress
 		overallProgress := totalProgress / float64(len(parts))
-		job.SetProgress(overallProgress, fmt.Sprintf("Building %d parts", len(parts)), 0)
+		job.SetBuildProgress(overallProgress)
 		w.broadcastJobProgress(job)
+
+		// Save to database periodically (every 10% progress change)
+		if overallProgress-lastSavedBuildProgress >= 0.1 {
+			w.saveJob(job)
+			lastSavedBuildProgress = overallProgress
+		}
 	}
 
 	// Build M4B file(s) in parallel with per-encoder progress tracking
@@ -561,9 +614,12 @@ func (w *Worker) uploadToAudiobookshelf(job *Job, book *parser.Book) error {
 }
 
 // sanitizeFileName removes or replaces characters that are invalid in file names
+// or problematic for ffmpeg/shell on different operating systems
 func sanitizeFileName(name string) string {
-	// Replace common problematic characters
-	// Note: single quotes can cause issues with shell commands and ffmpeg concat files
+	// Replace characters problematic for file systems and shell/ffmpeg arguments:
+	// - File system reserved: / \ : * ? " < > |
+	// - Shell special: ' " ` $ & ; ( ) [ ] { } ! # ~ ^
+	// - Whitespace: space, tab, newline, carriage return
 	replacer := strings.NewReplacer(
 		"/", "_",
 		"\\", "_",
@@ -574,26 +630,42 @@ func sanitizeFileName(name string) string {
 		"<", "_",
 		">", "_",
 		"|", "_",
-		"'", "'", // Replace curly apostrophe with straight single quote (safe)
-		"'", "'", // Keep straight single quote (handled by concat escaping)
-		"\n", " ",
-		"\r", " ",
-		"\t", " ",
+		"'", "_",
+		"'", "_",
+		"'", "_",
+		"`", "_",
+		"$", "_",
+		"&", "_",
+		";", "_",
+		"(", "_",
+		")", "_",
+		"[", "_",
+		"]", "_",
+		"{", "_",
+		"}", "_",
+		"!", "_",
+		"#", "_",
+		"~", "_",
+		"^", "_",
+		" ", "_",
+		"\n", "_",
+		"\r", "_",
+		"\t", "_",
 	)
 	result := replacer.Replace(name)
 
-	// Collapse multiple spaces into one
-	for strings.Contains(result, "  ") {
-		result = strings.ReplaceAll(result, "  ", " ")
+	// Collapse multiple underscores into one
+	for strings.Contains(result, "__") {
+		result = strings.ReplaceAll(result, "__", "_")
 	}
 
-	// Trim spaces and dots from ends
-	result = strings.TrimSpace(result)
-	result = strings.Trim(result, ".")
+	// Trim underscores and dots from ends
+	result = strings.Trim(result, "_.")
 
-	// Limit length
-	if len(result) > 100 {
-		result = result[:100]
+	// Limit length to 100 runes (not bytes) to avoid cutting UTF-8 characters
+	runes := []rune(result)
+	if len(runes) > 100 {
+		result = string(runes[:100])
 	}
 
 	if result == "" {

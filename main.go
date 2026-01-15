@@ -167,7 +167,7 @@ func main() {
 	if runTUI {
 		// Run TUI - it will handle shutdown
 		go func() {
-			if err := tui.RunTUI(url, srv.GetStore(), ttsService, srv.GetHub()); err != nil {
+			if err := tui.RunTUI(url, srv.GetDB(), ttsService, srv.GetHub()); err != nil {
 				logger.Error("TUI error: %v", err)
 			}
 			// TUI exited, trigger shutdown
