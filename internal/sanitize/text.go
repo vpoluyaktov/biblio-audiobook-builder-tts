@@ -43,7 +43,13 @@ func TextForTTS(text string) string {
 		"\u00A0": " ", // Non-breaking space
 		"\u2002": " ", // En space
 		"\u2003": " ", // Em space
+		"\u2004": " ", // Three-per-em space
+		"\u2005": " ", // Four-per-em space (from &#8197;)
+		"\u2006": " ", // Six-per-em space
+		"\u2007": " ", // Figure space
+		"\u2008": " ", // Punctuation space
 		"\u2009": " ", // Thin space
+		"\u200A": " ", // Hair space
 		"\u200B": "",  // Zero-width space
 		"\u200C": "",  // Zero-width non-joiner
 		"\u200D": "",  // Zero-width joiner
