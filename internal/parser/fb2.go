@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
+	"html"
 	"io"
 	"io/ioutil"
 	"os"
@@ -253,6 +254,9 @@ func fb2TreeToText(xmlContent string) string {
 
 	// Remove remaining XML tags
 	text = reFB2Tags.ReplaceAllString(text, "")
+
+	// Decode all HTML entities (numeric like &#8197; and named like &nbsp;)
+	text = html.UnescapeString(text)
 
 	// Clean up whitespace
 	text = strings.ReplaceAll(text, "\u00A0", " ")
