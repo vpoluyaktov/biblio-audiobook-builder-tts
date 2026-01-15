@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"abb_tts/internal/server"
+	"abb_tts/internal/storage"
 	"abb_tts/internal/tts"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -14,6 +15,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
+
+// JobDB defines the database operations needed for TUI
+type JobDB interface {
+	ListJobs(status string, limit int) ([]*storage.Job, error)
+}
 
 // Styles
 var (
@@ -51,7 +57,7 @@ type Model struct {
 	spinner        spinner.Model
 	serverURL      string
 	startTime      time.Time
-	jobStore       *server.JobStore
+	db             JobDB
 	ttsService     tts.Service
 	wsHub          *server.Hub
 	providersTable table.Model
@@ -61,7 +67,7 @@ type Model struct {
 }
 
 // InitialModel creates a new TUI model
-func InitialModel(serverURL string, jobStore *server.JobStore, ttsService tts.Service, wsHub *server.Hub) Model {
+func InitialModel(serverURL string, db JobDB, ttsService tts.Service, wsHub *server.Hub) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
@@ -101,7 +107,7 @@ func InitialModel(serverURL string, jobStore *server.JobStore, ttsService tts.Se
 		spinner:        s,
 		serverURL:      serverURL,
 		startTime:      time.Now(),
-		jobStore:       jobStore,
+		db:             db,
 		ttsService:     ttsService,
 		wsHub:          wsHub,
 		providersTable: providersTable,
@@ -310,11 +316,17 @@ func (m *Model) refreshProviders() {
 }
 
 func (m *Model) refreshJobs() {
-	if m.jobStore == nil {
+	if m.db == nil {
 		return
 	}
 
-	jobs := m.jobStore.List()
+	dbJobs, err := m.db.ListJobs("", 0)
+	if err != nil {
+		return
+	}
+
+	// Convert to slice for sorting
+	jobs := dbJobs
 
 	// Sort by created time (newest first)
 	sort.Slice(jobs, func(i, j int) bool {
@@ -323,8 +335,13 @@ func (m *Model) refreshJobs() {
 
 	rows := make([]table.Row, 0, len(jobs)*2) // Extra space for worker rows
 	for i, job := range jobs {
-		progress := fmt.Sprintf("%d%%", int(job.Progress*100))
-		progressBar := renderProgressBar(job.Progress, 8)
+		// Use conversion progress, or build progress if conversion is done
+		displayProgress := job.ConversionProgress
+		if job.ConversionProgress >= 1.0 && job.BuildProgress > 0 {
+			displayProgress = job.BuildProgress
+		}
+		progress := fmt.Sprintf("%d%%", int(displayProgress*100))
+		progressBar := renderProgressBar(displayProgress, 8)
 
 		chapter := "-"
 		if job.TotalChapters > 0 {
@@ -339,45 +356,16 @@ func (m *Model) refreshJobs() {
 			title = title[:25] + "..."
 		}
 
-		statusIcon := getStatusIcon(job.Status)
+		statusIcon := getStatusIconFromString(job.Status)
 
 		rows = append(rows, table.Row{
 			fmt.Sprintf("%d", i+1),
-			statusIcon + " " + string(job.Status),
+			statusIcon + " " + job.Status,
 			title,
 			progressBar + " " + progress,
 			chapter,
 			job.Provider,
 		})
-
-		// Add worker/encoder progress rows for converting and building jobs
-		if (job.Status == server.JobStatusConverting || job.Status == server.JobStatusBuilding) && len(job.WorkerProgress) > 0 {
-			for _, wp := range job.WorkerProgress {
-				workerStatus := "idle"
-				workerProgress := ""
-				label := "W" // Worker for converting
-				if job.Status == server.JobStatusBuilding {
-					label = "E" // Encoder for building
-					if wp.Active {
-						workerStatus = wp.ChapterTitle
-						workerProgress = renderProgressBar(wp.Progress, 6) + fmt.Sprintf(" %d%%", wp.ChunksComplete)
-					}
-				} else {
-					if wp.Active {
-						workerStatus = fmt.Sprintf("Ch.%d", wp.ChapterIndex+1)
-						workerProgress = renderProgressBar(wp.Progress, 6) + fmt.Sprintf(" %d/%d", wp.ChunksComplete, wp.ChunksTotal)
-					}
-				}
-				rows = append(rows, table.Row{
-					"",
-					fmt.Sprintf("  └─ %s%d", label, wp.WorkerID+1),
-					workerStatus,
-					workerProgress,
-					"",
-					"",
-				})
-			}
-		}
 	}
 
 	m.jobsTable.SetRows(rows)
@@ -395,23 +383,23 @@ func renderProgressBar(progress float64, width int) string {
 	return strings.Repeat("█", filled) + strings.Repeat("░", empty)
 }
 
-func getStatusIcon(status server.JobStatus) string {
+func getStatusIconFromString(status string) string {
 	switch status {
-	case server.JobStatusPending:
+	case "pending":
 		return "⏳"
-	case server.JobStatusParsing:
+	case "parsing":
 		return "📖"
-	case server.JobStatusConverting:
+	case "converting":
 		return "🔄"
-	case server.JobStatusBuilding:
+	case "building":
 		return "📦"
-	case server.JobStatusUploading:
+	case "uploading":
 		return "☁️"
-	case server.JobStatusCompleted:
+	case "completed":
 		return "✅"
-	case server.JobStatusFailed:
+	case "failed":
 		return "❌"
-	case server.JobStatusCancelled:
+	case "cancelled":
 		return "🚫"
 	default:
 		return "❓"
@@ -469,9 +457,9 @@ func (m *Model) updateLayout() {
 }
 
 // RunTUI starts the TUI application
-func RunTUI(serverURL string, jobStore *server.JobStore, ttsService tts.Service, wsHub *server.Hub) error {
+func RunTUI(serverURL string, db JobDB, ttsService tts.Service, wsHub *server.Hub) error {
 	p := tea.NewProgram(
-		InitialModel(serverURL, jobStore, ttsService, wsHub),
+		InitialModel(serverURL, db, ttsService, wsHub),
 		tea.WithAltScreen(),
 	)
 	_, err := p.Run()

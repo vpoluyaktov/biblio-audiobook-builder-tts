@@ -76,27 +76,28 @@ type Config struct {
 
 // Job represents a conversion job stored in the database
 type Job struct {
-	ID                string     `json:"id"`
-	Status            string     `json:"status"`
-	FileName          string     `json:"file_name"`
-	FilePath          string     `json:"file_path"`
-	Provider          string     `json:"provider"`
-	Voice             string     `json:"voice"`
-	Speed             float64    `json:"speed"`
-	Pitch             float64    `json:"pitch"`
-	BookTitle         string     `json:"book_title"`
-	BookAuthor        string     `json:"book_author"`
-	OutputPath        string     `json:"output_path"`
-	M4BFile           string     `json:"m4b_file"`
-	M4BFiles          []string   `json:"m4b_files"`
-	Progress          float64    `json:"progress"`
-	CurrentChapter    string     `json:"current_chapter"`
-	TotalChapters     int        `json:"total_chapters"`
-	CurrentChapterNum int        `json:"current_chapter_num"`
-	Error             string     `json:"error"`
-	CreatedAt         time.Time  `json:"created_at"`
-	StartedAt         *time.Time `json:"started_at"`
-	CompletedAt       *time.Time `json:"completed_at"`
+	ID                 string     `json:"id"`
+	Status             string     `json:"status"`
+	FileName           string     `json:"file_name"`
+	FilePath           string     `json:"file_path"`
+	Provider           string     `json:"provider"`
+	Voice              string     `json:"voice"`
+	Speed              float64    `json:"speed"`
+	Pitch              float64    `json:"pitch"`
+	BookTitle          string     `json:"book_title"`
+	BookAuthor         string     `json:"book_author"`
+	OutputPath         string     `json:"output_path"`
+	M4BFile            string     `json:"m4b_file"`
+	M4BFiles           []string   `json:"m4b_files"`
+	ConversionProgress float64    `json:"conversion_progress"`
+	BuildProgress      float64    `json:"build_progress"`
+	CurrentChapter     string     `json:"current_chapter"`
+	TotalChapters      int        `json:"total_chapters"`
+	CurrentChapterNum  int        `json:"current_chapter_num"`
+	Error              string     `json:"error"`
+	CreatedAt          time.Time  `json:"created_at"`
+	StartedAt          *time.Time `json:"started_at"`
+	CompletedAt        *time.Time `json:"completed_at"`
 }
 
 // NewDB creates a new database connection
@@ -150,7 +151,8 @@ func (db *DB) migrate() error {
 		output_path TEXT,
 		m4b_file TEXT,
 		m4b_files TEXT,
-		progress REAL DEFAULT 0,
+		conversion_progress REAL DEFAULT 0,
+		build_progress REAL DEFAULT 0,
 		current_chapter TEXT,
 		total_chapters INTEGER DEFAULT 0,
 		current_chapter_num INTEGER DEFAULT 0,
@@ -433,12 +435,12 @@ func (db *DB) CreateJob(job *Job) error {
 
 	_, err := db.conn.Exec(`
 		INSERT INTO jobs (id, status, file_name, file_path, provider, voice, speed, pitch,
-			book_title, book_author, output_path, m4b_file, m4b_files, progress,
+			book_title, book_author, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
 			current_chapter, total_chapters, current_chapter_num, error, created_at, started_at, completed_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, job.ID, job.Status, job.FileName, job.FilePath, job.Provider, job.Voice,
 		job.Speed, job.Pitch, job.BookTitle, job.BookAuthor, job.OutputPath,
-		job.M4BFile, string(m4bFilesJSON), job.Progress, job.CurrentChapter,
+		job.M4BFile, string(m4bFilesJSON), job.ConversionProgress, job.BuildProgress, job.CurrentChapter,
 		job.TotalChapters, job.CurrentChapterNum, job.Error, job.CreatedAt,
 		job.StartedAt, job.CompletedAt)
 
@@ -455,12 +457,12 @@ func (db *DB) UpdateJob(job *Job) error {
 	_, err := db.conn.Exec(`
 		UPDATE jobs SET status = ?, file_name = ?, file_path = ?, provider = ?, voice = ?,
 			speed = ?, pitch = ?, book_title = ?, book_author = ?, output_path = ?,
-			m4b_file = ?, m4b_files = ?, progress = ?, current_chapter = ?,
+			m4b_file = ?, m4b_files = ?, conversion_progress = ?, build_progress = ?, current_chapter = ?,
 			total_chapters = ?, current_chapter_num = ?, error = ?, started_at = ?, completed_at = ?
 		WHERE id = ?
 	`, job.Status, job.FileName, job.FilePath, job.Provider, job.Voice,
 		job.Speed, job.Pitch, job.BookTitle, job.BookAuthor, job.OutputPath,
-		job.M4BFile, string(m4bFilesJSON), job.Progress, job.CurrentChapter,
+		job.M4BFile, string(m4bFilesJSON), job.ConversionProgress, job.BuildProgress, job.CurrentChapter,
 		job.TotalChapters, job.CurrentChapterNum, job.Error, job.StartedAt,
 		job.CompletedAt, job.ID)
 
@@ -478,12 +480,12 @@ func (db *DB) GetJob(id string) (*Job, error) {
 
 	err := db.conn.QueryRow(`
 		SELECT id, status, file_name, file_path, provider, voice, speed, pitch,
-			book_title, book_author, output_path, m4b_file, m4b_files, progress,
+			book_title, book_author, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
 			current_chapter, total_chapters, current_chapter_num, error, created_at, started_at, completed_at
 		FROM jobs WHERE id = ?
 	`, id).Scan(&job.ID, &job.Status, &job.FileName, &job.FilePath, &job.Provider,
 		&job.Voice, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor,
-		&job.OutputPath, &job.M4BFile, &m4bFilesJSON, &job.Progress,
+		&job.OutputPath, &job.M4BFile, &m4bFilesJSON, &job.ConversionProgress, &job.BuildProgress,
 		&job.CurrentChapter, &job.TotalChapters, &job.CurrentChapterNum,
 		&job.Error, &job.CreatedAt, &startedAt, &completedAt)
 
@@ -513,7 +515,7 @@ func (db *DB) ListJobs(status string, limit int) ([]*Job, error) {
 
 	query := `
 		SELECT id, status, file_name, file_path, provider, voice, speed, pitch,
-			book_title, book_author, output_path, m4b_file, m4b_files, progress,
+			book_title, book_author, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
 			current_chapter, total_chapters, current_chapter_num, error, created_at, started_at, completed_at
 		FROM jobs
 	`
@@ -545,7 +547,7 @@ func (db *DB) ListJobs(status string, limit int) ([]*Job, error) {
 
 		err := rows.Scan(&job.ID, &job.Status, &job.FileName, &job.FilePath, &job.Provider,
 			&job.Voice, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor,
-			&job.OutputPath, &job.M4BFile, &m4bFilesJSON, &job.Progress,
+			&job.OutputPath, &job.M4BFile, &m4bFilesJSON, &job.ConversionProgress, &job.BuildProgress,
 			&job.CurrentChapter, &job.TotalChapters, &job.CurrentChapterNum,
 			&job.Error, &job.CreatedAt, &startedAt, &completedAt)
 		if err != nil {
@@ -573,6 +575,47 @@ func (db *DB) DeleteJob(id string) error {
 
 	_, err := db.conn.Exec("DELETE FROM jobs WHERE id = ?", id)
 	return err
+}
+
+// GetPendingJob retrieves the oldest pending job (FIFO)
+func (db *DB) GetPendingJob() (*Job, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	job := &Job{}
+	var m4bFilesJSON string
+	var startedAt, completedAt sql.NullTime
+
+	err := db.conn.QueryRow(`
+		SELECT id, status, file_name, file_path, provider, voice, speed, pitch,
+			book_title, book_author, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
+			current_chapter, total_chapters, current_chapter_num, error, created_at, started_at, completed_at
+		FROM jobs WHERE status = 'pending'
+		ORDER BY created_at ASC
+		LIMIT 1
+	`).Scan(&job.ID, &job.Status, &job.FileName, &job.FilePath, &job.Provider,
+		&job.Voice, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor,
+		&job.OutputPath, &job.M4BFile, &m4bFilesJSON, &job.ConversionProgress, &job.BuildProgress,
+		&job.CurrentChapter, &job.TotalChapters, &job.CurrentChapterNum,
+		&job.Error, &job.CreatedAt, &startedAt, &completedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if startedAt.Valid {
+		job.StartedAt = &startedAt.Time
+	}
+	if completedAt.Valid {
+		job.CompletedAt = &completedAt.Time
+	}
+
+	json.Unmarshal([]byte(m4bFilesJSON), &job.M4BFiles)
+
+	return job, nil
 }
 
 // CleanupOldJobs removes jobs older than the specified duration

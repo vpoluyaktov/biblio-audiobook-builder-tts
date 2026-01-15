@@ -500,7 +500,15 @@ func (s *Server) handleOPDSConvert(w http.ResponseWriter, r *http.Request) {
 
 	// Create job
 	job := NewJob(preview.FileName, preview.FilePath, provider, voice, speed, pitch)
-	s.store.Add(job)
+
+	// Save to database
+	if s.db != nil {
+		dbJob := jobToStorageJob(job)
+		if err := s.db.CreateJob(dbJob); err != nil {
+			s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to create job: %v", err))
+			return
+		}
+	}
 
 	// Broadcast job creation
 	s.hub.Broadcast(WSMessage{
