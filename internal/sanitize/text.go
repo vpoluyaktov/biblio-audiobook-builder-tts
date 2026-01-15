@@ -92,6 +92,75 @@ func TextForTTS(text string) string {
 		"\u00BE": " three quarters ", // ¾
 		"\u2153": " one third ",      // ⅓
 		"\u2154": " two thirds ",     // ⅔
+
+		// Superscript numbers
+		"\u00B9": "1", // ¹
+		"\u00B2": "2", // ²
+		"\u00B3": "3", // ³
+		"\u2070": "0", // ⁰
+		"\u2074": "4", // ⁴
+		"\u2075": "5", // ⁵
+		"\u2076": "6", // ⁶
+		"\u2077": "7", // ⁷
+		"\u2078": "8", // ⁸
+		"\u2079": "9", // ⁹
+
+		// Subscript numbers
+		"\u2080": "0", // ₀
+		"\u2081": "1", // ₁
+		"\u2082": "2", // ₂
+		"\u2083": "3", // ₃
+		"\u2084": "4", // ₄
+		"\u2085": "5", // ₅
+		"\u2086": "6", // ₆
+		"\u2087": "7", // ₇
+		"\u2088": "8", // ₈
+		"\u2089": "9", // ₉
+
+		// Prime marks (feet/inches, minutes/seconds)
+		"\u2032": "'",   // ′ Prime (feet, minutes)
+		"\u2033": "\"",  // ″ Double prime (inches, seconds)
+		"\u2034": "'''", // ‴ Triple prime
+
+		// Additional spaces
+		"\u202F": " ", // Narrow no-break space
+		"\u205F": " ", // Medium mathematical space
+		"\u3000": " ", // Ideographic space (CJK)
+
+		// Soft hyphen (invisible, can cause issues)
+		"\u00AD": "", // Soft hyphen - remove
+
+		// Ordinal indicators
+		"\u00BA": "o", // º Masculine ordinal
+		"\u00AA": "a", // ª Feminine ordinal
+
+		// Numero sign
+		"\u2116": "No.", // № Numero sign
+
+		// Per mille and per ten thousand
+		"\u2030": " per mille ",        // ‰
+		"\u2031": " per ten thousand ", // ‱
+
+		// Common arrows - expand to words
+		"\u2192": " to ",   // → Right arrow
+		"\u2190": " from ", // ← Left arrow
+		"\u2194": " to ",   // ↔ Left-right arrow
+
+		// Reference marks
+		"\u203B": "*",   // ※ Reference mark
+		"\u2042": "***", // ⁂ Asterism
+
+		// Currency (keep symbol but ensure TTS can handle)
+		"\u20AC": " euros ",  // €
+		"\u00A3": " pounds ", // £
+		"\u00A5": " yen ",    // ¥
+		"\u00A2": " cents ",  // ¢
+
+		// Other common symbols
+		"\u2713": " check ", // ✓ Check mark
+		"\u2717": " x ",     // ✗ Ballot X
+		"\u2605": " star ",  // ★ Black star
+		"\u2606": " star ",  // ☆ White star
 	}
 
 	result := text

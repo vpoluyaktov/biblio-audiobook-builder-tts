@@ -175,6 +175,66 @@ func TestTextForTTS_ReplacesProblematicCharacters(t *testing.T) {
 	if result != "Text here" {
 		t.Errorf("Thin space (U+2009) not converted to regular space: %q", result)
 	}
+
+	// Superscript numbers
+	result = TextForTTS("x\u00b2 + y\u00b3")
+	if result != "x2 + y3" {
+		t.Errorf("Superscript numbers not converted: %q", result)
+	}
+
+	// Subscript numbers
+	result = TextForTTS("H\u2082O")
+	if result != "H2O" {
+		t.Errorf("Subscript numbers not converted: %q", result)
+	}
+
+	// Prime marks (feet/inches)
+	result = TextForTTS("5\u2032 10\u2033")
+	if result != "5' 10\"" {
+		t.Errorf("Prime marks not converted: %q", result)
+	}
+
+	// Soft hyphen (should be removed)
+	result = TextForTTS("auto\u00ADmatic")
+	if result != "automatic" {
+		t.Errorf("Soft hyphen not removed: %q", result)
+	}
+
+	// Numero sign
+	result = TextForTTS("\u2116 5")
+	if result != "No. 5" {
+		t.Errorf("Numero sign not expanded: %q", result)
+	}
+
+	// Currency symbols
+	result = TextForTTS("Price: \u20AC50")
+	if result != "Price: euros 50" {
+		t.Errorf("Euro symbol not expanded: %q", result)
+	}
+
+	// Narrow no-break space U+202F
+	result = TextForTTS("100\u202F000")
+	if result != "100 000" {
+		t.Errorf("Narrow no-break space not converted: %q", result)
+	}
+
+	// Ideographic space U+3000 (CJK)
+	result = TextForTTS("Hello\u3000World")
+	if result != "Hello World" {
+		t.Errorf("Ideographic space not converted: %q", result)
+	}
+
+	// Right arrow
+	result = TextForTTS("A \u2192 B")
+	if result != "A to B" {
+		t.Errorf("Right arrow not expanded: %q", result)
+	}
+
+	// Check mark
+	result = TextForTTS("\u2713 Done")
+	if result != "check Done" {
+		t.Errorf("Check mark not expanded: %q", result)
+	}
 }
 
 func TestTextForTTS_RemovesControlCharacters(t *testing.T) {
