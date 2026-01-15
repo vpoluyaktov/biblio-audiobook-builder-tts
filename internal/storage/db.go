@@ -169,6 +169,8 @@ func (db *DB) migrate() error {
 		current_chapter TEXT,
 		total_chapters INTEGER DEFAULT 0,
 		current_chapter_num INTEGER DEFAULT 0,
+		worker_progress TEXT,
+		num_workers INTEGER DEFAULT 0,
 		error TEXT,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		started_at DATETIME,
@@ -195,7 +197,15 @@ func (db *DB) migrate() error {
 	`
 
 	_, err := db.conn.Exec(schema)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Add worker_progress and num_workers columns if they don't exist (migration for existing DBs)
+	db.conn.Exec("ALTER TABLE jobs ADD COLUMN worker_progress TEXT")
+	db.conn.Exec("ALTER TABLE jobs ADD COLUMN num_workers INTEGER DEFAULT 0")
+
+	return nil
 }
 
 // GetConfig retrieves a configuration value
@@ -445,16 +455,17 @@ func (db *DB) CreateJob(job *Job) error {
 	defer db.mu.Unlock()
 
 	m4bFilesJSON, _ := json.Marshal(job.M4BFiles)
+	workerProgressJSON, _ := json.Marshal(job.WorkerProgress)
 
 	_, err := db.conn.Exec(`
 		INSERT INTO jobs (id, status, file_name, file_path, provider, voice, speed, pitch,
 			book_title, book_author, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
-			current_chapter, total_chapters, current_chapter_num, error, created_at, started_at, completed_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			current_chapter, total_chapters, current_chapter_num, worker_progress, num_workers, error, created_at, started_at, completed_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, job.ID, job.Status, job.FileName, job.FilePath, job.Provider, job.Voice,
 		job.Speed, job.Pitch, job.BookTitle, job.BookAuthor, job.OutputPath,
 		job.M4BFile, string(m4bFilesJSON), job.ConversionProgress, job.BuildProgress, job.CurrentChapter,
-		job.TotalChapters, job.CurrentChapterNum, job.Error, job.CreatedAt,
+		job.TotalChapters, job.CurrentChapterNum, string(workerProgressJSON), job.NumWorkers, job.Error, job.CreatedAt,
 		job.StartedAt, job.CompletedAt)
 
 	return err
@@ -466,17 +477,18 @@ func (db *DB) UpdateJob(job *Job) error {
 	defer db.mu.Unlock()
 
 	m4bFilesJSON, _ := json.Marshal(job.M4BFiles)
+	workerProgressJSON, _ := json.Marshal(job.WorkerProgress)
 
 	_, err := db.conn.Exec(`
 		UPDATE jobs SET status = ?, file_name = ?, file_path = ?, provider = ?, voice = ?,
 			speed = ?, pitch = ?, book_title = ?, book_author = ?, output_path = ?,
 			m4b_file = ?, m4b_files = ?, conversion_progress = ?, build_progress = ?, current_chapter = ?,
-			total_chapters = ?, current_chapter_num = ?, error = ?, started_at = ?, completed_at = ?
+			total_chapters = ?, current_chapter_num = ?, worker_progress = ?, num_workers = ?, error = ?, started_at = ?, completed_at = ?
 		WHERE id = ?
 	`, job.Status, job.FileName, job.FilePath, job.Provider, job.Voice,
 		job.Speed, job.Pitch, job.BookTitle, job.BookAuthor, job.OutputPath,
 		job.M4BFile, string(m4bFilesJSON), job.ConversionProgress, job.BuildProgress, job.CurrentChapter,
-		job.TotalChapters, job.CurrentChapterNum, job.Error, job.StartedAt,
+		job.TotalChapters, job.CurrentChapterNum, string(workerProgressJSON), job.NumWorkers, job.Error, job.StartedAt,
 		job.CompletedAt, job.ID)
 
 	return err
@@ -489,18 +501,19 @@ func (db *DB) GetJob(id string) (*Job, error) {
 
 	job := &Job{}
 	var m4bFilesJSON string
+	var workerProgressJSON sql.NullString
 	var startedAt, completedAt sql.NullTime
 
 	err := db.conn.QueryRow(`
 		SELECT id, status, file_name, file_path, provider, voice, speed, pitch,
 			book_title, book_author, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
-			current_chapter, total_chapters, current_chapter_num, error, created_at, started_at, completed_at
+			current_chapter, total_chapters, current_chapter_num, worker_progress, num_workers, error, created_at, started_at, completed_at
 		FROM jobs WHERE id = ?
 	`, id).Scan(&job.ID, &job.Status, &job.FileName, &job.FilePath, &job.Provider,
 		&job.Voice, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor,
 		&job.OutputPath, &job.M4BFile, &m4bFilesJSON, &job.ConversionProgress, &job.BuildProgress,
 		&job.CurrentChapter, &job.TotalChapters, &job.CurrentChapterNum,
-		&job.Error, &job.CreatedAt, &startedAt, &completedAt)
+		&workerProgressJSON, &job.NumWorkers, &job.Error, &job.CreatedAt, &startedAt, &completedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -517,6 +530,9 @@ func (db *DB) GetJob(id string) (*Job, error) {
 	}
 
 	json.Unmarshal([]byte(m4bFilesJSON), &job.M4BFiles)
+	if workerProgressJSON.Valid {
+		json.Unmarshal([]byte(workerProgressJSON.String), &job.WorkerProgress)
+	}
 
 	return job, nil
 }
@@ -529,7 +545,7 @@ func (db *DB) ListJobs(status string, limit int) ([]*Job, error) {
 	query := `
 		SELECT id, status, file_name, file_path, provider, voice, speed, pitch,
 			book_title, book_author, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
-			current_chapter, total_chapters, current_chapter_num, error, created_at, started_at, completed_at
+			current_chapter, total_chapters, current_chapter_num, worker_progress, num_workers, error, created_at, started_at, completed_at
 		FROM jobs
 	`
 	args := []interface{}{}
@@ -556,13 +572,14 @@ func (db *DB) ListJobs(status string, limit int) ([]*Job, error) {
 	for rows.Next() {
 		job := &Job{}
 		var m4bFilesJSON string
+		var workerProgressJSON sql.NullString
 		var startedAt, completedAt sql.NullTime
 
 		err := rows.Scan(&job.ID, &job.Status, &job.FileName, &job.FilePath, &job.Provider,
 			&job.Voice, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor,
 			&job.OutputPath, &job.M4BFile, &m4bFilesJSON, &job.ConversionProgress, &job.BuildProgress,
 			&job.CurrentChapter, &job.TotalChapters, &job.CurrentChapterNum,
-			&job.Error, &job.CreatedAt, &startedAt, &completedAt)
+			&workerProgressJSON, &job.NumWorkers, &job.Error, &job.CreatedAt, &startedAt, &completedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -575,6 +592,9 @@ func (db *DB) ListJobs(status string, limit int) ([]*Job, error) {
 		}
 
 		json.Unmarshal([]byte(m4bFilesJSON), &job.M4BFiles)
+		if workerProgressJSON.Valid {
+			json.Unmarshal([]byte(workerProgressJSON.String), &job.WorkerProgress)
+		}
 		jobs = append(jobs, job)
 	}
 
