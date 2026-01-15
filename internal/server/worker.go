@@ -388,6 +388,7 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 	progressCb := func(chunkIndex, totalChunks int, chunkText string) {
 		job.SetWorkerProgress(workerID, index, chapter.Title, chunkIndex+1, totalChunks)
 		w.broadcastJobProgress(job)
+		w.saveJob(job) // Save to database so TUI can see worker progress
 	}
 
 	// Convert chapter with progress tracking
