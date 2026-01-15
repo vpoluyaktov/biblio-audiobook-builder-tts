@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
+	htmlPkg "html"
 	"io"
 	"io/ioutil"
 	"os"
@@ -429,13 +430,9 @@ func htmlToText(html string) string {
 	// Remove all remaining HTML tags
 	text := reTags.ReplaceAllString(html, "")
 
-	// Decode common HTML entities
-	text = strings.ReplaceAll(text, "&nbsp;", " ")
-	text = strings.ReplaceAll(text, "&amp;", "&")
-	text = strings.ReplaceAll(text, "&lt;", "<")
-	text = strings.ReplaceAll(text, "&gt;", ">")
-	text = strings.ReplaceAll(text, "&quot;", "\"")
-	text = strings.ReplaceAll(text, "&#39;", "'")
+	// Decode all HTML entities (numeric like &#8197; and named like &nbsp;)
+	text = htmlPkg.UnescapeString(text)
+	// Replace non-breaking space with regular space
 	text = strings.ReplaceAll(text, "\u00A0", " ")
 
 	// Clean up whitespace
