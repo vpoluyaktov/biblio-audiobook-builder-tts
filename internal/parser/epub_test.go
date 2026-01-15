@@ -73,6 +73,31 @@ func TestHtmlToText(t *testing.T) {
 			expected: "Hello World.",
 		},
 		{
+			name:     "with numeric HTML entities for spaces",
+			html:     "<p>Text&#160;with&#160;spaces</p>",
+			expected: "Text with spaces.",
+		},
+		{
+			name:     "with decimal entity for em dash",
+			html:     "<p>Hello&#8212;World</p>",
+			expected: "Hello\u2014World.",
+		},
+		{
+			name:     "with hex entity",
+			html:     "<p>Hello&#x2014;World</p>",
+			expected: "Hello\u2014World.",
+		},
+		{
+			name:     "with mixed entities",
+			html:     "<p>&quot;Hello&#8217;s World&quot;</p>",
+			expected: "\"Hello\u2019s World\"",
+		},
+		{
+			name:     "with four-per-em space entity",
+			html:     "<p>Text&#8197;here</p>",
+			expected: "Text\u2005here.",
+		},
+		{
 			name:     "empty content",
 			html:     "",
 			expected: "",
