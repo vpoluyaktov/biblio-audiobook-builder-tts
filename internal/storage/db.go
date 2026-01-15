@@ -74,30 +74,43 @@ type Config struct {
 	AudiobookshelfLibrary  string `json:"audiobookshelf_library"`
 }
 
+// WorkerProgress represents the progress of a single parallel worker
+type WorkerProgress struct {
+	WorkerID       int     `json:"worker_id"`
+	ChapterIndex   int     `json:"chapter_index"`
+	ChapterTitle   string  `json:"chapter_title"`
+	Progress       float64 `json:"progress"`
+	ChunksTotal    int     `json:"chunks_total"`
+	ChunksComplete int     `json:"chunks_complete"`
+	Active         bool    `json:"active"`
+}
+
 // Job represents a conversion job stored in the database
 type Job struct {
-	ID                 string     `json:"id"`
-	Status             string     `json:"status"`
-	FileName           string     `json:"file_name"`
-	FilePath           string     `json:"file_path"`
-	Provider           string     `json:"provider"`
-	Voice              string     `json:"voice"`
-	Speed              float64    `json:"speed"`
-	Pitch              float64    `json:"pitch"`
-	BookTitle          string     `json:"book_title"`
-	BookAuthor         string     `json:"book_author"`
-	OutputPath         string     `json:"output_path"`
-	M4BFile            string     `json:"m4b_file"`
-	M4BFiles           []string   `json:"m4b_files"`
-	ConversionProgress float64    `json:"conversion_progress"`
-	BuildProgress      float64    `json:"build_progress"`
-	CurrentChapter     string     `json:"current_chapter"`
-	TotalChapters      int        `json:"total_chapters"`
-	CurrentChapterNum  int        `json:"current_chapter_num"`
-	Error              string     `json:"error"`
-	CreatedAt          time.Time  `json:"created_at"`
-	StartedAt          *time.Time `json:"started_at"`
-	CompletedAt        *time.Time `json:"completed_at"`
+	ID                 string           `json:"id"`
+	Status             string           `json:"status"`
+	FileName           string           `json:"file_name"`
+	FilePath           string           `json:"file_path"`
+	Provider           string           `json:"provider"`
+	Voice              string           `json:"voice"`
+	Speed              float64          `json:"speed"`
+	Pitch              float64          `json:"pitch"`
+	BookTitle          string           `json:"book_title"`
+	BookAuthor         string           `json:"book_author"`
+	OutputPath         string           `json:"output_path"`
+	M4BFile            string           `json:"m4b_file"`
+	M4BFiles           []string         `json:"m4b_files"`
+	ConversionProgress float64          `json:"conversion_progress"`
+	BuildProgress      float64          `json:"build_progress"`
+	CurrentChapter     string           `json:"current_chapter"`
+	TotalChapters      int              `json:"total_chapters"`
+	CurrentChapterNum  int              `json:"current_chapter_num"`
+	WorkerProgress     []WorkerProgress `json:"worker_progress,omitempty"`
+	NumWorkers         int              `json:"num_workers,omitempty"`
+	Error              string           `json:"error"`
+	CreatedAt          time.Time        `json:"created_at"`
+	StartedAt          *time.Time       `json:"started_at"`
+	CompletedAt        *time.Time       `json:"completed_at"`
 }
 
 // NewDB creates a new database connection

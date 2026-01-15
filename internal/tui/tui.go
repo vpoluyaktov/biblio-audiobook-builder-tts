@@ -366,6 +366,30 @@ func (m *Model) refreshJobs() {
 			chapter,
 			job.Provider,
 		})
+
+		// Add worker progress rows for converting and building jobs
+		if (job.Status == "converting" || job.Status == "building") && len(job.WorkerProgress) > 0 {
+			for _, wp := range job.WorkerProgress {
+				workerStatus := "idle"
+				workerProgress := ""
+				if wp.Active {
+					if job.Status == "converting" {
+						workerStatus = fmt.Sprintf("Ch.%d", wp.ChapterIndex+1)
+					} else {
+						workerStatus = fmt.Sprintf("Part %d", wp.ChapterIndex+1)
+					}
+					workerProgress = renderProgressBar(wp.Progress, 6) + fmt.Sprintf(" %d/%d", wp.ChunksComplete, wp.ChunksTotal)
+				}
+				rows = append(rows, table.Row{
+					"",
+					fmt.Sprintf("  └─ W%d", wp.WorkerID+1),
+					workerStatus,
+					workerProgress,
+					"",
+					"",
+				})
+			}
+		}
 	}
 
 	m.jobsTable.SetRows(rows)

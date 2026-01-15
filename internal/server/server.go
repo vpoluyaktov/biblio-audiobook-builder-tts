@@ -76,6 +76,26 @@ func (s *Server) SetDB(db ConfigDB) {
 
 // jobToStorageJob converts a server.Job to storage.Job for database persistence
 func jobToStorageJob(job *Job) *storage.Job {
+	// Convert worker progress
+	var workerProgress []storage.WorkerProgress
+	job.mu.RLock()
+	if len(job.WorkerProgress) > 0 {
+		workerProgress = make([]storage.WorkerProgress, len(job.WorkerProgress))
+		for i, wp := range job.WorkerProgress {
+			workerProgress[i] = storage.WorkerProgress{
+				WorkerID:       wp.WorkerID,
+				ChapterIndex:   wp.ChapterIndex,
+				ChapterTitle:   wp.ChapterTitle,
+				Progress:       wp.Progress,
+				ChunksTotal:    wp.ChunksTotal,
+				ChunksComplete: wp.ChunksComplete,
+				Active:         wp.Active,
+			}
+		}
+	}
+	numWorkers := job.NumWorkers
+	job.mu.RUnlock()
+
 	return &storage.Job{
 		ID:                 job.ID,
 		Status:             string(job.Status),
@@ -95,6 +115,8 @@ func jobToStorageJob(job *Job) *storage.Job {
 		CurrentChapter:     job.CurrentChapter,
 		TotalChapters:      job.TotalChapters,
 		CurrentChapterNum:  job.CurrentChapterNum,
+		WorkerProgress:     workerProgress,
+		NumWorkers:         numWorkers,
 		Error:              job.Error,
 		CreatedAt:          job.CreatedAt,
 		StartedAt:          job.StartedAt,
