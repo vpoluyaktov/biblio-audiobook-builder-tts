@@ -5,14 +5,8 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
 	"time"
-	"unicode"
-
-	"golang.org/x/text/runes"
-	"golang.org/x/text/transform"
-	"golang.org/x/text/unicode/norm"
 )
 
 const (
@@ -46,90 +40,6 @@ func (a *Adapter) convertWithTimeout(chunk string, voice string, options *Conver
 		logger.Warn("TTS conversion timed out after %v - TTS backend may be hanging", chunkTimeout)
 		return nil, fmt.Errorf("TTS conversion timed out after %v", chunkTimeout)
 	}
-}
-
-// sanitizeTextForTTS normalizes text to avoid TTS model errors caused by
-// special Unicode characters, em dashes, curly quotes, etc.
-func sanitizeTextForTTS(text string) string {
-	// Normalize Unicode to NFC form first
-	t := transform.Chain(norm.NFC, runes.Remove(runes.In(unicode.Mn)))
-	result, _, _ := transform.String(t, text)
-
-	// Replace common problematic Unicode characters with ASCII equivalents
-	replacements := map[string]string{
-		// Dashes
-		"\u2014": " - ", // Em dash
-		"\u2013": " - ", // En dash
-		"\u2015": " - ", // Horizontal bar
-		"\u2012": " - ", // Figure dash
-		"\u2212": "-",   // Minus sign
-		// Quotes
-		"\u201C": `"`, // Left double quote
-		"\u201D": `"`, // Right double quote
-		"\u201E": `"`, // Double low-9 quote
-		"\u2018": "'", // Left single quote
-		"\u2019": "'", // Right single quote
-		"\u201A": "'", // Single low-9 quote
-		"\u00AB": `"`, // Left guillemet
-		"\u00BB": `"`, // Right guillemet
-		"\u2039": "'", // Single left guillemet
-		"\u203A": "'", // Single right guillemet
-		// Ellipsis
-		"\u2026": "...", // Horizontal ellipsis
-		// Spaces
-		"\u00A0": " ", // Non-breaking space
-		"\u2002": " ", // En space
-		"\u2003": " ", // Em space
-		"\u2009": " ", // Thin space
-		"\u200B": "",  // Zero-width space
-		"\u200C": "",  // Zero-width non-joiner
-		"\u200D": "",  // Zero-width joiner
-		"\uFEFF": "",  // BOM / zero-width no-break space
-		// Other
-		"\u2022": "-",                          // Bullet
-		"\u00B7": ".",                          // Middle dot
-		"\u2020": "",                           // Dagger
-		"\u2021": "",                           // Double dagger
-		"\u00A7": "Section ",                   // Section sign
-		"\u00B6": "",                           // Pilcrow
-		"\u00A9": "(c)",                        // Copyright
-		"\u00AE": "(R)",                        // Registered
-		"\u2122": "(TM)",                       // Trademark
-		"\u00B0": " degrees ",                  // Degree
-		"\u00B1": " plus or minus ",            // Plus-minus
-		"\u00D7": " times ",                    // Multiplication
-		"\u00F7": " divided by ",               // Division
-		"\u2248": " approximately ",            // Almost equal
-		"\u2260": " not equal to ",             // Not equal
-		"\u2264": " less than or equal to ",    // Less than or equal
-		"\u2265": " greater than or equal to ", // Greater than or equal
-		"\u221E": " infinity ",                 // Infinity
-	}
-
-	for old, new := range replacements {
-		result = strings.ReplaceAll(result, old, new)
-	}
-
-	// Replace multiple consecutive periods with ellipsis-like pause
-	multiPeriod := regexp.MustCompile(`\.{4,}`)
-	result = multiPeriod.ReplaceAllString(result, "...")
-
-	// Remove any remaining non-ASCII characters that might cause issues
-	// but keep basic extended Latin (accented chars like é, ñ, etc.)
-	var cleaned strings.Builder
-	for _, r := range result {
-		if r < 128 || (r >= 192 && r <= 687) { // ASCII + Extended Latin
-			cleaned.WriteRune(r)
-		} else {
-			cleaned.WriteRune(' ') // Replace unknown chars with space
-		}
-	}
-
-	// Normalize whitespace
-	whitespace := regexp.MustCompile(`\s+`)
-	result = whitespace.ReplaceAllString(cleaned.String(), " ")
-
-	return strings.TrimSpace(result)
 }
 
 // isRetryableError checks if an error is transient and worth retrying
@@ -211,10 +121,9 @@ func (a *Adapter) ConvertToSpeech(text string, voice string, options *Conversion
 				time.Sleep(delay)
 			}
 
-			// Sanitize chunk text to avoid TTS model errors from special characters
-			sanitizedChunk := sanitizeTextForTTS(chunk)
+			// Text is already sanitized by the worker before reaching here
 			// Use watchdog timeout to prevent hanging on stuck TTS backend
-			reader, err := a.convertWithTimeout(sanitizedChunk, voice, options)
+			reader, err := a.convertWithTimeout(chunk, voice, options)
 			if err != nil {
 				lastErr = err
 				// Check if this is a retryable error (server errors, tensor errors, etc.)
@@ -276,11 +185,10 @@ func (a *Adapter) ConvertToSpeechWithChunks(text string, voice string, options *
 				time.Sleep(delay)
 			}
 
-			// Sanitize chunk text to avoid TTS model errors from special characters
-			sanitizedChunk := sanitizeTextForTTS(chunk)
+			// Text is already sanitized by the worker before reaching here
 			// Use watchdog timeout to prevent hanging on stuck TTS backend
 			var err error
-			reader, err = a.convertWithTimeout(sanitizedChunk, voice, options)
+			reader, err = a.convertWithTimeout(chunk, voice, options)
 			if err != nil {
 				lastErr = err
 				if isRetryableError(err) {

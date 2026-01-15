@@ -16,6 +16,7 @@ import (
 	"abb_tts/internal/config"
 	"abb_tts/internal/logger"
 	"abb_tts/internal/parser"
+	"abb_tts/internal/sanitize"
 	"abb_tts/internal/storage"
 	"abb_tts/internal/tts"
 	"abb_tts/internal/utils"
@@ -32,34 +33,32 @@ type JobDB interface {
 
 // Worker processes conversion jobs from the queue
 type Worker struct {
-	db            JobDB
-	hub           *Hub
-	ttsService    tts.Service
-	cfg           *config.Config
-	pronunciation *tts.PronunciationDictionary
-	ctx           context.Context
-	cancel        context.CancelFunc
-	wg            sync.WaitGroup
+	db         JobDB
+	hub        *Hub
+	ttsService tts.Service
+	cfg        *config.Config
+	sanitizer  *sanitize.TextSanitizer
+	ctx        context.Context
+	cancel     context.CancelFunc
+	wg         sync.WaitGroup
 }
 
 // NewWorker creates a new job worker
 func NewWorker(db JobDB, hub *Hub, ttsService tts.Service, cfg *config.Config) *Worker {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Initialize pronunciation dictionary
-	pronunciation := tts.NewPronunciationDictionary()
+	// Initialize text sanitizer with pronunciation dictionary
+	textSanitizer := sanitize.NewTextSanitizer()
 
 	// Load default rules if enabled
 	if cfg.UseDefaultPronunciation {
-		for _, rule := range tts.GetDefaultRules() {
-			pronunciation.AddRule(rule.Pattern, rule.Replacement)
-		}
-		logger.Info("Loaded %d default pronunciation rules", pronunciation.RuleCount())
+		textSanitizer.LoadDefaultRules()
+		logger.Info("Loaded %d default pronunciation rules", textSanitizer.GetDictionary().RuleCount())
 	}
 
 	// Load custom dictionary if specified
 	if cfg.PronunciationDictFile != "" {
-		if err := pronunciation.LoadFromFile(cfg.PronunciationDictFile); err != nil {
+		if err := textSanitizer.GetDictionary().LoadFromFile(cfg.PronunciationDictFile); err != nil {
 			logger.Warn("Failed to load pronunciation dictionary: %v", err)
 		} else {
 			logger.Info("Loaded pronunciation dictionary from %s", cfg.PronunciationDictFile)
@@ -67,13 +66,13 @@ func NewWorker(db JobDB, hub *Hub, ttsService tts.Service, cfg *config.Config) *
 	}
 
 	return &Worker{
-		db:            db,
-		hub:           hub,
-		ttsService:    ttsService,
-		cfg:           cfg,
-		pronunciation: pronunciation,
-		ctx:           ctx,
-		cancel:        cancel,
+		db:         db,
+		hub:        hub,
+		ttsService: ttsService,
+		cfg:        cfg,
+		sanitizer:  textSanitizer,
+		ctx:        ctx,
+		cancel:     cancel,
 	}
 }
 
@@ -375,11 +374,8 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index int, outputDir string, workerID int) ChapterResult {
 	result := ChapterResult{Index: index}
 
-	// Apply pronunciation rules to chapter content
-	content := chapter.Content
-	if w.pronunciation != nil && w.pronunciation.RuleCount() > 0 {
-		content = w.pronunciation.Apply(content)
-	}
+	// Apply text sanitization (TTS normalization + pronunciation rules) to chapter content
+	content := w.sanitizer.Sanitize(chapter.Content)
 
 	// Save chapter text file for debugging
 	textFileName := fmt.Sprintf("%02d_%s.txt", index+1, sanitizeFileName(chapter.Title))
@@ -616,63 +612,7 @@ func (w *Worker) uploadToAudiobookshelf(job *Job, book *parser.Book) error {
 // sanitizeFileName removes or replaces characters that are invalid in file names
 // or problematic for ffmpeg/shell on different operating systems
 func sanitizeFileName(name string) string {
-	// Replace characters problematic for file systems and shell/ffmpeg arguments:
-	// - File system reserved: / \ : * ? " < > |
-	// - Shell special: ' " ` $ & ; ( ) [ ] { } ! # ~ ^
-	// - Whitespace: space, tab, newline, carriage return
-	replacer := strings.NewReplacer(
-		"/", "_",
-		"\\", "_",
-		":", "_",
-		"*", "_",
-		"?", "_",
-		"\"", "_",
-		"<", "_",
-		">", "_",
-		"|", "_",
-		"'", "_",
-		"'", "_",
-		"'", "_",
-		"`", "_",
-		"$", "_",
-		"&", "_",
-		";", "_",
-		"(", "_",
-		")", "_",
-		"[", "_",
-		"]", "_",
-		"{", "_",
-		"}", "_",
-		"!", "_",
-		"#", "_",
-		"~", "_",
-		"^", "_",
-		" ", "_",
-		"\n", "_",
-		"\r", "_",
-		"\t", "_",
-	)
-	result := replacer.Replace(name)
-
-	// Collapse multiple underscores into one
-	for strings.Contains(result, "__") {
-		result = strings.ReplaceAll(result, "__", "_")
-	}
-
-	// Trim underscores and dots from ends
-	result = strings.Trim(result, "_.")
-
-	// Limit length to 100 runes (not bytes) to avoid cutting UTF-8 characters
-	runes := []rune(result)
-	if len(runes) > 100 {
-		result = string(runes[:100])
-	}
-
-	if result == "" {
-		result = "untitled"
-	}
-
-	return result
+	return sanitize.FileName(name)
 }
 
 // Broadcast helpers
