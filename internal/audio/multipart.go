@@ -136,30 +136,20 @@ func buildMultiPartM4BInternal(parts []Part, outputDir string, baseFileName stri
 	}
 	close(partsChan)
 
-	// Encoder ID pool for tracking which encoder is working on which part
-	encoderPool := make(chan int, numWorkers)
-	for i := 0; i < numWorkers; i++ {
-		encoderPool <- i
-	}
-
 	// WaitGroup for workers
 	var wg sync.WaitGroup
 
 	// Start workers
 	for w := 0; w < numWorkers; w++ {
 		wg.Add(1)
-		go func() {
+		go func(workerID int) {
 			defer wg.Done()
 			for partIdx := range partsChan {
-				// Get encoder ID from pool
-				encoderID := <-encoderPool
-				defer func() { encoderPool <- encoderID }()
-
 				part := parts[partIdx]
-				result := buildSinglePartWithEncoderProgress(part, parts, outputDir, baseFileName, options, encoderID, encoderCb, progressCb)
+				result := buildSinglePartWithEncoderProgress(part, parts, outputDir, baseFileName, options, workerID, encoderCb, progressCb)
 				results[partIdx] = result
 			}
-		}()
+		}(w)
 	}
 
 	// Wait for all workers to complete

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestSplitIntoParts_NoSplitting(t *testing.T) {
@@ -298,5 +299,43 @@ func TestSplitIntoParts_TotalSize(t *testing.T) {
 	expectedTotalSize := int64(3 * fileSize)
 	if parts[0].TotalSize != expectedTotalSize {
 		t.Errorf("Expected TotalSize %d, got %d", expectedTotalSize, parts[0].TotalSize)
+	}
+}
+
+// TestBuildMultiPartM4B_MorePartsThanWorkers tests that building more parts than
+// workers doesn't cause a deadlock. This is a regression test for a bug where
+// defer inside a for loop caused encoder IDs to never be returned to the pool.
+// Scenario: 12 parts with 5 workers should complete all 12 parts, not hang after 5.
+func TestBuildMultiPartM4B_MorePartsThanWorkers(t *testing.T) {
+	// Create 12 parts (more than 5 workers)
+	numParts := 12
+	numWorkers := 5
+	parts := make([]Part, numParts)
+	for i := 0; i < numParts; i++ {
+		parts[i] = Part{
+			Number:       i + 1,
+			ChapterFiles: []string{"/fake/file.wav"}, // Will fail, but we're testing concurrency
+		}
+	}
+
+	// Use a channel to signal completion or timeout
+	done := make(chan bool, 1)
+
+	go func() {
+		// Call the parallel build function
+		// Files don't exist so it will fail, but we're testing that it doesn't deadlock
+		_, _ = BuildMultiPartM4BParallel(parts, t.TempDir(), "test", M4BOptions{}, numWorkers)
+		done <- true
+	}()
+
+	// Wait for completion with timeout
+	// If there's a deadlock, this will timeout
+	select {
+	case <-done:
+		// Completed without deadlock - this is the expected behavior
+		t.Log("Build completed without deadlock (errors expected due to fake files)")
+	case <-time.After(10 * time.Second):
+		t.Fatalf("DEADLOCK DETECTED: Build timed out after 10 seconds with %d parts and %d workers. "+
+			"This indicates the encoder pool is not returning IDs correctly after each part.", numParts, numWorkers)
 	}
 }
