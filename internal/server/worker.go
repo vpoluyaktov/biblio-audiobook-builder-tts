@@ -241,16 +241,13 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 
 	totalChapters := len(book.Chapters)
 
-	// Determine number of workers
-	numWorkers := w.cfg.ConcurrentTTSWorkers
-	if numWorkers <= 0 {
-		numWorkers = 3 // Default
-	}
+	// Determine number of workers based on provider-specific setting
+	numWorkers := w.cfg.GetTTSWorkersForProvider(job.Provider)
 	if numWorkers > totalChapters {
 		numWorkers = totalChapters
 	}
 
-	logger.Info("Converting %d chapters using %d parallel workers", totalChapters, numWorkers)
+	logger.Info("Converting %d chapters using %d parallel workers (provider: %s)", totalChapters, numWorkers, job.Provider)
 
 	// Results channel and slice
 	results := make([]ChapterResult, totalChapters)

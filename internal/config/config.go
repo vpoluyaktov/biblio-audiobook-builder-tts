@@ -22,16 +22,17 @@ type Config struct {
 	OpenBrowser bool   `mapstructure:"open_browser"`
 
 	// TTS settings
-	BitRateKbs              int     `mapstructure:"bit_rate_kbs"`
-	SampleRateHz            int     `mapstructure:"sample_rate_hz"`
-	DefaultSpeed            float64 `mapstructure:"default_speed"`
-	DefaultPitch            float64 `mapstructure:"default_pitch"`
-	ChapterGapSeconds       int     `mapstructure:"chapter_gap_seconds"`       // Silence between chapters
-	PronunciationDictFile   string  `mapstructure:"pronunciation_dict_file"`   // Path to pronunciation dictionary
-	UseDefaultPronunciation bool    `mapstructure:"use_default_pronunciation"` // Use built-in pronunciation rules
-	MaxFileSizeMB           int     `mapstructure:"max_file_size_mb"`          // Max M4B file size before splitting
-	ConcurrentTTSWorkers    int     `mapstructure:"concurrent_tts_workers"`    // Number of parallel TTS workers
-	ConcurrentEncoders      int     `mapstructure:"concurrent_encoders"`       // Number of parallel M4B encoders
+	BitRateKbs              int            `mapstructure:"bit_rate_kbs"`
+	SampleRateHz            int            `mapstructure:"sample_rate_hz"`
+	DefaultSpeed            float64        `mapstructure:"default_speed"`
+	DefaultPitch            float64        `mapstructure:"default_pitch"`
+	ChapterGapSeconds       int            `mapstructure:"chapter_gap_seconds"`       // Silence between chapters
+	PronunciationDictFile   string         `mapstructure:"pronunciation_dict_file"`   // Path to pronunciation dictionary
+	UseDefaultPronunciation bool           `mapstructure:"use_default_pronunciation"` // Use built-in pronunciation rules
+	MaxFileSizeMB           int            `mapstructure:"max_file_size_mb"`          // Max M4B file size before splitting
+	ConcurrentTTSWorkers    int            `mapstructure:"concurrent_tts_workers"`    // Default number of parallel TTS workers (legacy)
+	ProviderTTSWorkers      map[string]int `mapstructure:"provider_tts_workers"`      // Per-provider TTS worker counts
+	ConcurrentEncoders      int            `mapstructure:"concurrent_encoders"`       // Number of parallel M4B encoders
 
 	// Cloud provider settings
 	CloudAPIKey       string `mapstructure:"cloud_api_key"`
@@ -84,7 +85,7 @@ func Load(configFile string) (*Config, error) {
 	viper.SetDefault("pronunciation_dict_file", "")     // Custom pronunciation dictionary
 	viper.SetDefault("use_default_pronunciation", true) // Use built-in pronunciation rules
 	viper.SetDefault("max_file_size_mb", 2000)          // 2GB max file size before splitting
-	viper.SetDefault("concurrent_tts_workers", 3)       // 3 parallel TTS workers
+	viper.SetDefault("concurrent_tts_workers", 3)       // 3 parallel TTS workers (legacy default)
 	viper.SetDefault("concurrent_encoders", 2)          // 2 parallel M4B encoders
 
 	// Cloud provider settings
@@ -193,6 +194,17 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 	} else if v, ok := dbConfig["concurrent_tts_workers"].(int); ok {
 		cfg.ConcurrentTTSWorkers = v
 	}
+	// Load per-provider TTS workers
+	cfg.ProviderTTSWorkers = make(map[string]int)
+	providers := []string{"espeak", "google", "opentts", "rhvoice", "openai", "azure"}
+	for _, p := range providers {
+		key := "tts_workers_" + p
+		if v, ok := dbConfig[key].(float64); ok {
+			cfg.ProviderTTSWorkers[p] = int(v)
+		} else if v, ok := dbConfig[key].(int); ok {
+			cfg.ProviderTTSWorkers[p] = v
+		}
+	}
 	if v, ok := dbConfig["concurrent_encoders"].(float64); ok {
 		cfg.ConcurrentEncoders = int(v)
 	} else if v, ok := dbConfig["concurrent_encoders"].(int); ok {
@@ -239,4 +251,18 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 	}
 
 	return cfg
+}
+
+// GetTTSWorkersForProvider returns the number of TTS workers for a specific provider.
+// Falls back to ConcurrentTTSWorkers if not set, then to default of 3.
+func (c *Config) GetTTSWorkersForProvider(provider string) int {
+	if c.ProviderTTSWorkers != nil {
+		if workers, ok := c.ProviderTTSWorkers[provider]; ok && workers > 0 {
+			return workers
+		}
+	}
+	if c.ConcurrentTTSWorkers > 0 {
+		return c.ConcurrentTTSWorkers
+	}
+	return 3 // Default
 }

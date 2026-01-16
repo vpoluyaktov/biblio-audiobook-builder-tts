@@ -446,16 +446,16 @@
                 <!-- Performance Tab -->
                 <div class="tab-content" id="tab-performance">
                     <div class="settings-section">
-                        <h3>⚡ Parallel Processing</h3>
+                        <h3>⚡ TTS Workers (Per Provider)</h3>
                         <p class="section-description">
-                            Configure the number of concurrent workers for TTS conversion and M4B encoding.
-                            Higher values = faster processing but more CPU/memory usage.
+                            Configure the number of concurrent TTS workers for each provider.
+                            Different providers have different rate limits and resource requirements.
                         </p>
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="cfg-concurrent-tts-workers">TTS Workers</label>
-                                <select id="cfg-concurrent-tts-workers">
-                                    <option value="1">1 (Sequential)</option>
+                                <label for="cfg-tts-workers-espeak">espeak (Local)</label>
+                                <select id="cfg-tts-workers-espeak">
+                                    <option value="1">1</option>
                                     <option value="2">2</option>
                                     <option value="3" selected>3</option>
                                     <option value="4">4</option>
@@ -464,8 +464,85 @@
                                     <option value="8">8</option>
                                     <option value="10">10</option>
                                 </select>
-                                <small>Number of chapters to convert simultaneously</small>
+                                <small>Limited by CPU cores</small>
                             </div>
+                            <div class="form-group">
+                                <label for="cfg-tts-workers-opentts">OpenTTS (Self-hosted)</label>
+                                <select id="cfg-tts-workers-opentts">
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                    <option value="3" selected>3</option>
+                                    <option value="4">4</option>
+                                    <option value="5">5</option>
+                                    <option value="6">6</option>
+                                    <option value="8">8</option>
+                                    <option value="10">10</option>
+                                </select>
+                                <small>Limited by server capacity</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="cfg-tts-workers-rhvoice">RHVoice (Self-hosted)</label>
+                                <select id="cfg-tts-workers-rhvoice">
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                    <option value="3" selected>3</option>
+                                    <option value="4">4</option>
+                                    <option value="5">5</option>
+                                    <option value="6">6</option>
+                                    <option value="8">8</option>
+                                    <option value="10">10</option>
+                                </select>
+                                <small>Limited by server capacity</small>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="cfg-tts-workers-openai">OpenAI (Cloud)</label>
+                                <select id="cfg-tts-workers-openai">
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                    <option value="3" selected>3</option>
+                                    <option value="4">4</option>
+                                    <option value="5">5</option>
+                                    <option value="6">6</option>
+                                    <option value="8">8</option>
+                                    <option value="10">10</option>
+                                </select>
+                                <small>API rate limits may apply</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="cfg-tts-workers-google">Google Cloud (Cloud)</label>
+                                <select id="cfg-tts-workers-google">
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                    <option value="3" selected>3</option>
+                                    <option value="4">4</option>
+                                    <option value="5">5</option>
+                                    <option value="6">6</option>
+                                    <option value="8">8</option>
+                                    <option value="10">10</option>
+                                </select>
+                                <small>API rate limits may apply</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="cfg-tts-workers-azure">Azure (Cloud)</label>
+                                <select id="cfg-tts-workers-azure">
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                    <option value="3" selected>3</option>
+                                    <option value="4">4</option>
+                                    <option value="5">5</option>
+                                    <option value="6">6</option>
+                                    <option value="8">8</option>
+                                    <option value="10">10</option>
+                                </select>
+                                <small>API rate limits may apply</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h3>🔧 M4B Encoding</h3>
+                        <div class="form-row">
                             <div class="form-group">
                                 <label for="cfg-concurrent-encoders">M4B Encoders</label>
                                 <select id="cfg-concurrent-encoders">
@@ -478,14 +555,6 @@
                                 <small>Number of M4B parts to build simultaneously</small>
                             </div>
                         </div>
-                    </div>
-                    <div class="settings-section">
-                        <h3>ℹ️ Performance Notes</h3>
-                        <ul class="info-list">
-                            <li><strong>Local TTS (espeak):</strong> Limited by CPU cores</li>
-                            <li><strong>Self-hosted (OpenTTS, RHVoice):</strong> Limited by server capacity</li>
-                            <li><strong>Cloud TTS (Google, Azure, OpenAI):</strong> May have API rate limits - reduce workers if you encounter errors</li>
-                        </ul>
                     </div>
                 </div>
 

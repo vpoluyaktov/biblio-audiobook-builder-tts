@@ -75,7 +75,8 @@ func main() {
 	}
 
 	// Convert to app config
-	cfg := config.LoadFromDB(dbConfig.ToAppConfig())
+	appConfigMap := dbConfig.ToAppConfig()
+	cfg := config.LoadFromDB(appConfigMap)
 	config.SetInstance(cfg)
 
 	// Override config with command line flags
