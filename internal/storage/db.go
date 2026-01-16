@@ -45,8 +45,9 @@ type Config struct {
 	MaxFileSizeMB           int     `json:"max_file_size_mb"`
 
 	// Performance settings
-	ConcurrentTTSWorkers int `json:"concurrent_tts_workers"`
-	ConcurrentEncoders   int `json:"concurrent_encoders"`
+	ConcurrentTTSWorkers int            `json:"concurrent_tts_workers"`
+	ProviderTTSWorkers   map[string]int `json:"provider_tts_workers"`
+	ConcurrentEncoders   int            `json:"concurrent_encoders"`
 
 	// Cloud provider settings
 	CloudAPIKey       string `json:"cloud_api_key"`
@@ -306,6 +307,16 @@ func (db *DB) GetAllConfig() (*Config, error) {
 	}
 	if v, ok := configMap["concurrent_tts_workers"]; ok {
 		fmt.Sscanf(v, "%d", &cfg.ConcurrentTTSWorkers)
+	}
+	// Load per-provider TTS workers
+	cfg.ProviderTTSWorkers = make(map[string]int)
+	providers := []string{"espeak", "google", "opentts", "rhvoice", "openai", "azure"}
+	for _, p := range providers {
+		if v, ok := configMap["tts_workers_"+p]; ok {
+			var workers int
+			fmt.Sscanf(v, "%d", &workers)
+			cfg.ProviderTTSWorkers[p] = workers
+		}
 	}
 	if v, ok := configMap["concurrent_encoders"]; ok {
 		fmt.Sscanf(v, "%d", &cfg.ConcurrentEncoders)
@@ -855,7 +866,7 @@ func (db *DB) InitializeDefaults() error {
 
 // ToAppConfig converts storage.Config to the application config format
 func (c *Config) ToAppConfig() map[string]interface{} {
-	return map[string]interface{}{
+	result := map[string]interface{}{
 		"log_file":                  c.LogFile,
 		"output_dir":                c.OutputDir,
 		"temp_dir":                  c.TempDir,
@@ -888,4 +899,9 @@ func (c *Config) ToAppConfig() map[string]interface{} {
 		"audiobookshelf_password":   c.AudiobookshelfPassword,
 		"audiobookshelf_library":    c.AudiobookshelfLibrary,
 	}
+	// Add per-provider TTS workers
+	for provider, workers := range c.ProviderTTSWorkers {
+		result["tts_workers_"+provider] = workers
+	}
+	return result
 }

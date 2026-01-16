@@ -35,8 +35,9 @@ type SettingsRequest struct {
 	MaxFileSizeMB     int `json:"max_file_size_mb"`
 
 	// Performance
-	ConcurrentTTSWorkers int `json:"concurrent_tts_workers"`
-	ConcurrentEncoders   int `json:"concurrent_encoders"`
+	ConcurrentTTSWorkers int            `json:"concurrent_tts_workers"` // Legacy, kept for backward compatibility
+	ProviderTTSWorkers   map[string]int `json:"provider_tts_workers"`   // Per-provider TTS worker counts
+	ConcurrentEncoders   int            `json:"concurrent_encoders"`
 
 	// Cloud TTS
 	OpenAIAPIKey   string `json:"openai_api_key"`
@@ -101,6 +102,7 @@ func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
 
 		// Performance
 		ConcurrentTTSWorkers: s.cfg.ConcurrentTTSWorkers,
+		ProviderTTSWorkers:   s.cfg.ProviderTTSWorkers,
 		ConcurrentEncoders:   s.cfg.ConcurrentEncoders,
 
 		// Cloud TTS
@@ -214,6 +216,14 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 	if wasProvided("concurrent_tts_workers") {
 		s.cfg.ConcurrentTTSWorkers = req.ConcurrentTTSWorkers
 	}
+	if wasProvided("provider_tts_workers") {
+		if s.cfg.ProviderTTSWorkers == nil {
+			s.cfg.ProviderTTSWorkers = make(map[string]int)
+		}
+		for provider, workers := range req.ProviderTTSWorkers {
+			s.cfg.ProviderTTSWorkers[provider] = workers
+		}
+	}
 	if wasProvided("concurrent_encoders") {
 		s.cfg.ConcurrentEncoders = req.ConcurrentEncoders
 	}
@@ -295,6 +305,16 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 		for key, cfg := range configs {
 			if cfg.provided {
 				if err := s.db.SetConfig(key, cfg.value); err != nil {
+					logger.Warn("Failed to save config %s: %v", key, err)
+				}
+			}
+		}
+
+		// Save per-provider TTS workers
+		if wasProvided("provider_tts_workers") && req.ProviderTTSWorkers != nil {
+			for provider, workers := range req.ProviderTTSWorkers {
+				key := "tts_workers_" + provider
+				if err := s.db.SetConfig(key, fmt.Sprintf("%d", workers)); err != nil {
 					logger.Warn("Failed to save config %s: %v", key, err)
 				}
 			}

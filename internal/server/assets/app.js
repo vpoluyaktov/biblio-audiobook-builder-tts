@@ -1180,8 +1180,15 @@ class App {
         document.getElementById('cfg-chapter-gap').value = s.chapter_gap_seconds || 2;
         document.getElementById('cfg-max-file-size').value = s.max_file_size_mb || 250;
         
-        // Performance tab
-        document.getElementById('cfg-concurrent-tts-workers').value = s.concurrent_tts_workers || 3;
+        // Performance tab - per-provider TTS workers
+        const defaultWorkers = s.concurrent_tts_workers || 3;
+        const providerWorkers = s.provider_tts_workers || {};
+        document.getElementById('cfg-tts-workers-espeak').value = providerWorkers.espeak || defaultWorkers;
+        document.getElementById('cfg-tts-workers-opentts').value = providerWorkers.opentts || defaultWorkers;
+        document.getElementById('cfg-tts-workers-rhvoice').value = providerWorkers.rhvoice || defaultWorkers;
+        document.getElementById('cfg-tts-workers-openai').value = providerWorkers.openai || defaultWorkers;
+        document.getElementById('cfg-tts-workers-google').value = providerWorkers.google || defaultWorkers;
+        document.getElementById('cfg-tts-workers-azure').value = providerWorkers.azure || defaultWorkers;
         document.getElementById('cfg-concurrent-encoders').value = s.concurrent_encoders || 2;
         
         // Cloud TTS tab
@@ -1227,8 +1234,15 @@ class App {
             chapter_gap_seconds: parseInt(document.getElementById('cfg-chapter-gap').value),
             max_file_size_mb: parseInt(document.getElementById('cfg-max-file-size').value),
             
-            // Performance
-            concurrent_tts_workers: parseInt(document.getElementById('cfg-concurrent-tts-workers').value),
+            // Performance - per-provider TTS workers
+            provider_tts_workers: {
+                espeak: parseInt(document.getElementById('cfg-tts-workers-espeak').value),
+                opentts: parseInt(document.getElementById('cfg-tts-workers-opentts').value),
+                rhvoice: parseInt(document.getElementById('cfg-tts-workers-rhvoice').value),
+                openai: parseInt(document.getElementById('cfg-tts-workers-openai').value),
+                google: parseInt(document.getElementById('cfg-tts-workers-google').value),
+                azure: parseInt(document.getElementById('cfg-tts-workers-azure').value)
+            },
             concurrent_encoders: parseInt(document.getElementById('cfg-concurrent-encoders').value),
             
             // Cloud TTS
