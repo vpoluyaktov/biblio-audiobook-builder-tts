@@ -1155,6 +1155,23 @@ h1 .icon {
     display: flex;
     gap: 0.75rem;
     margin-bottom: 1.5rem;
+    align-items: center;
+}
+
+.opds-search-type {
+    padding: 0.75rem 1rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    min-width: 120px;
+}
+
+.opds-search-type:focus {
+    outline: none;
+    border-color: var(--accent);
 }
 
 .opds-search input {

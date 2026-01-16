@@ -98,11 +98,15 @@ class App {
         this.opdsSourceSelect = document.getElementById('opds-source');
         this.opdsBrowseBtn = document.getElementById('opds-browse-btn');
         this.opdsSearchContainer = document.getElementById('opds-search-container');
+        this.opdsSearchType = document.getElementById('opds-search-type');
         this.opdsSearchInput = document.getElementById('opds-search-input');
         this.opdsSearchBtn = document.getElementById('opds-search-btn');
         this.opdsBreadcrumb = document.getElementById('opds-breadcrumb');
         this.opdsContent = document.getElementById('opds-content');
         this.opdsLoading = document.getElementById('opds-loading');
+        
+        // OPDS search state
+        this.currentSearchInfo = null;
 
         // OPDS Book Modal
         this.opdsBookModal = document.getElementById('opds-book-modal');
@@ -1490,8 +1494,17 @@ class App {
         // Update breadcrumb
         this.renderBreadcrumb();
 
-        // Show search if available
-        this.opdsSearchContainer.style.display = 'none'; // TODO: detect search capability
+        // Show search if available and configure search types
+        if (catalog.search_info && catalog.search_info.supported) {
+            this.currentSearchInfo = catalog.search_info;
+            this.opdsSearchContainer.style.display = 'flex';
+            
+            // Configure search type options based on available search URLs
+            this.updateSearchTypeOptions(catalog.search_info);
+        } else {
+            this.currentSearchInfo = null;
+            this.opdsSearchContainer.style.display = 'none';
+        }
 
         if (!catalog.entries || catalog.entries.length === 0) {
             this.opdsContent.innerHTML = `
@@ -1519,14 +1532,26 @@ class App {
         html += '</div>';
 
         // Add pagination if available
-        if (catalog.next_page_url) {
-            html += `
-                <div class="opds-pagination">
-                    <button class="btn btn-secondary" onclick="app.loadNextPage('${this.escapeHtml(catalog.next_page_url)}')">
-                        Load More →
+        if (catalog.prev_page_url || catalog.next_page_url) {
+            html += '<div class="opds-pagination">';
+            
+            if (catalog.prev_page_url) {
+                html += `
+                    <button class="btn btn-secondary" onclick="app.loadPage('${this.escapeHtml(catalog.prev_page_url)}')">
+                        ← Previous
                     </button>
-                </div>
-            `;
+                `;
+            }
+            
+            if (catalog.next_page_url) {
+                html += `
+                    <button class="btn btn-secondary" onclick="app.loadPage('${this.escapeHtml(catalog.next_page_url)}')">
+                        Next →
+                    </button>
+                `;
+            }
+            
+            html += '</div>';
         }
 
         this.opdsContent.innerHTML = html;
@@ -1606,17 +1631,114 @@ class App {
         this.fetchOPDSCatalog(item.url);
     }
 
-    loadNextPage(url) {
-        // Don't add to history, just load more content
+    loadPage(url) {
+        // Load a page (next or previous) without adding to breadcrumb history
         this.fetchOPDSCatalog(url);
+    }
+
+    loadNextPage(url) {
+        // Keep for backward compatibility
+        this.loadPage(url);
     }
 
     async searchOPDS() {
         const query = this.opdsSearchInput.value.trim();
         if (!query) return;
 
-        // TODO: Implement search using the catalog's search link
-        this.showToast('Search not yet implemented', 'info');
+        if (!this.currentSearchInfo || !this.currentSearchInfo.supported) {
+            this.showToast('Search not available for this catalog', 'warning');
+            return;
+        }
+
+        const sourceId = this.opdsSourceSelect.value;
+        if (!sourceId) {
+            this.showToast('Please select a catalog source', 'warning');
+            return;
+        }
+
+        const searchType = this.opdsSearchType ? this.opdsSearchType.value : 'title';
+
+        this.showOPDSLoading(true);
+
+        try {
+            const params = new URLSearchParams({
+                source_id: sourceId,
+                q: query,
+                type: searchType
+            });
+
+            const response = await fetch(`/api/opds/search?${params}`);
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Search failed');
+            }
+
+            const catalog = await response.json();
+            
+            // Add search results to breadcrumb
+            this.opdsHistory.push({
+                url: `search:${searchType}:${query}`,
+                title: `Search: "${query}" (${searchType})`
+            });
+            
+            this.renderOPDSCatalog(catalog);
+            this.showToast(`Found ${catalog.entries ? catalog.entries.length : 0} results`, 'success');
+        } catch (e) {
+            console.error('OPDS search error:', e);
+            this.showToast(`Search failed: ${e.message}`, 'error');
+        } finally {
+            this.showOPDSLoading(false);
+        }
+    }
+
+    updateSearchTypeOptions(searchInfo) {
+        if (!this.opdsSearchType) return;
+
+        // Clear existing options
+        this.opdsSearchType.innerHTML = '';
+
+        // Add options based on available search URLs
+        const hasTitleSearch = searchInfo.title_search_url || searchInfo.search_template_url || searchInfo.opensearch_url;
+        const hasAuthorSearch = searchInfo.author_search_url;
+
+        if (hasTitleSearch) {
+            const option = document.createElement('option');
+            option.value = 'title';
+            option.textContent = '📖 By Title';
+            this.opdsSearchType.appendChild(option);
+        }
+
+        if (hasAuthorSearch) {
+            const option = document.createElement('option');
+            option.value = 'author';
+            option.textContent = '✍️ By Author';
+            this.opdsSearchType.appendChild(option);
+        }
+
+        // If no specific search types, add a generic "All" option
+        if (!hasTitleSearch && !hasAuthorSearch) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = '🔍 All';
+            this.opdsSearchType.appendChild(option);
+        }
+
+        // Update placeholder based on selected type
+        this.updateSearchPlaceholder();
+        this.opdsSearchType.addEventListener('change', () => this.updateSearchPlaceholder());
+    }
+
+    updateSearchPlaceholder() {
+        if (!this.opdsSearchInput || !this.opdsSearchType) return;
+        
+        const type = this.opdsSearchType.value;
+        if (type === 'author') {
+            this.opdsSearchInput.placeholder = 'Enter author name...';
+        } else if (type === 'title') {
+            this.opdsSearchInput.placeholder = 'Enter book title...';
+        } else {
+            this.opdsSearchInput.placeholder = 'Search books...';
+        }
     }
 
     showOPDSLoading(show) {

@@ -133,7 +133,9 @@ type CatalogResponse struct {
 	Title       string         `json:"title"`
 	Entries     []CatalogEntry `json:"entries"`
 	NextPageURL string         `json:"next_page_url,omitempty"`
+	PrevPageURL string         `json:"prev_page_url,omitempty"`
 	Links       []NavLink      `json:"links,omitempty"`
+	SearchInfo  *SearchInfo    `json:"search_info,omitempty"`
 }
 
 // NavLink represents a navigation link
@@ -142,6 +144,35 @@ type NavLink struct {
 	Href  string `json:"href"`
 	Title string `json:"title"`
 	Type  string `json:"type"`
+}
+
+// OpenSearchDescription represents an OpenSearch description document
+type OpenSearchDescription struct {
+	XMLName     xml.Name        `xml:"OpenSearchDescription"`
+	ShortName   string          `xml:"ShortName"`
+	Description string          `xml:"Description"`
+	URLs        []OpenSearchURL `xml:"Url"`
+}
+
+// OpenSearchURL represents a URL template in OpenSearch
+type OpenSearchURL struct {
+	Type     string `xml:"type,attr"`
+	Template string `xml:"template,attr"`
+	Rel      string `xml:"rel,attr"`
+}
+
+// SearchInfo contains search capability information for a catalog
+type SearchInfo struct {
+	// SearchTemplateURL is the direct Atom search URL template (if available in feed)
+	SearchTemplateURL string `json:"search_template_url,omitempty"`
+	// OpenSearchURL is the URL to the OpenSearch description document
+	OpenSearchURL string `json:"opensearch_url,omitempty"`
+	// Supported indicates if search is available
+	Supported bool `json:"supported"`
+	// TitleSearchURL is a URL template for title-specific search (for feeds like FreeLib)
+	TitleSearchURL string `json:"title_search_url,omitempty"`
+	// AuthorSearchURL is a URL template for author-specific search
+	AuthorSearchURL string `json:"author_search_url,omitempty"`
 }
 
 // FetchCatalog fetches and parses an OPDS catalog from a URL
@@ -195,12 +226,44 @@ func (c *Client) ParseCatalog(data []byte, baseURL string) (*CatalogResponse, er
 		Links:   make([]NavLink, 0),
 	}
 
+	// Extract search info from feed links
+	searchInfo := &SearchInfo{}
+
 	// Process feed links
 	for _, link := range feed.Links {
 		absURL := resolveURL(base, link.Href)
 
 		if link.Rel == "next" {
 			response.NextPageURL = absURL
+		}
+		if link.Rel == "previous" || link.Rel == "prev" {
+			response.PrevPageURL = absURL
+		}
+
+		// Extract search links
+		if link.Rel == "search" {
+			if strings.Contains(link.Type, "opensearchdescription") {
+				// OpenSearch description document URL
+				searchInfo.OpenSearchURL = absURL
+				searchInfo.Supported = true
+			} else if strings.Contains(link.Type, "atom+xml") {
+				// Direct Atom search template (FreeLib style)
+				searchInfo.SearchTemplateURL = absURL
+				searchInfo.Supported = true
+
+				// Check if this template supports field-specific search (like FreeLib)
+				// Template format: /search?q={searchTerms}&author={atom:author}&title={atom:title}
+				if strings.Contains(link.Href, "{atom:title}") {
+					// Extract title search URL - build clean URL with just title parameter
+					titleURL := extractFieldSearchURL(link.Href, "title")
+					searchInfo.TitleSearchURL = resolveURL(base, titleURL)
+				}
+				if strings.Contains(link.Href, "{atom:author}") {
+					// Extract author search URL - build clean URL with just author parameter
+					authorURL := extractFieldSearchURL(link.Href, "author")
+					searchInfo.AuthorSearchURL = resolveURL(base, authorURL)
+				}
+			}
 		}
 
 		// Add navigation links
@@ -213,6 +276,11 @@ func (c *Client) ParseCatalog(data []byte, baseURL string) (*CatalogResponse, er
 				Type:  link.Type,
 			})
 		}
+	}
+
+	// Set search info if search is supported
+	if searchInfo.Supported {
+		response.SearchInfo = searchInfo
 	}
 
 	// Process entries
@@ -323,7 +391,40 @@ func resolveURL(base *url.URL, href string) string {
 		return href
 	}
 
-	return base.ResolveReference(ref).String()
+	resolved := base.ResolveReference(ref).String()
+
+	// Fix invalid port :0 that some OPDS feeds return (e.g., FreeLib)
+	// Replace "http://host:0/" with "https://host/"
+	resolved = fixInvalidPort(resolved)
+
+	return resolved
+}
+
+// fixInvalidPort fixes URLs with invalid port :0 by removing it and using https
+func fixInvalidPort(urlStr string) string {
+	if strings.Contains(urlStr, ":0/") {
+		// Replace http://host:0/ with https://host/
+		urlStr = strings.Replace(urlStr, ":0/", "/", 1)
+		// Also upgrade to https if it was http
+		if strings.HasPrefix(urlStr, "http://") {
+			urlStr = strings.Replace(urlStr, "http://", "https://", 1)
+		}
+	}
+	return urlStr
+}
+
+// extractFieldSearchURL extracts a clean field-specific search URL from a template
+// Input: /search?q={searchTerms}&author={atom:author}&title={atom:title}
+// Output for field="title": /search?title={searchTerms}
+func extractFieldSearchURL(templateURL, field string) string {
+	// Parse the URL to extract the base path
+	u, err := url.Parse(templateURL)
+	if err != nil {
+		return ""
+	}
+
+	// Build a clean URL with just the specified field
+	return fmt.Sprintf("%s?%s={searchTerms}", u.Path, field)
 }
 
 // detectFormat detects the book format from MIME type
@@ -358,6 +459,112 @@ func (c *Client) Search(searchURL, query string) (*CatalogResponse, error) {
 	searchURL = strings.ReplaceAll(searchURL, "{count?}", "")
 
 	return c.FetchCatalog(searchURL)
+}
+
+// FetchOpenSearchDescription fetches and parses an OpenSearch description document
+func (c *Client) FetchOpenSearchDescription(openSearchURL string) (*OpenSearchDescription, error) {
+	req, err := http.NewRequest("GET", openSearchURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Accept", "application/opensearchdescription+xml, application/xml, text/xml")
+	req.Header.Set("User-Agent", "abb_tts OPDS Client/1.0")
+
+	if c.username != "" && c.password != "" {
+		req.SetBasicAuth(c.username, c.password)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch OpenSearch description: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("OpenSearch description returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var osd OpenSearchDescription
+	if err := xml.Unmarshal(body, &osd); err != nil {
+		return nil, fmt.Errorf("failed to parse OpenSearch description: %w", err)
+	}
+
+	return &osd, nil
+}
+
+// GetAtomSearchTemplate extracts the Atom/OPDS search URL template from an OpenSearch description
+func (osd *OpenSearchDescription) GetAtomSearchTemplate() string {
+	for _, u := range osd.URLs {
+		// Look for atom+xml type (OPDS search results)
+		if strings.Contains(u.Type, "atom+xml") {
+			return u.Template
+		}
+	}
+	// Fallback: return first URL if no atom type found
+	if len(osd.URLs) > 0 {
+		return osd.URLs[0].Template
+	}
+	return ""
+}
+
+// GetSearchTemplate returns the search URL template for a catalog.
+// It first checks for a direct Atom search template, then falls back to fetching OpenSearch description.
+func (c *Client) GetSearchTemplate(searchInfo *SearchInfo) (string, error) {
+	return c.GetSearchTemplateByType(searchInfo, "")
+}
+
+// GetSearchTemplateByType returns the search URL template for a specific search type.
+// searchType can be "title", "author", or "" for default search.
+// For feeds like FreeLib that support field-specific search, using "title" returns
+// actual book results instead of navigation categories.
+func (c *Client) GetSearchTemplateByType(searchInfo *SearchInfo, searchType string) (string, error) {
+	if searchInfo == nil || !searchInfo.Supported {
+		return "", fmt.Errorf("search not supported")
+	}
+
+	// Check for field-specific search templates first
+	switch searchType {
+	case "title":
+		if searchInfo.TitleSearchURL != "" {
+			return searchInfo.TitleSearchURL, nil
+		}
+	case "author":
+		if searchInfo.AuthorSearchURL != "" {
+			return searchInfo.AuthorSearchURL, nil
+		}
+	}
+
+	// For default search, prefer title search if available (returns actual books)
+	// This handles FreeLib-style feeds where q= returns navigation categories
+	if searchType == "" && searchInfo.TitleSearchURL != "" {
+		return searchInfo.TitleSearchURL, nil
+	}
+
+	// Use direct Atom search template
+	if searchInfo.SearchTemplateURL != "" {
+		return searchInfo.SearchTemplateURL, nil
+	}
+
+	// Fall back to OpenSearch description (Gutenberg style)
+	if searchInfo.OpenSearchURL != "" {
+		osd, err := c.FetchOpenSearchDescription(searchInfo.OpenSearchURL)
+		if err != nil {
+			return "", fmt.Errorf("failed to get OpenSearch description: %w", err)
+		}
+		template := osd.GetAtomSearchTemplate()
+		if template == "" {
+			return "", fmt.Errorf("no search URL template found in OpenSearch description")
+		}
+		return template, nil
+	}
+
+	return "", fmt.Errorf("no search URL available")
 }
 
 // DownloadBook downloads a book from the given URL
