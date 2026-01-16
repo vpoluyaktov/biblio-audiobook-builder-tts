@@ -290,6 +290,7 @@ func (s *Server) handleOPDSBrowse(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleOPDSSearch handles searching an OPDS catalog
+// Accepts: source_id (required), q (required), type (optional: "title", "author", or "" for default)
 func (s *Server) handleOPDSSearch(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
 		s.handleCORS(w)
@@ -301,34 +302,61 @@ func (s *Server) handleOPDSSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	searchURL := r.URL.Query().Get("url")
 	query := r.URL.Query().Get("q")
 	sourceID := r.URL.Query().Get("source_id")
+	searchType := r.URL.Query().Get("type") // "title", "author", or "" for default
 
-	if searchURL == "" || query == "" {
-		s.jsonError(w, http.StatusBadRequest, "URL and q parameters required")
+	if sourceID == "" || query == "" {
+		s.jsonError(w, http.StatusBadRequest, "source_id and q parameters required")
+		return
+	}
+
+	// Get source from database
+	db, ok := s.db.(OPDSDB)
+	if !ok {
+		s.jsonError(w, http.StatusInternalServerError, "Database not available")
+		return
+	}
+
+	source, err := db.GetOPDSSource(sourceID)
+	if err != nil || source == nil {
+		s.jsonError(w, http.StatusNotFound, "OPDS source not found")
 		return
 	}
 
 	// Create client with auth if source has credentials
 	client := opds.NewClient()
-	if sourceID != "" {
-		if db, ok := s.db.(OPDSDB); ok {
-			if source, err := db.GetOPDSSource(sourceID); err == nil && source != nil {
-				if source.Username != "" && source.Password != "" {
-					client.SetAuth(source.Username, source.Password)
-				}
-			}
-		}
+	if source.Username != "" && source.Password != "" {
+		client.SetAuth(source.Username, source.Password)
 	}
 
-	catalog, err := client.Search(searchURL, query)
+	// Fetch the catalog to get SearchInfo
+	catalog, err := client.FetchCatalog(source.URL)
+	if err != nil {
+		s.jsonError(w, http.StatusBadGateway, fmt.Sprintf("Failed to fetch catalog: %v", err))
+		return
+	}
+
+	if catalog.SearchInfo == nil || !catalog.SearchInfo.Supported {
+		s.jsonError(w, http.StatusBadRequest, "This catalog does not support search")
+		return
+	}
+
+	// Get the appropriate search template based on search type
+	searchURL, err := client.GetSearchTemplateByType(catalog.SearchInfo, searchType)
+	if err != nil {
+		s.jsonError(w, http.StatusBadGateway, fmt.Sprintf("Failed to get search template: %v", err))
+		return
+	}
+
+	// Perform the search
+	results, err := client.Search(searchURL, query)
 	if err != nil {
 		s.jsonError(w, http.StatusBadGateway, fmt.Sprintf("Search failed: %v", err))
 		return
 	}
 
-	s.jsonResponse(w, http.StatusOK, catalog)
+	s.jsonResponse(w, http.StatusOK, results)
 }
 
 // handleOPDSDownload handles downloading a book from OPDS and creating a preview
