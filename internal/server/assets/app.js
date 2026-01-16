@@ -1200,7 +1200,7 @@ class App {
         document.getElementById('cfg-abs-url').value = s.audiobookshelf_url || '';
         document.getElementById('cfg-abs-user').value = s.audiobookshelf_user || 'admin';
         document.getElementById('cfg-abs-password').value = s.audiobookshelf_password || '';
-        document.getElementById('cfg-abs-library').value = s.audiobookshelf_library || 'TTS Books';
+        document.getElementById('cfg-abs-library').value = s.audiobookshelf_library || 'TTS books';
     }
 
     collectSettingsForm() {

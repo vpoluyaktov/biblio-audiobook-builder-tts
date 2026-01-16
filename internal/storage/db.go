@@ -443,7 +443,7 @@ func DefaultConfig() *Config {
 		AudiobookshelfURL:       "",
 		AudiobookshelfUser:      "admin",
 		AudiobookshelfPassword:  "",
-		AudiobookshelfLibrary:   "TTS Books",
+		AudiobookshelfLibrary:   "TTS books",
 	}
 }
 
