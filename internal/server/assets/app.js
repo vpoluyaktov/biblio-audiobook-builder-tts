@@ -692,9 +692,6 @@ class App {
         this.previewWords.textContent = this.formatNumber(preview.total_words);
         this.previewDuration.textContent = preview.estimated_duration_formatted;
 
-        // Update cost estimate for current selection
-        this.updateCostEstimate();
-
         // Set chapter list
         this.previewChapterList.innerHTML = preview.chapters.map((ch, i) => `
             <div class="chapter-item">
@@ -703,9 +700,11 @@ class App {
             </div>
         `).join('');
 
-        // Show preview section
+        // Show preview section first, then update cost estimate
+        // (updateCostEstimate returns early if preview section is hidden)
         this.previewSection.style.display = 'block';
         this.previewSection.scrollIntoView({ behavior: 'smooth' });
+        this.updateCostEstimate();
     }
 
     closePreview() {
