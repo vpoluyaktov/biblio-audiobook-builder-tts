@@ -792,26 +792,6 @@ func (db *DB) InitializeDefaultOPDSSources() error {
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
 		},
-		{
-			ID:          "standardebooks",
-			Name:        "Standard Ebooks",
-			URL:         "https://standardebooks.org/feeds/opds",
-			Description: "Free, beautifully formatted ebooks with modern typography.",
-			IsDefault:   true,
-			Enabled:     true,
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
-		},
-		{
-			ID:          "feedbooks-public",
-			Name:        "Feedbooks Public Domain",
-			URL:         "https://catalog.feedbooks.com/publicdomain/browse/en/homepage.atom",
-			Description: "Public domain books from Feedbooks.",
-			IsDefault:   true,
-			Enabled:     true,
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
-		},
 	}
 
 	for _, source := range defaults {
