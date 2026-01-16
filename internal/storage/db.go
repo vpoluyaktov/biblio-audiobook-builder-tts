@@ -792,6 +792,36 @@ func (db *DB) InitializeDefaultOPDSSources() error {
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
 		},
+		{
+			ID:          "wikisource",
+			Name:        "Wikisource",
+			URL:         "https://ws-export.wmcloud.org/opds/en/Ready_for_export.xml",
+			Description: "Free ebooks from Wikisource. Public domain works ready for export.",
+			IsDefault:   true,
+			Enabled:     true,
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		},
+		{
+			ID:          "anarchist-library",
+			Name:        "The Anarchist Library",
+			URL:         "https://theanarchistlibrary.org/opds",
+			Description: "Free anarchist texts and books.",
+			IsDefault:   true,
+			Enabled:     true,
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		},
+		{
+			ID:          "gallica",
+			Name:        "Gallica (French)",
+			URL:         "https://gallica.bnf.fr/opds",
+			Description: "French National Library digital collection. Mostly French language books.",
+			IsDefault:   true,
+			Enabled:     true,
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		},
 	}
 
 	for _, source := range defaults {
