@@ -1,5 +1,8 @@
 // Audiobook Builder TTS - Web Client
 
+// localStorage key for TTS settings
+const TTS_SETTINGS_KEY = 'abb_tts_settings';
+
 class App {
     constructor() {
         this.ws = null;
@@ -12,6 +15,7 @@ class App {
         this.maxReconnectAttempts = 10;
         this.reconnectDelay = 1000;
         this.settings = {};
+        this.savedTTSSettings = this.loadTTSSettings();
 
         // OPDS state
         this.opdsSources = [];
@@ -19,6 +23,35 @@ class App {
         this.currentOPDSBook = null;
 
         this.init();
+    }
+
+    // Load TTS settings from localStorage
+    loadTTSSettings() {
+        try {
+            const saved = localStorage.getItem(TTS_SETTINGS_KEY);
+            if (saved) {
+                return JSON.parse(saved);
+            }
+        } catch (e) {
+            console.error('Failed to load TTS settings from localStorage:', e);
+        }
+        return null;
+    }
+
+    // Save TTS settings to localStorage
+    saveTTSSettings() {
+        try {
+            const settings = {
+                provider: this.providerSelect.value,
+                language: this.languageSelect.value,
+                model: this.modelSelect.value,
+                voice: this.voiceSelect.value
+            };
+            localStorage.setItem(TTS_SETTINGS_KEY, JSON.stringify(settings));
+            this.savedTTSSettings = settings;
+        } catch (e) {
+            console.error('Failed to save TTS settings to localStorage:', e);
+        }
     }
 
     async init() {
@@ -140,13 +173,15 @@ class App {
         this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
         this.removeFileBtn.addEventListener('click', () => this.clearSelectedFile());
 
-        // Cascading dropdown changes
+        // Cascading dropdown changes - settings are saved in loadVoices() at the end of cascade
         this.providerSelect.addEventListener('change', () => {
             this.loadLanguages();
             this.updateCostEstimate();
         });
         this.languageSelect.addEventListener('change', () => this.loadModels());
         this.modelSelect.addEventListener('change', () => this.loadVoices());
+        // Save settings when voice is changed directly (without cascade)
+        this.voiceSelect.addEventListener('change', () => this.saveTTSSettings());
 
         // Range inputs
         this.speedInput.addEventListener('input', () => {
@@ -348,8 +383,14 @@ class App {
             const data = await response.json();
             this.providers = data.providers || [];
             
+            // Use saved provider if available and valid, otherwise use server default
+            const savedProvider = this.savedTTSSettings?.provider;
+            const defaultProvider = (savedProvider && this.providers.includes(savedProvider)) 
+                ? savedProvider 
+                : data.default;
+            
             this.providerSelect.innerHTML = this.providers.map(p => 
-                `<option value="${p}" ${p === data.default ? 'selected' : ''}>${p}</option>`
+                `<option value="${p}" ${p === defaultProvider ? 'selected' : ''}>${p}</option>`
             ).join('');
 
             await this.loadLanguages();
@@ -375,8 +416,15 @@ class App {
                 return;
             }
 
-            // Default to en-US if available, otherwise first language
-            const defaultLang = languages.includes('en-US') ? 'en-US' : languages[0];
+            // Use saved language if available and valid for current provider, otherwise default to en-US or first
+            const savedLang = this.savedTTSSettings?.language;
+            const isSameProvider = this.savedTTSSettings?.provider === provider;
+            let defaultLang;
+            if (isSameProvider && savedLang && languages.includes(savedLang)) {
+                defaultLang = savedLang;
+            } else {
+                defaultLang = languages.includes('en-US') ? 'en-US' : languages[0];
+            }
 
             this.languageSelect.innerHTML = languages.map(lang => 
                 `<option value="${lang}" ${lang === defaultLang ? 'selected' : ''}>${lang}</option>`
@@ -412,8 +460,15 @@ class App {
                 return;
             }
 
+            // Use saved model if available and valid for current provider
+            const savedModel = this.savedTTSSettings?.model;
+            const isSameProvider = this.savedTTSSettings?.provider === provider;
+            const defaultModel = (isSameProvider && savedModel && models.includes(savedModel)) 
+                ? savedModel 
+                : models[0];
+
             this.modelSelect.innerHTML = models.map(model => 
-                `<option value="${model}">${model}</option>`
+                `<option value="${model}" ${model === defaultModel ? 'selected' : ''}>${model}</option>`
             ).join('');
 
             await this.loadVoices();
@@ -440,9 +495,25 @@ class App {
             // Sort voices by name
             this.voices.sort((a, b) => a.Name.localeCompare(b.Name));
 
+            // Use saved voice if available and valid for current provider/language/model
+            const savedVoice = this.savedTTSSettings?.voice;
+            const isSameProvider = this.savedTTSSettings?.provider === provider;
+            const isSameLanguage = this.savedTTSSettings?.language === language;
+            const isSameModel = this.savedTTSSettings?.model === model;
+            const voiceIds = this.voices.map(v => v.ID);
+            let defaultVoice;
+            if (isSameProvider && isSameLanguage && isSameModel && savedVoice && voiceIds.includes(savedVoice)) {
+                defaultVoice = savedVoice;
+            } else {
+                defaultVoice = data.default || (this.voices.length > 0 ? this.voices[0].ID : '');
+            }
+
             this.voiceSelect.innerHTML = this.voices.map(v => 
-                `<option value="${v.ID}" ${v.ID === data.default ? 'selected' : ''}>${v.Name}</option>`
+                `<option value="${v.ID}" ${v.ID === defaultVoice ? 'selected' : ''}>${v.Name}</option>`
             ).join('');
+            
+            // Save settings after all dropdowns are populated
+            this.saveTTSSettings();
         } catch (e) {
             console.error('Failed to load voices:', e);
         }
