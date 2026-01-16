@@ -2,7 +2,6 @@ package audio
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -19,7 +18,16 @@ type Part struct {
 
 // SplitIntoParts splits chapter files into parts based on max file size
 // Returns a slice of Parts, each containing chapter files that fit within maxSizeMB
+// Deprecated: Use SplitIntoPartsByEstimatedSize for accurate M4B size estimation
 func SplitIntoParts(chapterFiles []string, chapterTitles []string, maxSizeMB int) ([]Part, error) {
+	// Use default bitrate of 128kbps for backward compatibility
+	return SplitIntoPartsByEstimatedSize(chapterFiles, chapterTitles, maxSizeMB, 128)
+}
+
+// SplitIntoPartsByEstimatedSize splits chapter files into parts based on estimated M4B output size
+// It uses audio duration and bitrate to estimate the compressed M4B size, not the WAV file size
+// Returns a slice of Parts, each containing chapter files that fit within maxSizeMB
+func SplitIntoPartsByEstimatedSize(chapterFiles []string, chapterTitles []string, maxSizeMB int, bitRateKbps int) ([]Part, error) {
 	if maxSizeMB <= 0 {
 		// No splitting, return single part with all chapters
 		chapters := make([]Chapter, len(chapterTitles))
@@ -33,28 +41,34 @@ func SplitIntoParts(chapterFiles []string, chapterTitles []string, maxSizeMB int
 		}}, nil
 	}
 
+	if bitRateKbps <= 0 {
+		bitRateKbps = 128 // Default to 128kbps
+	}
+
 	maxSizeBytes := int64(maxSizeMB) * 1024 * 1024
 	var parts []Part
 	var currentPart Part
 	currentPart.Number = 1
-	var currentSize int64
+	var currentEstimatedSize int64
 
 	for i, file := range chapterFiles {
-		// Get file size
-		info, err := os.Stat(file)
+		// Get audio duration and estimate M4B size
+		duration, err := getAudioDuration(file)
 		if err != nil {
-			return nil, fmt.Errorf("failed to stat file %s: %w", file, err)
+			return nil, fmt.Errorf("failed to get duration for %s: %w", file, err)
 		}
-		fileSize := info.Size()
+
+		// Estimate M4B size based on duration and bitrate
+		estimatedSize := EstimateM4BSize(duration.Seconds(), bitRateKbps)
 
 		// Check if adding this file would exceed max size
-		if currentSize+fileSize > maxSizeBytes && len(currentPart.ChapterFiles) > 0 {
+		if currentEstimatedSize+estimatedSize > maxSizeBytes && len(currentPart.ChapterFiles) > 0 {
 			// Save current part and start new one
 			parts = append(parts, currentPart)
 			currentPart = Part{
 				Number: len(parts) + 1,
 			}
-			currentSize = 0
+			currentEstimatedSize = 0
 		}
 
 		// Add file to current part
@@ -64,8 +78,9 @@ func SplitIntoParts(chapterFiles []string, chapterTitles []string, maxSizeMB int
 			title = chapterTitles[i]
 		}
 		currentPart.Chapters = append(currentPart.Chapters, Chapter{Title: title})
-		currentPart.TotalSize += fileSize
-		currentSize += fileSize
+		currentPart.TotalSize += estimatedSize
+		currentPart.Duration += duration
+		currentEstimatedSize += estimatedSize
 	}
 
 	// Add final part

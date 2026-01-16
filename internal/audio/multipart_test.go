@@ -138,18 +138,89 @@ func TestSplitIntoParts_NonexistentFile(t *testing.T) {
 	}
 }
 
-// Helper function to create test files
+// Helper function to create test WAV files with valid headers
+// durationMs is the duration in milliseconds for each file
 func createTestFiles(t *testing.T, dir string, count int, sizeBytes int) []string {
+	// For backward compatibility, create files with ~1 second duration per KB
+	// This approximates the old behavior where file size determined splitting
+	durationMs := sizeBytes / 1024 * 1000 // 1 second per KB
+	if durationMs < 100 {
+		durationMs = 100 // minimum 100ms
+	}
+	return createTestWAVFiles(t, dir, count, durationMs)
+}
+
+// createTestWAVFiles creates valid WAV files with specified duration
+func createTestWAVFiles(t *testing.T, dir string, count int, durationMs int) []string {
 	var files []string
 	for i := 0; i < count; i++ {
 		path := filepath.Join(dir, "chapter_"+string(rune('a'+i))+".wav")
-		data := make([]byte, sizeBytes)
-		if err := os.WriteFile(path, data, 0644); err != nil {
-			t.Fatalf("Failed to create test file: %v", err)
+		if err := createMinimalWAV(path, durationMs); err != nil {
+			t.Fatalf("Failed to create test WAV file: %v", err)
 		}
 		files = append(files, path)
 	}
 	return files
+}
+
+// createMinimalWAV creates a minimal valid WAV file with silence of specified duration
+func createMinimalWAV(path string, durationMs int) error {
+	sampleRate := 44100
+	numChannels := 1
+	bitsPerSample := 16
+
+	numSamples := sampleRate * durationMs / 1000
+	dataSize := numSamples * numChannels * (bitsPerSample / 8)
+
+	// WAV file header (44 bytes)
+	header := make([]byte, 44)
+
+	// RIFF header
+	copy(header[0:4], "RIFF")
+	putLittleEndian32(header[4:8], uint32(36+dataSize))
+	copy(header[8:12], "WAVE")
+
+	// fmt chunk
+	copy(header[12:16], "fmt ")
+	putLittleEndian32(header[16:20], 16) // chunk size
+	putLittleEndian16(header[20:22], 1)  // audio format (PCM)
+	putLittleEndian16(header[22:24], uint16(numChannels))
+	putLittleEndian32(header[24:28], uint32(sampleRate))
+	putLittleEndian32(header[28:32], uint32(sampleRate*numChannels*bitsPerSample/8)) // byte rate
+	putLittleEndian16(header[32:34], uint16(numChannels*bitsPerSample/8))            // block align
+	putLittleEndian16(header[34:36], uint16(bitsPerSample))
+
+	// data chunk
+	copy(header[36:40], "data")
+	putLittleEndian32(header[40:44], uint32(dataSize))
+
+	// Create file with header + silence data
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	if _, err := f.Write(header); err != nil {
+		return err
+	}
+
+	// Write silence (zeros)
+	silence := make([]byte, dataSize)
+	_, err = f.Write(silence)
+	return err
+}
+
+func putLittleEndian16(b []byte, v uint16) {
+	b[0] = byte(v)
+	b[1] = byte(v >> 8)
+}
+
+func putLittleEndian32(b []byte, v uint32) {
+	b[0] = byte(v)
+	b[1] = byte(v >> 8)
+	b[2] = byte(v >> 16)
+	b[3] = byte(v >> 24)
 }
 
 func TestBuildMultiPartM4BParallel_EmptyParts(t *testing.T) {
@@ -281,8 +352,9 @@ func TestSplitIntoParts_FewerTitlesThanFiles(t *testing.T) {
 
 func TestSplitIntoParts_TotalSize(t *testing.T) {
 	tmpDir := t.TempDir()
-	fileSize := 1024
-	files := createTestFiles(t, tmpDir, 3, fileSize)
+	// Create 3 files with 1 second duration each (1000ms)
+	durationMs := 1000
+	files := createTestWAVFiles(t, tmpDir, 3, durationMs)
 
 	titles := []string{"A", "B", "C"}
 	// Use maxSizeMB=10 to trigger the code path that calculates TotalSize
@@ -296,7 +368,10 @@ func TestSplitIntoParts_TotalSize(t *testing.T) {
 		t.Fatalf("Expected 1 part, got %d", len(parts))
 	}
 
-	expectedTotalSize := int64(3 * fileSize)
+	// TotalSize is now estimated M4B size based on duration and bitrate (128kbps default)
+	// 3 files × 1 second × 128kbps / 8 × 1.05 overhead ≈ 50,400 bytes
+	expectedSizePerFile := EstimateM4BSize(float64(durationMs)/1000, 128)
+	expectedTotalSize := expectedSizePerFile * 3
 	if parts[0].TotalSize != expectedTotalSize {
 		t.Errorf("Expected TotalSize %d, got %d", expectedTotalSize, parts[0].TotalSize)
 	}

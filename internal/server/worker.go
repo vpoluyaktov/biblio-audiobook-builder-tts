@@ -444,8 +444,8 @@ func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (s
 		chapterTitles[i] = ch.Title
 	}
 
-	// Split into parts if needed
-	parts, err := audio.SplitIntoParts(chapterFiles, chapterTitles, w.cfg.MaxFileSizeMB)
+	// Split into parts if needed based on estimated M4B output size
+	parts, err := audio.SplitIntoPartsByEstimatedSize(chapterFiles, chapterTitles, w.cfg.MaxFileSizeMB, w.cfg.BitRateKbs)
 	if err != nil {
 		return "", fmt.Errorf("failed to split into parts: %v", err)
 	}
