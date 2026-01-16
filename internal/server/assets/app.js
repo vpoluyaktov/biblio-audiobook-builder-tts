@@ -1178,7 +1178,7 @@ class App {
         document.getElementById('cfg-bit-rate').value = s.bit_rate_kbs || 128;
         document.getElementById('cfg-sample-rate').value = s.sample_rate_hz || 44100;
         document.getElementById('cfg-chapter-gap').value = s.chapter_gap_seconds || 2;
-        document.getElementById('cfg-max-file-size').value = s.max_file_size_mb || 2000;
+        document.getElementById('cfg-max-file-size').value = s.max_file_size_mb || 250;
         
         // Performance tab
         document.getElementById('cfg-concurrent-tts-workers').value = s.concurrent_tts_workers || 3;
