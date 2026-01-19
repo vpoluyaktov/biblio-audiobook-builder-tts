@@ -1194,6 +1194,7 @@ class App {
         document.getElementById('cfg-tts-workers-espeak').value = providerWorkers.espeak || defaultWorkers;
         document.getElementById('cfg-tts-workers-opentts').value = providerWorkers.opentts || defaultWorkers;
         document.getElementById('cfg-tts-workers-rhvoice').value = providerWorkers.rhvoice || defaultWorkers;
+        document.getElementById('cfg-tts-workers-silero').value = providerWorkers.silero || defaultWorkers;
         document.getElementById('cfg-tts-workers-openai').value = providerWorkers.openai || defaultWorkers;
         document.getElementById('cfg-tts-workers-google').value = providerWorkers.google || defaultWorkers;
         document.getElementById('cfg-tts-workers-azure').value = providerWorkers.azure || defaultWorkers;
@@ -1250,6 +1251,7 @@ class App {
                 espeak: parseInt(document.getElementById('cfg-tts-workers-espeak').value),
                 opentts: parseInt(document.getElementById('cfg-tts-workers-opentts').value),
                 rhvoice: parseInt(document.getElementById('cfg-tts-workers-rhvoice').value),
+                silero: parseInt(document.getElementById('cfg-tts-workers-silero').value),
                 openai: parseInt(document.getElementById('cfg-tts-workers-openai').value),
                 google: parseInt(document.getElementById('cfg-tts-workers-google').value),
                 azure: parseInt(document.getElementById('cfg-tts-workers-azure').value)
