@@ -522,3 +522,78 @@ func (s *Server) handleTestRHVoice(w http.ResponseWriter, r *http.Request) {
 		"voice_count": len(serverInfo.SupportVoices),
 	})
 }
+
+// TestSileroRequest represents the test connection request for Silero
+type TestSileroRequest struct {
+	URL string `json:"url"`
+}
+
+// handleTestSilero tests connection to Silero TTS server
+func (s *Server) handleTestSilero(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.handleCORS(w)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req TestSileroRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.URL == "" {
+		s.jsonError(w, http.StatusBadRequest, "Server URL is required")
+		return
+	}
+
+	// Test connection by fetching health endpoint
+	client := &http.Client{}
+	resp, err := client.Get(req.URL + "/health")
+	if err != nil {
+		s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Connection failed: %v", err),
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Server returned status %d", resp.StatusCode),
+		})
+		return
+	}
+
+	// Fetch voices to get count
+	voicesResp, err := client.Get(req.URL + "/api/voices")
+	if err != nil {
+		s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+			"success":     true,
+			"voice_count": 0,
+		})
+		return
+	}
+	defer voicesResp.Body.Close()
+
+	// Parse voices map to get count
+	var voicesMap map[string]interface{}
+	if err := json.NewDecoder(voicesResp.Body).Decode(&voicesMap); err != nil {
+		s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+			"success":     true,
+			"voice_count": 0,
+		})
+		return
+	}
+
+	s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"success":     true,
+		"voice_count": len(voicesMap),
+	})
+}

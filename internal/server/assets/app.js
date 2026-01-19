@@ -122,6 +122,8 @@ class App {
         this.openTTSConnectionResult = document.getElementById('opentts-connection-result');
         this.testRHVoiceBtn = document.getElementById('test-rhvoice-connection');
         this.rhvoiceConnectionResult = document.getElementById('rhvoice-connection-result');
+        this.testSileroBtn = document.getElementById('test-silero-connection');
+        this.sileroConnectionResult = document.getElementById('silero-connection-result');
 
         // Main tab elements
         this.mainTabs = document.querySelectorAll('.main-tab');
@@ -224,6 +226,11 @@ class App {
         // Test RHVoice connection
         if (this.testRHVoiceBtn) {
             this.testRHVoiceBtn.addEventListener('click', () => this.testRHVoiceConnection());
+        }
+
+        // Test Silero connection
+        if (this.testSileroBtn) {
+            this.testSileroBtn.addEventListener('click', () => this.testSileroConnection());
         }
 
         // Test Voice Modal events
@@ -1203,6 +1210,9 @@ class App {
         // RHVoice tab
         document.getElementById('cfg-rhvoice-url').value = s.rhvoice_url || '';
         
+        // Silero tab
+        document.getElementById('cfg-silero-url').value = s.silero_url || '';
+        
         // Audiobookshelf tab
         document.getElementById('cfg-abs-url').value = s.audiobookshelf_url || '';
         document.getElementById('cfg-abs-user').value = s.audiobookshelf_user || 'admin';
@@ -1256,6 +1266,9 @@ class App {
             
             // RHVoice
             rhvoice_url: document.getElementById('cfg-rhvoice-url').value,
+            
+            // Silero
+            silero_url: document.getElementById('cfg-silero-url').value,
             
             // Audiobookshelf
             audiobookshelf_url: document.getElementById('cfg-abs-url').value,
@@ -1392,6 +1405,40 @@ class App {
         } catch (e) {
             this.rhvoiceConnectionResult.textContent = '❌ ' + e.message;
             this.rhvoiceConnectionResult.className = 'connection-result error';
+        }
+    }
+
+    async testSileroConnection() {
+        const url = document.getElementById('cfg-silero-url').value;
+
+        if (!url) {
+            this.sileroConnectionResult.textContent = '❌ Please enter a server URL';
+            this.sileroConnectionResult.className = 'connection-result error';
+            return;
+        }
+
+        this.sileroConnectionResult.textContent = '⏳ Testing...';
+        this.sileroConnectionResult.className = 'connection-result';
+
+        try {
+            const response = await fetch('/api/settings/test-silero', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                this.sileroConnectionResult.textContent = `✅ Connected! ${data.voice_count} voices available`;
+                this.sileroConnectionResult.className = 'connection-result success';
+            } else {
+                this.sileroConnectionResult.textContent = '❌ ' + (data.error || 'Connection failed');
+                this.sileroConnectionResult.className = 'connection-result error';
+            }
+        } catch (e) {
+            this.sileroConnectionResult.textContent = '❌ ' + e.message;
+            this.sileroConnectionResult.className = 'connection-result error';
         }
     }
 

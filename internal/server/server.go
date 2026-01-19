@@ -182,6 +182,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/settings/test-audiobookshelf", s.handleTestAudiobookshelf)
 	mux.HandleFunc("/api/settings/test-opentts", s.handleTestOpenTTS)
 	mux.HandleFunc("/api/settings/test-rhvoice", s.handleTestRHVoice)
+	mux.HandleFunc("/api/settings/test-silero", s.handleTestSilero)
 	mux.HandleFunc("/api/test-voice", s.handleTestVoice)
 	mux.HandleFunc("/api/ws", func(w http.ResponseWriter, r *http.Request) {
 		ServeWS(s.hub, w, r)

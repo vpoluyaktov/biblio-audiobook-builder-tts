@@ -46,6 +46,9 @@ type Config struct {
 	// RHVoice settings
 	RHVoiceURL string `mapstructure:"rhvoice_url"` // RHVoice REST server URL (e.g., http://localhost:8080)
 
+	// Silero TTS settings
+	SileroURL string `mapstructure:"silero_url"` // Silero TTS server URL (e.g., http://localhost:5555)
+
 	// OpenAI TTS settings
 	OpenAIAPIKey string `mapstructure:"openai_api_key"` // OpenAI API key for TTS
 
@@ -99,6 +102,9 @@ func Load(configFile string) (*Config, error) {
 
 	// RHVoice settings
 	viper.SetDefault("rhvoice_url", "")
+
+	// Silero TTS settings
+	viper.SetDefault("silero_url", "")
 
 	// OpenAI TTS settings
 	viper.SetDefault("openai_api_key", "")
@@ -196,7 +202,7 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 	}
 	// Load per-provider TTS workers
 	cfg.ProviderTTSWorkers = make(map[string]int)
-	providers := []string{"espeak", "google", "opentts", "rhvoice", "openai", "azure"}
+	providers := []string{"espeak", "google", "opentts", "rhvoice", "silero", "openai", "azure"}
 	for _, p := range providers {
 		key := "tts_workers_" + p
 		if v, ok := dbConfig[key].(float64); ok {
@@ -227,6 +233,9 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 	}
 	if v, ok := dbConfig["rhvoice_url"].(string); ok {
 		cfg.RHVoiceURL = v
+	}
+	if v, ok := dbConfig["silero_url"].(string); ok {
+		cfg.SileroURL = v
 	}
 	if v, ok := dbConfig["openai_api_key"].(string); ok {
 		cfg.OpenAIAPIKey = v

@@ -74,6 +74,14 @@ func NewService(cfg *config.Config) Service {
 		logger.Debug("RHVoice URL not configured, skipping RHVoice provider")
 	}
 
+	// Initialize Silero TTS if URL is configured
+	if cfg.SileroURL != "" {
+		logger.Debug("Initializing Silero TTS provider with URL: %s", cfg.SileroURL)
+		s.providers["silero"] = NewSileroProvider(cfg.SileroURL)
+	} else {
+		logger.Debug("Silero URL not configured, skipping Silero provider")
+	}
+
 	// Initialize OpenAI TTS if API key is configured
 	if cfg.OpenAIAPIKey != "" {
 		logger.Debug("Initializing OpenAI TTS provider")
@@ -183,6 +191,11 @@ func (s *service) GetVoicesFiltered(providerName, language, model string) []Voic
 			return rp.GetVoicesFiltered(language, model)
 		}
 
+		// Check if provider supports filtering (SileroProvider does)
+		if sp, ok := provider.(*SileroProvider); ok {
+			return sp.GetVoicesFiltered(language, model)
+		}
+
 		// For other providers, get all voices and filter manually
 		allVoices := provider.GetAvailableVoices()
 		for _, v := range allVoices {
@@ -248,6 +261,11 @@ func (s *service) GetAvailableLanguages(providerName string) []string {
 			return rp.GetAvailableLanguages()
 		}
 
+		// Check if provider has GetAvailableLanguages method (Silero)
+		if sp, ok := provider.(*SileroProvider); ok {
+			return sp.GetAvailableLanguages()
+		}
+
 		// For other providers, extract from voices
 		for _, v := range provider.GetAvailableVoices() {
 			langMap[v.Language] = true
@@ -303,6 +321,11 @@ func (s *service) GetAvailableModels(providerName string) []string {
 			return rp.GetAvailableModels()
 		}
 
+		// Check if provider is Silero - use models
+		if sp, ok := provider.(*SileroProvider); ok {
+			return sp.GetAvailableModels()
+		}
+
 		// For other providers, extract from voices
 		for _, v := range provider.GetAvailableVoices() {
 			model := extractModelType(v.ID)
@@ -349,6 +372,11 @@ func (s *service) ReloadProviders() {
 	// Initialize RHVoice if URL is configured
 	if s.cfg.RHVoiceURL != "" {
 		s.providers["rhvoice"] = NewRHVoiceProvider(s.cfg.RHVoiceURL)
+	}
+
+	// Initialize Silero TTS if URL is configured
+	if s.cfg.SileroURL != "" {
+		s.providers["silero"] = NewSileroProvider(s.cfg.SileroURL)
 	}
 
 	// Initialize OpenAI TTS if API key is configured
