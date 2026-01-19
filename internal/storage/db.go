@@ -61,6 +61,9 @@ type Config struct {
 	// RHVoice settings
 	RHVoiceURL string `json:"rhvoice_url"`
 
+	// Silero TTS settings
+	SileroURL string `json:"silero_url"`
+
 	// OpenAI TTS settings
 	OpenAIAPIKey string `json:"openai_api_key"`
 
@@ -310,7 +313,7 @@ func (db *DB) GetAllConfig() (*Config, error) {
 	}
 	// Load per-provider TTS workers
 	cfg.ProviderTTSWorkers = make(map[string]int)
-	providers := []string{"espeak", "google", "opentts", "rhvoice", "openai", "azure"}
+	providers := []string{"espeak", "google", "opentts", "rhvoice", "silero", "openai", "azure"}
 	for _, p := range providers {
 		if v, ok := configMap["tts_workers_"+p]; ok {
 			var workers int
@@ -338,6 +341,9 @@ func (db *DB) GetAllConfig() (*Config, error) {
 	}
 	if v, ok := configMap["rhvoice_url"]; ok {
 		cfg.RHVoiceURL = v
+	}
+	if v, ok := configMap["silero_url"]; ok {
+		cfg.SileroURL = v
 	}
 	if v, ok := configMap["openai_api_key"]; ok {
 		cfg.OpenAIAPIKey = v
@@ -891,6 +897,7 @@ func (c *Config) ToAppConfig() map[string]interface{} {
 		"google_api_key":            c.GoogleAPIKey,
 		"opentts_url":               c.OpenTTSURL,
 		"rhvoice_url":               c.RHVoiceURL,
+		"silero_url":                c.SileroURL,
 		"openai_api_key":            c.OpenAIAPIKey,
 		"azure_tts_key":             c.AzureTTSKey,
 		"azure_tts_region":          c.AzureTTSRegion,
