@@ -51,6 +51,9 @@ type SettingsRequest struct {
 	// RHVoice
 	RHVoiceURL string `json:"rhvoice_url"`
 
+	// Silero
+	SileroURL string `json:"silero_url"`
+
 	// Audiobookshelf
 	AudiobookshelfURL      string `json:"audiobookshelf_url"`
 	AudiobookshelfUser     string `json:"audiobookshelf_user"`
@@ -116,6 +119,9 @@ func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
 
 		// RHVoice
 		RHVoiceURL: s.cfg.RHVoiceURL,
+
+		// Silero
+		SileroURL: s.cfg.SileroURL,
 
 		// Audiobookshelf
 		AudiobookshelfURL:      s.cfg.AudiobookshelfURL,
@@ -252,6 +258,11 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 		s.cfg.RHVoiceURL = req.RHVoiceURL
 	}
 
+	// Silero
+	if wasProvided("silero_url") {
+		s.cfg.SileroURL = req.SileroURL
+	}
+
 	// Audiobookshelf
 	if wasProvided("audiobookshelf_url") {
 		s.cfg.AudiobookshelfURL = req.AudiobookshelfURL
@@ -300,6 +311,7 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 			"azure_tts_region":          {req.AzureTTSRegion, wasProvided("azure_tts_region")},
 			"opentts_url":               {req.OpenTTSURL, wasProvided("opentts_url")},
 			"rhvoice_url":               {req.RHVoiceURL, wasProvided("rhvoice_url")},
+			"silero_url":                {req.SileroURL, wasProvided("silero_url")},
 		}
 
 		for key, cfg := range configs {
