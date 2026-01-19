@@ -446,7 +446,8 @@ class App {
     async loadModels() {
         try {
             const provider = this.providerSelect.value;
-            const response = await fetch(`/api/models?provider=${provider}`);
+            const language = this.languageSelect.value;
+            const response = await fetch(`/api/models?provider=${provider}&language=${language}`);
             const data = await response.json();
             const models = data.models || [];
 
