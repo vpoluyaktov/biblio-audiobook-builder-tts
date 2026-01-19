@@ -163,10 +163,18 @@ func (p *SileroProvider) GetAvailableLanguages() []string {
 
 // GetAvailableModels returns available Silero models
 func (p *SileroProvider) GetAvailableModels() []string {
+	return p.GetModelsForLanguage("")
+}
+
+// GetModelsForLanguage returns models filtered by language
+func (p *SileroProvider) GetModelsForLanguage(language string) []string {
 	modelMap := make(map[string]bool)
 	for _, v := range p.voicesMap {
 		if v.ModelID != "" {
-			modelMap[v.ModelID] = true
+			// Filter by language if specified
+			if language == "" || v.Language == language {
+				modelMap[v.ModelID] = true
+			}
 		}
 	}
 

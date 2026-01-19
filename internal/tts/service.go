@@ -15,7 +15,7 @@ type Service interface {
 	GetAvailableVoices() []Voice
 	GetVoicesFiltered(provider, language, model string) []Voice
 	GetAvailableLanguages(provider string) []string
-	GetAvailableModels(provider string) []string
+	GetAvailableModels(provider, language string) []string
 	GetAvailableProviders() []string
 	GetAdapter(providerName string) (*Adapter, error)
 	ReloadProviders()
@@ -287,7 +287,7 @@ func (s *service) GetAvailableLanguages(providerName string) []string {
 }
 
 // GetAvailableModels returns available model types for a provider
-func (s *service) GetAvailableModels(providerName string) []string {
+func (s *service) GetAvailableModels(providerName, language string) []string {
 	modelMap := make(map[string]bool)
 
 	if providerName != "" {
@@ -321,9 +321,9 @@ func (s *service) GetAvailableModels(providerName string) []string {
 			return rp.GetAvailableModels()
 		}
 
-		// Check if provider is Silero - use models
+		// Check if provider is Silero - use models filtered by language
 		if sp, ok := provider.(*SileroProvider); ok {
-			return sp.GetAvailableModels()
+			return sp.GetModelsForLanguage(language)
 		}
 
 		// For other providers, extract from voices

@@ -663,7 +663,8 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 	}
 
 	provider := r.URL.Query().Get("provider")
-	models := s.ttsService.GetAvailableModels(provider)
+	language := r.URL.Query().Get("language")
+	models := s.ttsService.GetAvailableModels(provider, language)
 
 	s.jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"models": models,
