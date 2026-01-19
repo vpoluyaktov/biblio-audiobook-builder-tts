@@ -90,7 +90,7 @@ func TestService_GetAvailableModels_OpenTTS(t *testing.T) {
 	}
 
 	svc := NewService(cfg)
-	models := svc.GetAvailableModels("opentts")
+	models := svc.GetAvailableModels("opentts", "")
 
 	// Should return unique engine names
 	if len(models) != 4 {
