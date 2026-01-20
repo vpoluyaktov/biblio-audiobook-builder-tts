@@ -513,3 +513,53 @@ func TestRussianOrdinalSuffixes(t *testing.T) {
 		})
 	}
 }
+
+func TestRussianDateFormat(t *testing.T) {
+	p := NewProcessor()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "day of March",
+			input:    "25 марта",
+			expected: "двадцать пятое марта",
+		},
+		{
+			name:     "day of January",
+			input:    "1 января",
+			expected: "первое января",
+		},
+		{
+			name:     "day of December",
+			input:    "31 декабря",
+			expected: "тридцать первое декабря",
+		},
+		{
+			name:     "full date with year",
+			input:    "25 марта 1996 года",
+			expected: "двадцать пятое марта одна тысяча девятьсот девяносто шестого года",
+		},
+		{
+			name:     "date in sentence",
+			input:    "Это случилось 10 мая",
+			expected: "Это случилось десятое мая",
+		},
+		{
+			name:     "year nominative",
+			input:    "1996 год",
+			expected: "одна тысяча девятьсот девяносто шестой год",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := p.Process(tt.input, "ru")
+			if result != tt.expected {
+				t.Errorf("Process(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}

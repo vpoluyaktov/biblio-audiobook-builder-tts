@@ -34,10 +34,6 @@ func (p *Processor) GetNounDatabase() *NounDatabase {
 // numberPattern matches integers (with optional leading minus sign)
 var numberPattern = regexp.MustCompile(`-?\d+`)
 
-// russianOrdinalSuffixPattern matches Russian ordinal suffixes after numbers
-// e.g., "1996-м", "1996-го", "1996-й", "1996-я", "1996-е", "1996-ом", "1996-ым"
-var russianOrdinalSuffixPattern = regexp.MustCompile(`(\d+)-([мгйяеыо][оаяу|мй]?|ого|ему|ым|ом|ой|ую|ая|ое|ые|ых|ым|ыми)`)
-
 // Process replaces numbers in text with words based on the language.
 // It uses context (surrounding words) to determine cardinal/ordinal form and gender.
 func (p *Processor) Process(text, lang string) string {
@@ -86,6 +82,11 @@ func (p *Processor) Process(text, lang string) string {
 		// Convert number to words
 		words := converter.ToWords(n, ctx)
 
+		// Apply case transformation for Russian ordinals
+		if lang == "ru" && ctx.Form == Ordinal && ctx.Case != Nominative {
+			words = TransformOrdinalCase(words, ctx.Case, ctx.Gender)
+		}
+
 		// Replace in result
 		result = result[:start] + words + result[end:]
 	}
@@ -96,7 +97,7 @@ func (p *Processor) Process(text, lang string) string {
 // processRussianOrdinalSuffixes handles Russian numbers with ordinal suffixes like "1996-м"
 func (p *Processor) processRussianOrdinalSuffixes(text string, converter NumberConverter) string {
 	// Find all matches from end to start
-	matches := russianOrdinalSuffixPattern.FindAllStringSubmatchIndex(text, -1)
+	matches := RussianOrdinalSuffixPattern.FindAllStringSubmatchIndex(text, -1)
 	if len(matches) == 0 {
 		return text
 	}
@@ -117,7 +118,7 @@ func (p *Processor) processRussianOrdinalSuffixes(text string, converter NumberC
 		}
 
 		// Determine gender from suffix
-		gender := p.genderFromRussianSuffix(suffix)
+		gender := GenderFromSuffix(suffix)
 
 		ctx := Context{
 			Form:   Ordinal,
@@ -129,191 +130,13 @@ func (p *Processor) processRussianOrdinalSuffixes(text string, converter NumberC
 		words := converter.ToWords(n, ctx)
 
 		// Apply case ending transformation based on suffix
-		words = p.applyRussianCaseEnding(words, suffix, gender)
+		words = TransformBySuffix(words, suffix, gender)
 
 		// Replace the entire match (number + hyphen + suffix) with the ordinal word
 		result = result[:fullStart] + words + result[fullEnd:]
 	}
 
 	return result
-}
-
-// genderFromRussianSuffix determines grammatical gender from Russian ordinal suffix
-func (p *Processor) genderFromRussianSuffix(suffix string) Gender {
-	suffix = strings.ToLower(suffix)
-	switch suffix {
-	case "й", "го", "ого", "ему", "ым", "ом", "м":
-		return Masculine
-	case "я", "ую", "ая", "ей", "ою":
-		return Feminine
-	case "е", "ое":
-		return Neuter
-	default:
-		return Masculine
-	}
-}
-
-// applyRussianCaseEnding transforms nominative ordinal ending to the appropriate case
-func (p *Processor) applyRussianCaseEnding(words, suffix string, gender Gender) string {
-	suffix = strings.ToLower(suffix)
-
-	// Map suffix to case ending transformation
-	// The converter outputs nominative case, we need to transform the last word's ending
-	wordList := strings.Split(words, " ")
-	if len(wordList) == 0 {
-		return words
-	}
-
-	lastWord := wordList[len(wordList)-1]
-	var newEnding string
-
-	switch suffix {
-	// Genitive case (родительный падеж)
-	case "го", "ого":
-		newEnding = p.transformToGenitive(lastWord, gender)
-	// Dative case (дательный падеж)
-	case "ему", "ому":
-		newEnding = p.transformToDative(lastWord, gender)
-	// Instrumental case (творительный падеж)
-	case "ым", "им":
-		newEnding = p.transformToInstrumental(lastWord, gender)
-	// Prepositional case (предложный падеж)
-	case "м", "ом":
-		newEnding = p.transformToPrepositional(lastWord, gender)
-	// Accusative feminine (винительный падеж)
-	case "ую":
-		newEnding = p.transformToAccusativeFem(lastWord)
-	default:
-		// Nominative - no change needed
-		return words
-	}
-
-	if newEnding != "" {
-		wordList[len(wordList)-1] = newEnding
-		return strings.Join(wordList, " ")
-	}
-	return words
-}
-
-// transformToGenitive transforms nominative ordinal to genitive case
-func (p *Processor) transformToGenitive(word string, gender Gender) string {
-	// Masculine/Neuter: -ый/-ий/-ой -> -ого, -ий -> -ьего (for третий)
-	// Feminine: -ая/-яя -> -ой/-ей
-	if gender == Feminine {
-		if strings.HasSuffix(word, "ая") {
-			return strings.TrimSuffix(word, "ая") + "ой"
-		}
-		if strings.HasSuffix(word, "яя") {
-			return strings.TrimSuffix(word, "яя") + "ей"
-		}
-		if strings.HasSuffix(word, "ья") {
-			return strings.TrimSuffix(word, "ья") + "ьей"
-		}
-	} else {
-		if strings.HasSuffix(word, "ий") {
-			// Special case for третий -> третьего
-			if word == "третий" {
-				return "третьего"
-			}
-			return strings.TrimSuffix(word, "ий") + "ьего"
-		}
-		if strings.HasSuffix(word, "ый") {
-			return strings.TrimSuffix(word, "ый") + "ого"
-		}
-		if strings.HasSuffix(word, "ой") {
-			return strings.TrimSuffix(word, "ой") + "ого"
-		}
-	}
-	return word
-}
-
-// transformToDative transforms nominative ordinal to dative case
-func (p *Processor) transformToDative(word string, gender Gender) string {
-	if gender == Feminine {
-		if strings.HasSuffix(word, "ая") {
-			return strings.TrimSuffix(word, "ая") + "ой"
-		}
-		if strings.HasSuffix(word, "яя") {
-			return strings.TrimSuffix(word, "яя") + "ей"
-		}
-	} else {
-		if strings.HasSuffix(word, "ий") {
-			if word == "третий" {
-				return "третьему"
-			}
-			return strings.TrimSuffix(word, "ий") + "ьему"
-		}
-		if strings.HasSuffix(word, "ый") {
-			return strings.TrimSuffix(word, "ый") + "ому"
-		}
-		if strings.HasSuffix(word, "ой") {
-			return strings.TrimSuffix(word, "ой") + "ому"
-		}
-	}
-	return word
-}
-
-// transformToInstrumental transforms nominative ordinal to instrumental case
-func (p *Processor) transformToInstrumental(word string, gender Gender) string {
-	if gender == Feminine {
-		if strings.HasSuffix(word, "ая") {
-			return strings.TrimSuffix(word, "ая") + "ой"
-		}
-		if strings.HasSuffix(word, "яя") {
-			return strings.TrimSuffix(word, "яя") + "ей"
-		}
-	} else {
-		if strings.HasSuffix(word, "ий") {
-			if word == "третий" {
-				return "третьим"
-			}
-			return strings.TrimSuffix(word, "ий") + "ьим"
-		}
-		if strings.HasSuffix(word, "ый") {
-			return strings.TrimSuffix(word, "ый") + "ым"
-		}
-		if strings.HasSuffix(word, "ой") {
-			return strings.TrimSuffix(word, "ой") + "ым"
-		}
-	}
-	return word
-}
-
-// transformToPrepositional transforms nominative ordinal to prepositional case
-func (p *Processor) transformToPrepositional(word string, gender Gender) string {
-	if gender == Feminine {
-		if strings.HasSuffix(word, "ая") {
-			return strings.TrimSuffix(word, "ая") + "ой"
-		}
-		if strings.HasSuffix(word, "яя") {
-			return strings.TrimSuffix(word, "яя") + "ей"
-		}
-	} else {
-		if strings.HasSuffix(word, "ий") {
-			if word == "третий" {
-				return "третьем"
-			}
-			return strings.TrimSuffix(word, "ий") + "ьем"
-		}
-		if strings.HasSuffix(word, "ый") {
-			return strings.TrimSuffix(word, "ый") + "ом"
-		}
-		if strings.HasSuffix(word, "ой") {
-			return strings.TrimSuffix(word, "ой") + "ом"
-		}
-	}
-	return word
-}
-
-// transformToAccusativeFem transforms nominative feminine ordinal to accusative case
-func (p *Processor) transformToAccusativeFem(word string) string {
-	if strings.HasSuffix(word, "ая") {
-		return strings.TrimSuffix(word, "ая") + "ую"
-	}
-	if strings.HasSuffix(word, "яя") {
-		return strings.TrimSuffix(word, "яя") + "юю"
-	}
-	return word
 }
 
 // detectContext analyzes surrounding text to determine grammatical context.
@@ -326,23 +149,48 @@ func (p *Processor) detectContext(text string, numStart, numEnd int, lang string
 	// Extract word after the number
 	wordAfter := p.extractWordAfter(text, numEnd)
 
-	// Check if word before is a known noun (e.g., "Chapter 5", "Глава 5")
-	// In this pattern, the noun comes first, so we use its trigger form
+	// Check word before - handles patterns like "Chapter 5", "Глава 5"
+	// where the noun before determines the number's form (usually ordinal)
+	// Skip if word before is a Russian month (doesn't affect following number)
 	if wordBefore != "" {
-		if info, ok := p.nounDB.Lookup(lang, wordBefore); ok {
+		if lang == "ru" && IsRussianMonth(strings.ToLower(wordBefore)) {
+			// Month before number doesn't affect it (e.g., "марта 1996")
+			// Fall through to check word after
+		} else if info, ok := p.nounDB.Lookup(lang, wordBefore); ok {
 			ctx.Form = info.TriggerForm
 			ctx.Gender = info.Gender
 			return ctx
 		}
 	}
 
-	// Check if word after is a known noun (e.g., "5 dollars", "5 рублей")
-	// In this pattern, the number comes first, so we always use cardinal form
-	// regardless of the noun's trigger form (e.g., "15 страниц" = "fifteen pages", not "fifteenth pages")
+	// Check word after - handles patterns like "5 dollars", "5 рублей", "25 марта"
 	if wordAfter != "" {
 		if info, ok := p.nounDB.Lookup(lang, wordAfter); ok {
-			ctx.Form = Cardinal // Always cardinal when number precedes noun
 			ctx.Gender = info.Gender
+
+			if lang == "ru" {
+				// Russian-specific logic for dates and years
+				lowerWord := strings.ToLower(wordAfter)
+				if IsRussianMonth(lowerWord) {
+					// Dates: "25 марта" → ordinal neuter
+					ctx.Form = Ordinal
+					return ctx
+				} else if lowerWord == "год" {
+					// Year nominative: "1996 год" → ordinal masculine
+					ctx.Form = Ordinal
+					ctx.Gender = Masculine
+					return ctx
+				} else if lowerWord == "года" {
+					// Year genitive: "1996 года" → ordinal masculine genitive
+					ctx.Form = Ordinal
+					ctx.Gender = Masculine
+					ctx.Case = Genitive
+					return ctx
+				}
+			}
+
+			// Default for quantities: cardinal
+			ctx.Form = Cardinal
 			return ctx
 		}
 	}

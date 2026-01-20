@@ -1,6 +1,7 @@
 package normalize
 
 import (
+	"regexp"
 	"strings"
 )
 
@@ -87,6 +88,231 @@ var scaleOrdinalRU = map[Gender][]string{
 
 func init() {
 	Register(&RussianConverter{})
+}
+
+// RussianOrdinalSuffixPattern matches Russian ordinal suffixes after numbers
+// e.g., "1996-м", "1996-го", "1996-й", "1996-я", "1996-е", "1996-ом", "1996-ым"
+var RussianOrdinalSuffixPattern = regexp.MustCompile(`(\d+)-([мгйяеыо][оаяу|мй]?|ого|ему|ым|ом|ой|ую|ая|ое|ые|ых|ым|ыми)`)
+
+// GenderFromSuffix determines grammatical gender from Russian ordinal suffix
+func GenderFromSuffix(suffix string) Gender {
+	suffix = strings.ToLower(suffix)
+	switch suffix {
+	case "й", "го", "ого", "ему", "ым", "ом", "м":
+		return Masculine
+	case "я", "ую", "ая", "ей", "ою":
+		return Feminine
+	case "е", "ое":
+		return Neuter
+	default:
+		return Masculine
+	}
+}
+
+// DetectCase detects grammatical case from Russian word ending
+func DetectCase(word string) Case {
+	word = strings.ToLower(word)
+	// Genitive case for year ordinals: "года" (but not "лет" which is for quantities)
+	if word == "года" {
+		return Genitive
+	}
+	return Nominative
+}
+
+// IsRussianMonth checks if the word is a Russian month name (in genitive form)
+func IsRussianMonth(word string) bool {
+	word = strings.ToLower(word)
+	months := map[string]bool{
+		"января": true, "февраля": true, "марта": true, "апреля": true,
+		"мая": true, "июня": true, "июля": true, "августа": true,
+		"сентября": true, "октября": true, "ноября": true, "декабря": true,
+	}
+	return months[word]
+}
+
+// TransformOrdinalCase transforms nominative ordinal to target case
+func TransformOrdinalCase(words string, targetCase Case, gender Gender) string {
+	wordList := strings.Split(words, " ")
+	if len(wordList) == 0 {
+		return words
+	}
+
+	lastWord := wordList[len(wordList)-1]
+	var newWord string
+
+	switch targetCase {
+	case Genitive:
+		newWord = transformToGenitive(lastWord, gender)
+	case Dative:
+		newWord = transformToDative(lastWord, gender)
+	case Instrumental:
+		newWord = transformToInstrumental(lastWord, gender)
+	case Prepositional:
+		newWord = transformToPrepositional(lastWord, gender)
+	case Accusative:
+		if gender == Feminine {
+			newWord = transformToAccusativeFem(lastWord)
+		} else {
+			return words
+		}
+	default:
+		return words
+	}
+
+	if newWord != "" && newWord != lastWord {
+		wordList[len(wordList)-1] = newWord
+		return strings.Join(wordList, " ")
+	}
+	return words
+}
+
+// TransformBySuffix transforms nominative ordinal based on explicit suffix
+func TransformBySuffix(words, suffix string, gender Gender) string {
+	suffix = strings.ToLower(suffix)
+	wordList := strings.Split(words, " ")
+	if len(wordList) == 0 {
+		return words
+	}
+
+	lastWord := wordList[len(wordList)-1]
+	var newWord string
+
+	switch suffix {
+	case "го", "ого":
+		newWord = transformToGenitive(lastWord, gender)
+	case "ему", "ому":
+		newWord = transformToDative(lastWord, gender)
+	case "ым", "им":
+		newWord = transformToInstrumental(lastWord, gender)
+	case "м", "ом":
+		newWord = transformToPrepositional(lastWord, gender)
+	case "ую":
+		newWord = transformToAccusativeFem(lastWord)
+	default:
+		return words
+	}
+
+	if newWord != "" && newWord != lastWord {
+		wordList[len(wordList)-1] = newWord
+		return strings.Join(wordList, " ")
+	}
+	return words
+}
+
+func transformToGenitive(word string, gender Gender) string {
+	if gender == Feminine {
+		if strings.HasSuffix(word, "ая") {
+			return strings.TrimSuffix(word, "ая") + "ой"
+		}
+		if strings.HasSuffix(word, "яя") {
+			return strings.TrimSuffix(word, "яя") + "ей"
+		}
+		if strings.HasSuffix(word, "ья") {
+			return strings.TrimSuffix(word, "ья") + "ьей"
+		}
+	} else {
+		if strings.HasSuffix(word, "ий") {
+			if word == "третий" {
+				return "третьего"
+			}
+			return strings.TrimSuffix(word, "ий") + "ьего"
+		}
+		if strings.HasSuffix(word, "ый") {
+			return strings.TrimSuffix(word, "ый") + "ого"
+		}
+		if strings.HasSuffix(word, "ой") {
+			return strings.TrimSuffix(word, "ой") + "ого"
+		}
+		if strings.HasSuffix(word, "ое") {
+			return strings.TrimSuffix(word, "ое") + "ого"
+		}
+	}
+	return word
+}
+
+func transformToDative(word string, gender Gender) string {
+	if gender == Feminine {
+		if strings.HasSuffix(word, "ая") {
+			return strings.TrimSuffix(word, "ая") + "ой"
+		}
+		if strings.HasSuffix(word, "яя") {
+			return strings.TrimSuffix(word, "яя") + "ей"
+		}
+	} else {
+		if strings.HasSuffix(word, "ий") {
+			if word == "третий" {
+				return "третьему"
+			}
+			return strings.TrimSuffix(word, "ий") + "ьему"
+		}
+		if strings.HasSuffix(word, "ый") {
+			return strings.TrimSuffix(word, "ый") + "ому"
+		}
+		if strings.HasSuffix(word, "ой") {
+			return strings.TrimSuffix(word, "ой") + "ому"
+		}
+	}
+	return word
+}
+
+func transformToInstrumental(word string, gender Gender) string {
+	if gender == Feminine {
+		if strings.HasSuffix(word, "ая") {
+			return strings.TrimSuffix(word, "ая") + "ой"
+		}
+		if strings.HasSuffix(word, "яя") {
+			return strings.TrimSuffix(word, "яя") + "ей"
+		}
+	} else {
+		if strings.HasSuffix(word, "ий") {
+			if word == "третий" {
+				return "третьим"
+			}
+			return strings.TrimSuffix(word, "ий") + "ьим"
+		}
+		if strings.HasSuffix(word, "ый") {
+			return strings.TrimSuffix(word, "ый") + "ым"
+		}
+		if strings.HasSuffix(word, "ой") {
+			return strings.TrimSuffix(word, "ой") + "ым"
+		}
+	}
+	return word
+}
+
+func transformToPrepositional(word string, gender Gender) string {
+	if gender == Feminine {
+		if strings.HasSuffix(word, "ая") {
+			return strings.TrimSuffix(word, "ая") + "ой"
+		}
+		if strings.HasSuffix(word, "яя") {
+			return strings.TrimSuffix(word, "яя") + "ей"
+		}
+	} else {
+		if strings.HasSuffix(word, "ий") {
+			if word == "третий" {
+				return "третьем"
+			}
+			return strings.TrimSuffix(word, "ий") + "ьем"
+		}
+		if strings.HasSuffix(word, "ый") {
+			return strings.TrimSuffix(word, "ый") + "ом"
+		}
+		if strings.HasSuffix(word, "ой") {
+			return strings.TrimSuffix(word, "ой") + "ом"
+		}
+	}
+	return word
+}
+
+func transformToAccusativeFem(word string) string {
+	if strings.HasSuffix(word, "ая") {
+		return strings.TrimSuffix(word, "ая") + "ую"
+	}
+	if strings.HasSuffix(word, "яя") {
+		return strings.TrimSuffix(word, "яя") + "юю"
+	}
+	return word
 }
 
 // LanguageCode returns the ISO 639-1 language code.
