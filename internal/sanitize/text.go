@@ -427,8 +427,8 @@ func GetDefaultRules() []struct {
 		{`(?i)\blinux\b`, "Linux", "Linux pronunciation"},
 		{`(?i)\bgithub\b`, "GitHub", "GitHub pronunciation"},
 
-		// Clean up multiple spaces
-		{`\s+`, " ", "Normalize whitespace"},
+		// Clean up multiple spaces (preserve newlines for paragraph breaks)
+		{`[ \t]+`, " ", "Normalize horizontal whitespace"},
 	}
 }
 

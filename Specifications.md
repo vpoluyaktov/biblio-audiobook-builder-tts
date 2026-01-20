@@ -1724,6 +1724,31 @@ lint: fmt vet
 
 ## Changelog
 
+### v0.1.1 (2026-01-20)
+
+#### Bug Fix: Line Breaks Lost in Output Text Files
+
+**Problem**: Text files produced by the parser, sanitizer, and normalizer were losing all line breaks. Original ebook paragraphs (e.g., `<p>` tags in FB2 files) were being merged into a single long line in the output `.txt` files.
+
+**Root Cause**: The default pronunciation rule in `internal/sanitize/text.go` used the regex pattern `\s+` to normalize whitespace. This pattern matches ALL whitespace characters including newlines (`\n`), replacing them with a single space and destroying paragraph structure.
+
+**Location**: `internal/sanitize/text.go`, function `GetDefaultRules()`, line ~431
+
+**Fix**: Changed the regex pattern from `\s+` to `[ \t]+` to only match horizontal whitespace (spaces and tabs), preserving newlines for paragraph breaks.
+
+**Implementation**:
+- [x] Investigate parser (`internal/parser/fb2.go`) - correctly adds `\n\n` for `</p>` tags
+- [x] Investigate sanitizer (`internal/sanitize/text.go`) - `TextForTTS()` preserves newlines correctly
+- [x] Investigate default pronunciation rules - **found the bug** in `GetDefaultRules()`
+- [x] Fix: Change `\s+` → `[ \t]+` in whitespace normalization rule
+- [x] Run existing tests - all pass
+- [x] Test with FB2 book - output now has proper paragraph breaks
+
+**Files Changed**:
+- `internal/sanitize/text.go`: Fixed whitespace normalization regex
+
+---
+
 ### v0.1.0 (2026-01-12)
 
 - Initial server-client architecture
