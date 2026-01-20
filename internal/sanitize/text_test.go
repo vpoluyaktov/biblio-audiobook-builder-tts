@@ -243,7 +243,8 @@ func TestTextForTTS_RemovesControlCharacters(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"Preserves newlines as space", "Line 1\nLine 2", "Line 1 Line 2"},
+		{"Preserves single newline", "Line 1\nLine 2", "Line 1\nLine 2"},
+		{"Preserves paragraph break", "Para 1\n\nPara 2", "Para 1\n\nPara 2"},
 		{"Preserves tabs as space", "Word1\tWord2", "Word1 Word2"},
 		{"Removes null character", "Hello\x00World", "Hello World"},
 		{"Removes bell character", "Hello\x07World", "Hello World"},
@@ -268,9 +269,10 @@ func TestTextForTTS_NormalizesWhitespace(t *testing.T) {
 		expected string
 	}{
 		{"Multiple spaces", "Hello    world", "Hello world"},
-		{"Mixed whitespace", "Hello \t \n world", "Hello world"},
+		{"Mixed whitespace on same line", "Hello \t  world", "Hello world"},
 		{"Leading and trailing", "   Hello world   ", "Hello world"},
 		{"Multiple periods", "Hello.....world", "Hello...world"},
+		{"Collapses 3+ newlines to 2", "Para 1\n\n\n\nPara 2", "Para 1\n\nPara 2"},
 	}
 
 	for _, tt := range tests {

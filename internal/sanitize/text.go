@@ -189,9 +189,28 @@ func TextForTTS(text string) string {
 		}
 	}
 
-	// Normalize whitespace
-	whitespace := regexp.MustCompile(`\s+`)
-	result = whitespace.ReplaceAllString(cleaned.String(), " ")
+	// Normalize whitespace while preserving paragraph breaks
+	result = cleaned.String()
+
+	// First, normalize line endings to \n
+	result = strings.ReplaceAll(result, "\r\n", "\n")
+	result = strings.ReplaceAll(result, "\r", "\n")
+
+	// Preserve paragraph breaks (2+ newlines) by replacing with placeholder
+	paragraphBreak := regexp.MustCompile(`\n\s*\n`)
+	result = paragraphBreak.ReplaceAllString(result, "\n\n")
+
+	// Normalize spaces within lines (but not newlines)
+	spaceOnly := regexp.MustCompile(`[ \t]+`)
+	result = spaceOnly.ReplaceAllString(result, " ")
+
+	// Clean up: remove spaces at start/end of lines
+	lineSpaces := regexp.MustCompile(`(?m)^ +| +$`)
+	result = lineSpaces.ReplaceAllString(result, "")
+
+	// Collapse 3+ newlines to 2 (paragraph break)
+	multiNewline := regexp.MustCompile(`\n{3,}`)
+	result = multiNewline.ReplaceAllString(result, "\n\n")
 
 	return strings.TrimSpace(result)
 }
