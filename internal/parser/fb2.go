@@ -30,7 +30,7 @@ var (
 	reFB2SubOpen    = regexp.MustCompile(`(?i)<subtitle[^>]*>`)
 	reFB2Tags       = regexp.MustCompile(`<[^>]+>`)
 	reFB2Spaces     = regexp.MustCompile(`[ \t]+`)
-	reFB2Newlines   = regexp.MustCompile(`\n{3,}`)
+	reFB2Newlines   = regexp.MustCompile(`\n{2,}`)
 )
 
 type fb2Parser struct {
@@ -234,23 +234,23 @@ func fb2TreeToText(xmlContent string) string {
 		text = newText
 	}
 
-	// Handle special elements
+	// Handle special elements (single newline for tighter spacing)
 	text = reFB2Table.ReplaceAllString(text, "\nTable omitted.\n")
 	text = reFB2Image.ReplaceAllString(text, "\nIllustration.\n")
-	text = reFB2EmptyLine.ReplaceAllString(text, "\n\n")
+	text = reFB2EmptyLine.ReplaceAllString(text, "\n")
 
 	// Skip footnotes and links
 	text = reFB2Link.ReplaceAllString(text, "")
 
-	// Handle paragraphs
-	text = reFB2PClose.ReplaceAllString(text, "\n\n")
-	text = reFB2POpen.ReplaceAllString(text, "    ")
+	// Handle paragraphs (single newline for tighter spacing)
+	text = reFB2PClose.ReplaceAllString(text, "\n")
+	text = reFB2POpen.ReplaceAllString(text, "")
 
-	// Handle titles
-	text = reFB2TitleClose.ReplaceAllString(text, "\n\n")
-	text = reFB2TitleOpen.ReplaceAllString(text, "\n\n")
-	text = reFB2SubClose.ReplaceAllString(text, "\n\n")
-	text = reFB2SubOpen.ReplaceAllString(text, "\n\n")
+	// Handle titles (single newline for tighter spacing)
+	text = reFB2TitleClose.ReplaceAllString(text, "\n")
+	text = reFB2TitleOpen.ReplaceAllString(text, "\n")
+	text = reFB2SubClose.ReplaceAllString(text, "\n")
+	text = reFB2SubOpen.ReplaceAllString(text, "\n")
 
 	// Remove remaining XML tags
 	text = reFB2Tags.ReplaceAllString(text, "")
@@ -258,10 +258,10 @@ func fb2TreeToText(xmlContent string) string {
 	// Decode all HTML entities (numeric like &#8197; and named like &nbsp;)
 	text = html.UnescapeString(text)
 
-	// Clean up whitespace
+	// Clean up whitespace (collapse 3+ newlines to single newline for tighter spacing)
 	text = strings.ReplaceAll(text, "\u00A0", " ")
 	text = reFB2Spaces.ReplaceAllString(text, " ")
-	text = reFB2Newlines.ReplaceAllString(text, "\n\n")
+	text = reFB2Newlines.ReplaceAllString(text, "\n")
 
 	// Add periods to paragraphs
 	text = addPeriodToText(text)

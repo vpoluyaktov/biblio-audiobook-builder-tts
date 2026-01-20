@@ -1724,6 +1724,30 @@ lint: fmt vet
 
 ## Changelog
 
+### v0.1.1 (2026-01-20)
+
+#### Bug Fix: Line Breaks Lost in Output Text Files
+
+**Problem**: Text files produced by the parser, sanitizer, and normalizer were losing all line breaks. Original ebook paragraphs (e.g., `<p>` tags in FB2 files) were being merged into a single long line in the output `.txt` files.
+
+**Root Cause**: The default pronunciation rule in `internal/sanitize/text.go` used the regex pattern `\s+` to normalize whitespace. This pattern matches ALL whitespace characters including newlines (`\n`), replacing them with a single space and destroying paragraph structure.
+
+**Fix**: Changed the regex pattern from `\s+` to `[ \t]+` to only match horizontal whitespace (spaces and tabs), preserving newlines for paragraph breaks.
+
+**Files Changed**:
+- `internal/sanitize/text.go`: Fixed whitespace normalization regex
+
+#### Enhancement: Single Newline Between Paragraphs
+
+**Change**: Reduced paragraph spacing from double newline (`\n\n`) to single newline (`\n`) for tighter, more compact text output.
+
+**Files Changed**:
+- `internal/parser/fb2.go`: Changed `</p>`, `<title>`, `<subtitle>`, `<empty-line>` to use single newline; updated `reFB2Newlines` pattern from `\n{3,}` to `\n{2,}`
+- `internal/parser/epub.go`: Updated `reNewlines` pattern from `\n{3,}` to `\n{2,}`
+- `internal/parser/fb2_test.go`: Updated test expectations for single newline
+
+---
+
 ### v0.1.0 (2026-01-12)
 
 - Initial server-client architecture

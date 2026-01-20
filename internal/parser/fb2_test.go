@@ -33,32 +33,32 @@ func TestFb2TreeToText(t *testing.T) {
 		{
 			name:     "multiple paragraphs",
 			xml:      "<p>First paragraph</p><p>Second paragraph</p>",
-			expected: "First paragraph.\n\nSecond paragraph.",
+			expected: "First paragraph.\nSecond paragraph.",
 		},
 		{
 			name:     "with title",
 			xml:      "<title><p>Chapter Title</p></title><p>Content</p>",
-			expected: "Chapter Title.\n\nContent.",
+			expected: "Chapter Title.\nContent.",
 		},
 		{
 			name:     "with subtitle",
 			xml:      "<subtitle>Subtitle</subtitle><p>Content</p>",
-			expected: "Subtitle.\n\nContent.",
+			expected: "Subtitle.\nContent.",
 		},
 		{
 			name:     "with empty-line",
 			xml:      "<p>Before</p><empty-line/><p>After</p>",
-			expected: "Before.\n\nAfter.",
+			expected: "Before.\nAfter.",
 		},
 		{
 			name:     "with table",
 			xml:      "<p>Before</p><table><tr><td>Cell</td></tr></table><p>After</p>",
-			expected: "Before.\n\nTable omitted.\nAfter.",
+			expected: "Before.\nTable omitted.\nAfter.",
 		},
 		{
 			name:     "with image",
 			xml:      "<p>Before</p><image l:href=\"#img1\"/><p>After</p>",
-			expected: "Before.\n\nIllustration.\nAfter.",
+			expected: "Before.\nIllustration.\nAfter.",
 		},
 		{
 			name:     "with link (should be removed)",
