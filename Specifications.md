@@ -323,6 +323,7 @@ CREATE TABLE IF NOT EXISTS providers (
     
     -- Processing settings
     normalize_numbers BOOLEAN DEFAULT 1,  -- Enable number normalization
+    ssml_support BOOLEAN DEFAULT 0,       -- Provider supports SSML markup
     
     -- Metadata
     is_default BOOLEAN DEFAULT 0,  -- Default provider for new jobs
@@ -349,6 +350,7 @@ type TTSProvider struct {
     Region           string    `json:"region"`   // Region for Azure TTS
     TTSWorkers       int       `json:"tts_workers"`
     NormalizeNumbers bool      `json:"normalize_numbers"`
+    SSMLSupport      bool      `json:"ssml_support"`  // Provider supports SSML markup
     IsDefault        bool      `json:"is_default"`
     DisplayOrder     int       `json:"display_order"`
     CreatedAt        time.Time `json:"created_at"`
@@ -360,15 +362,15 @@ type TTSProvider struct {
 
 On first run, initialize with default providers:
 
-| ID | Name | Type | Enabled | URL | API Key |
-|----|------|------|---------|-----|---------|
-| espeak | eSpeak | local | true | - | - |
-| google | Google Cloud TTS | cloud | false | - | (required) |
-| openai | OpenAI TTS | cloud | false | - | (required) |
-| azure | Azure TTS | cloud | false | - | (required + region) |
-| opentts | OpenTTS | self-hosted | false | (required) | - |
-| rhvoice | RHVoice | self-hosted | false | (required) | - |
-| silero | Silero TTS | self-hosted | false | (required) | - |
+| ID | Name | Type | Enabled | SSML | URL | API Key |
+|----|------|------|---------|------|-----|---------|
+| espeak | eSpeak | local | true | false | - | - |
+| google | Google Cloud TTS | cloud | false | true | - | (required) |
+| openai | OpenAI TTS | cloud | false | false | - | (required) |
+| azure | Azure TTS | cloud | false | true | - | (required + region) |
+| opentts | OpenTTS | self-hosted | false | false | (required) | - |
+| rhvoice | RHVoice | self-hosted | false | true | (required) | - |
+| silero | Silero TTS | self-hosted | false | true | (required) | - |
 
 #### -3.5 API Endpoints
 
@@ -1048,6 +1050,137 @@ func (c *Config) NeedsNormalization(provider string) bool
 - [x] Add `NeedsNormalization(provider)` config method with sensible defaults
 - [x] Integrate processor into TTS pipeline (worker.go)
 - [ ] Add normalization toggle to Settings UI (per provider)
+
+---
+
+### Phase -0.24: SSML Text Processing
+
+**Goal**: Wrap text in SSML (Speech Synthesis Markup Language) tags when sending to TTS providers that support SSML, improving speech quality with proper paragraph and sentence pauses.
+
+#### -0.24.1 SSML Structure
+
+When `ssml_support` is enabled for a provider, text is wrapped with SSML tags:
+
+```xml
+<speak>
+<p>
+    <s>First sentence of the paragraph.</s>
+    <s>Second sentence of the paragraph.</s>
+</p>
+<p>
+    <s>First sentence of next paragraph.</s>
+    <s>Another sentence here.</s>
+</p>
+</speak>
+```
+
+**Tags used:**
+- `<speak>` - Root element required by SSML
+- `<p>` - Paragraph tag, adds natural pause between paragraphs
+- `<s>` - Sentence tag, adds natural pause between sentences
+
+#### -0.24.2 Text Processing Logic
+
+1. **Paragraph Detection**: Split text by double newlines (`\n\n`) or single newlines
+2. **Sentence Detection**: Split paragraphs by sentence-ending punctuation (`. ! ? ։ ؟` etc.)
+3. **XML Escaping**: Escape special characters (`& < > " '`) before wrapping
+4. **Empty Content Handling**: Skip empty paragraphs and sentences
+
+```go
+// WrapTextInSSML converts plain text to SSML format
+func WrapTextInSSML(text string) string {
+    // Split into paragraphs
+    paragraphs := splitIntoParagraphs(text)
+    
+    var result strings.Builder
+    result.WriteString("<speak>\n")
+    
+    for _, para := range paragraphs {
+        if strings.TrimSpace(para) == "" {
+            continue
+        }
+        result.WriteString("<p>\n")
+        
+        // Split paragraph into sentences
+        sentences := splitIntoSentences(para)
+        for _, sent := range sentences {
+            sent = strings.TrimSpace(sent)
+            if sent == "" {
+                continue
+            }
+            result.WriteString("    <s>")
+            result.WriteString(escapeXML(sent))
+            result.WriteString("</s>\n")
+        }
+        result.WriteString("</p>\n")
+    }
+    
+    result.WriteString("</speak>")
+    return result.String()
+}
+```
+
+#### -0.24.3 Sentence Boundary Detection
+
+Sentences are split on:
+- Period followed by space or end: `. `
+- Exclamation mark: `!`
+- Question mark: `?`
+- Armenian question mark: `։`
+- Arabic question mark: `؟`
+- Ellipsis handling: `...` treated as single boundary
+
+**Edge cases handled:**
+- Abbreviations (Mr., Dr., etc.) - not split
+- Decimal numbers (3.14) - not split
+- Quoted speech ending with punctuation
+- Multiple punctuation marks (`?!`, `...`)
+
+#### -0.24.4 Provider SSML Support
+
+| Provider | SSML Support | Notes |
+|----------|--------------|-------|
+| eSpeak | No | Does not support SSML |
+| Google Cloud TTS | Yes | Full SSML support |
+| OpenAI TTS | No | Plain text only |
+| Azure TTS | Yes | Full SSML support |
+| OpenTTS | No | Depends on underlying engine |
+| RHVoice | Yes | Supports basic SSML |
+| Silero | Yes | Supports SSML with prosody tags |
+
+#### -0.24.5 Integration Point
+
+SSML wrapping is applied in the TTS worker before sending text to the provider:
+
+```go
+// In internal/tts/worker.go
+func (w *Worker) processChapter(text string, provider *storage.TTSProvider) ([]byte, error) {
+    processedText := text
+    
+    // Apply number normalization if enabled
+    if provider.NormalizeNumbers {
+        processedText = w.normalizer.Process(processedText, w.language)
+    }
+    
+    // Apply SSML wrapping if provider supports it
+    if provider.SSMLSupport {
+        processedText = ssml.WrapTextInSSML(processedText)
+    }
+    
+    return w.synthesize(processedText)
+}
+```
+
+#### -0.24.6 Implementation Tasks
+
+- [x] Add `ssml_support` field to providers table schema
+- [x] Add `SSMLSupport` field to `TTSProvider` struct
+- [x] Update provider CRUD operations to include `ssml_support`
+- [x] Add SSML checkbox to provider settings UI
+- [ ] Create `internal/ssml/ssml.go` with `WrapTextInSSML` function
+- [ ] Create `internal/ssml/ssml_test.go` with tests
+- [ ] Integrate SSML processing into TTS worker pipeline
+- [ ] Test with Google Cloud TTS and Azure TTS
 
 ---
 

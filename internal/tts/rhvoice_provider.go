@@ -218,11 +218,22 @@ func (p *RHVoiceProvider) ConvertToSpeech(text string, voice string, options *Co
 	// Use POST to /rhasspy endpoint (text in body, always returns WAV)
 	reqURL := fmt.Sprintf("%s/rhasspy?%s", p.serverURL, params.Encode())
 
+	// Check if text is already SSML-wrapped
+	trimmedText := strings.TrimSpace(text)
+	contentType := "text/plain; charset=utf-8"
+	if strings.HasPrefix(trimmedText, "<speak>") && strings.HasSuffix(trimmedText, "</speak>") {
+		// Text is SSML - use appropriate content type
+		contentType = "application/ssml+xml; charset=utf-8"
+	}
+
 	req, err := http.NewRequest("POST", reqURL, strings.NewReader(text))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("Content-Type", "text/plain; charset=utf-8")
+	req.Header.Set("Content-Type", contentType)
+
+	logger.Debug("RHVoiceProvider.ConvertToSpeech: voice='%s', content_type='%s', text_len=%d", voice, contentType, len(text))
+	logger.Debug("RHVoiceProvider text: %s", text)
 
 	resp, err := p.httpClient.Do(req)
 	if err != nil {

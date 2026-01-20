@@ -79,17 +79,20 @@ func TextForTTS(text string) string {
 		"\u2012": " - ", // Figure dash
 		"\u2212": "-",   // Minus sign
 
-		// Quotes - normalize to ASCII quotes
-		"\u201C": `"`, // Left double quote
-		"\u201D": `"`, // Right double quote
-		"\u201E": `"`, // Double low-9 quote
-		"\u2018": "'", // Left single quote
-		"\u2019": "'", // Right single quote
-		"\u201A": "'", // Single low-9 quote
-		"\u00AB": `"`, // Left guillemet «
-		"\u00BB": `"`, // Right guillemet »
-		"\u2039": "'", // Single left guillemet ‹
-		"\u203A": "'", // Single right guillemet ›
+		// Quotes - remove to avoid SSML escaping issues with TTS engines
+		"\u201C": "", // Left double quote "
+		"\u201D": "", // Right double quote "
+		"\u201E": "", // Double low-9 quote „
+		"\u2018": "", // Left single quote '
+		"\u2019": "", // Right single quote '
+		"\u201A": "", // Single low-9 quote ‚
+		"\u00AB": "", // Left guillemet «
+		"\u00BB": "", // Right guillemet »
+		"\u2039": "", // Single left guillemet ‹
+		"\u203A": "", // Single right guillemet ›
+		`"`:      "", // ASCII double quote
+		"'":      "", // ASCII single quote
+		"`":      "", // Backtick
 
 		// Ellipsis
 		"\u2026": "...", // Horizontal ellipsis …
@@ -172,10 +175,10 @@ func TextForTTS(text string) string {
 		"\u2088": "8", // ₈
 		"\u2089": "9", // ₉
 
-		// Prime marks (feet/inches, minutes/seconds)
-		"\u2032": "'",   // ′ Prime (feet, minutes)
-		"\u2033": "\"",  // ″ Double prime (inches, seconds)
-		"\u2034": "'''", // ‴ Triple prime
+		// Prime marks (feet/inches, minutes/seconds) - remove to avoid SSML issues
+		"\u2032": "", // ′ Prime (feet, minutes)
+		"\u2033": "", // ″ Double prime (inches, seconds)
+		"\u2034": "", // ‴ Triple prime
 
 		// Additional spaces
 		"\u202F": " ", // Narrow no-break space

@@ -234,8 +234,8 @@ func escapeXML(text string) string {
 }
 
 // wrapTextWithSSML wraps text in SSML with optional prosody for speed/pitch
+// If text is already SSML-wrapped (starts with <speak>), it inserts prosody inside
 func wrapTextWithSSML(text string, speed, pitch float64) string {
-	escapedText := escapeXML(text)
 	rate := mapSpeedToSSML(speed)
 	pitchVal := mapPitchToSSML(pitch)
 
@@ -248,7 +248,26 @@ func wrapTextWithSSML(text string, speed, pitch float64) string {
 		attrs = append(attrs, fmt.Sprintf(`pitch="%s"`, pitchVal))
 	}
 
-	// Always wrap in <speak>, add <prosody> only if needed
+	// Check if text is already SSML-wrapped
+	trimmedText := strings.TrimSpace(text)
+	isAlreadySSML := strings.HasPrefix(trimmedText, "<speak>") && strings.HasSuffix(trimmedText, "</speak>")
+
+	if isAlreadySSML {
+		// Extract content between <speak> and </speak>
+		innerContent := strings.TrimPrefix(trimmedText, "<speak>")
+		innerContent = strings.TrimSuffix(innerContent, "</speak>")
+		innerContent = strings.TrimSpace(innerContent)
+
+		// Add prosody wrapper if needed
+		if len(attrs) > 0 {
+			prosodyAttrs := strings.Join(attrs, " ")
+			return fmt.Sprintf("<speak><prosody %s>%s</prosody></speak>", prosodyAttrs, innerContent)
+		}
+		return trimmedText // Already valid SSML, no prosody needed
+	}
+
+	// Text is not SSML - escape and wrap it
+	escapedText := escapeXML(text)
 	if len(attrs) > 0 {
 		prosodyAttrs := strings.Join(attrs, " ")
 		return fmt.Sprintf("<speak><prosody %s>%s</prosody></speak>", prosodyAttrs, escapedText)
@@ -276,7 +295,8 @@ func (p *SileroProvider) ConvertToSpeech(text string, voice string, options *Con
 
 	// Wrap text in SSML with prosody for speed/pitch control
 	ssmlText := wrapTextWithSSML(text, speed, pitch)
-	logger.Debug("SileroProvider.ConvertToSpeech: voice='%s' -> '%s', speed=%.2f, pitch=%.2f, ssml_len=%d", voice, normalizedVoice, speed, pitch, len(ssmlText))
+	logger.Debug("SileroProvider.ConvertToSpeech: voice='%s', speed=%.2f, pitch=%.2f, ssml_len=%d", normalizedVoice, speed, pitch, len(ssmlText))
+	logger.Debug("SileroProvider SSML text: %s", ssmlText)
 
 	// Build the TTS URL
 	params := url.Values{}

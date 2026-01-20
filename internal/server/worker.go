@@ -396,6 +396,9 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 	// Apply text sanitization (pronunciation rules) to chapter content
 	content = w.sanitizer.Sanitize(content)
 
+	// Note: SSML wrapping is applied per-chunk in the TTS adapter, not here
+	// This allows proper chunking of long chapters before SSML tags are added
+
 	// Save chapter text file for debugging
 	textFileName := fmt.Sprintf("%02d_%s.txt", index+1, sanitizeFileName(chapter.Title))
 	textFilePath := filepath.Join(outputDir, textFileName)
@@ -410,13 +413,20 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		w.saveJob(job) // Save to database so TUI can see worker progress
 	}
 
+	// Check if provider supports SSML
+	ssmlSupport := false
+	if providerInfo := w.ttsService.GetProviderInfo(job.Provider); providerInfo != nil {
+		ssmlSupport = providerInfo.SSMLSupport
+	}
+
 	// Convert chapter with progress tracking
 	reader, err := w.ttsService.ConvertToSpeechWithProgress(content, &tts.ConversionOptions{
-		Voice:    job.Voice,
-		Provider: job.Provider,
-		Speed:    job.Speed,
-		Pitch:    job.Pitch,
-		Language: job.Language,
+		Voice:       job.Voice,
+		Provider:    job.Provider,
+		Speed:       job.Speed,
+		Pitch:       job.Pitch,
+		Language:    job.Language,
+		SSMLSupport: ssmlSupport,
 	}, progressCb)
 	if err != nil {
 		result.Error = fmt.Errorf("TTS conversion failed: %v", err)
