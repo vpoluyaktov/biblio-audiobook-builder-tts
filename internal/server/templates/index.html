@@ -401,6 +401,63 @@
                             <small>Format: pattern → replacement (one per line)</small>
                         </div>
                     </div>
+                    <div class="settings-section">
+                        <h3>🔢 Number Normalization</h3>
+                        <p class="section-description">
+                            Convert numbers to words before TTS (e.g., "Chapter 5" → "Chapter fifth").
+                            Some providers handle this automatically, others need preprocessing.
+                        </p>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="cfg-normalize-espeak" checked>
+                                    espeak (recommended)
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="cfg-normalize-opentts" checked>
+                                    OpenTTS (recommended)
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="cfg-normalize-rhvoice" checked>
+                                    RHVoice (recommended)
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="cfg-normalize-silero" checked>
+                                    Silero (recommended)
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="cfg-normalize-google">
+                                    Google TTS (not needed)
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="cfg-normalize-openai">
+                                    OpenAI TTS (not needed)
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="cfg-normalize-azure">
+                                    Azure TTS (not needed)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Output Tab -->
