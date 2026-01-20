@@ -2,6 +2,7 @@ package tts
 
 import (
 	"abb_tts/internal/logger"
+	"abb_tts/internal/sanitize"
 	"bytes"
 	"fmt"
 	"io"
@@ -111,6 +112,13 @@ func (a *Adapter) ConvertToSpeech(text string, voice string, options *Conversion
 			progressCb(i, len(chunks), chunk)
 		}
 
+		// Skip chunks with no speakable content (e.g., "* * *" section breaks)
+		// These would cause TTS engines to fail
+		if !sanitize.HasSpeakableContent(chunk) {
+			logger.Debug("Skipping chunk %d/%d with no speakable content: '%s'", i+1, len(chunks), chunk)
+			continue
+		}
+
 		// Convert this chunk with retry logic for transient failures
 		var audioData []byte
 		var lastErr error
@@ -173,6 +181,13 @@ func (a *Adapter) ConvertToSpeechWithChunks(text string, voice string, options *
 	for i, chunk := range chunks {
 		if progressCb != nil {
 			progressCb(i, len(chunks), chunk)
+		}
+
+		// Skip chunks with no speakable content (e.g., "* * *" section breaks)
+		// These would cause TTS engines to fail
+		if !sanitize.HasSpeakableContent(chunk) {
+			logger.Debug("Skipping chunk %d/%d with no speakable content: '%s'", i+1, len(chunks), chunk)
+			continue
 		}
 
 		// Convert this chunk with retry logic for transient failures

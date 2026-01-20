@@ -186,11 +186,25 @@ func (p *SileroProvider) GetModelsForLanguage(language string) []string {
 	return models
 }
 
+// normalizeVoiceID normalizes voice ID to lowercase speaker name
+func normalizeVoiceID(voice string) string {
+	parts := strings.Split(voice, "#")
+	if len(parts) != 2 {
+		return voice
+	}
+	return fmt.Sprintf("%s#%s", parts[0], strings.ToLower(parts[1]))
+}
+
 // ConvertToSpeech converts text to speech using Silero TTS
 func (p *SileroProvider) ConvertToSpeech(text string, voice string, options *ConversionOptions) (io.Reader, error) {
+	// Normalize voice ID: Silero expects lowercase speaker names
+	// Voice format: silero:model_id#speaker
+	normalizedVoice := normalizeVoiceID(voice)
+	logger.Debug("SileroProvider.ConvertToSpeech: voice='%s' -> '%s', text_len=%d", voice, normalizedVoice, len(text))
+
 	// Build the TTS URL
 	params := url.Values{}
-	params.Set("voice", voice)
+	params.Set("voice", normalizedVoice)
 	params.Set("text", text)
 
 	// Silero supports sample_rate parameter

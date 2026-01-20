@@ -9,6 +9,17 @@ import (
 	"unicode"
 )
 
+// HasSpeakableContent checks if text contains any speakable content (letters from any language).
+// Text with only punctuation, symbols, or whitespace will cause TTS engines to fail.
+func HasSpeakableContent(text string) bool {
+	for _, r := range text {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return true
+		}
+	}
+	return false
+}
+
 // TextForTTS sanitizes text for TTS processing by normalizing problematic
 // Unicode characters while preserving all readable text from any language.
 // This should be applied during parsing stage so sanitized text is visible
