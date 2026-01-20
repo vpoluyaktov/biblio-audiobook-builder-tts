@@ -310,13 +310,9 @@
             </div>
             <div class="settings-tabs">
                 <button class="tab-btn active" data-tab="general">General</button>
+                <button class="tab-btn" data-tab="providers">TTS Providers</button>
                 <button class="tab-btn" data-tab="tts">TTS Settings</button>
                 <button class="tab-btn" data-tab="output">Output</button>
-                <button class="tab-btn" data-tab="performance">Performance</button>
-                <button class="tab-btn" data-tab="cloud">Cloud TTS</button>
-                <button class="tab-btn" data-tab="opentts">OpenTTS</button>
-                <button class="tab-btn" data-tab="rhvoice">RHVoice</button>
-                <button class="tab-btn" data-tab="silero">Silero</button>
                 <button class="tab-btn" data-tab="audiobookshelf">Audiobookshelf</button>
                 <button class="tab-btn" data-tab="opds">OPDS Sources</button>
             </div>
@@ -356,6 +352,31 @@
                             <label for="cfg-log-file">Log File</label>
                             <input type="text" id="cfg-log-file" placeholder="abb_tts.log">
                         </div>
+                    </div>
+                </div>
+
+                <!-- TTS Providers Tab -->
+                <div class="tab-content" id="tab-providers">
+                    <div class="settings-section">
+                        <h3>🎤 TTS Providers</h3>
+                        <p class="section-description">
+                            Configure your TTS providers. Click on a row to edit provider settings.
+                        </p>
+                        <table class="providers-table" id="providers-table">
+                            <thead>
+                                <tr>
+                                    <th>Provider</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Workers</th>
+                                    <th>Normalize</th>
+                                    <th>Default</th>
+                                </tr>
+                            </thead>
+                            <tbody id="providers-table-body">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -401,63 +422,6 @@
                             <small>Format: pattern → replacement (one per line)</small>
                         </div>
                     </div>
-                    <div class="settings-section">
-                        <h3>🔢 Number Normalization</h3>
-                        <p class="section-description">
-                            Convert numbers to words before TTS (e.g., "Chapter 5" → "Chapter fifth").
-                            Some providers handle this automatically, others need preprocessing.
-                        </p>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="cfg-normalize-espeak" checked>
-                                    espeak (recommended)
-                                </label>
-                            </div>
-                            <div class="form-group">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="cfg-normalize-opentts" checked>
-                                    OpenTTS (recommended)
-                                </label>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="cfg-normalize-rhvoice" checked>
-                                    RHVoice (recommended)
-                                </label>
-                            </div>
-                            <div class="form-group">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="cfg-normalize-silero" checked>
-                                    Silero (recommended)
-                                </label>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="cfg-normalize-google">
-                                    Google TTS (not needed)
-                                </label>
-                            </div>
-                            <div class="form-group">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="cfg-normalize-openai">
-                                    OpenAI TTS (not needed)
-                                </label>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="cfg-normalize-azure">
-                                    Azure TTS (not needed)
-                                </label>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- Output Tab -->
@@ -501,274 +465,6 @@
                     </div>
                 </div>
 
-                <!-- Performance Tab -->
-                <div class="tab-content" id="tab-performance">
-                    <div class="settings-section">
-                        <h3>⚡ TTS Workers (Per Provider)</h3>
-                        <p class="section-description">
-                            Configure the number of concurrent TTS workers for each provider.
-                            Different providers have different rate limits and resource requirements.
-                        </p>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="cfg-tts-workers-espeak">espeak (Local)</label>
-                                <select id="cfg-tts-workers-espeak">
-                                    <option value="1">1</option>
-                                    <option value="2">2</option>
-                                    <option value="3" selected>3</option>
-                                    <option value="4">4</option>
-                                    <option value="5">5</option>
-                                    <option value="6">6</option>
-                                    <option value="8">8</option>
-                                    <option value="10">10</option>
-                                </select>
-                                <small>Limited by CPU cores</small>
-                            </div>
-                            <div class="form-group">
-                                <label for="cfg-tts-workers-opentts">OpenTTS (Self-hosted)</label>
-                                <select id="cfg-tts-workers-opentts">
-                                    <option value="1">1</option>
-                                    <option value="2">2</option>
-                                    <option value="3" selected>3</option>
-                                    <option value="4">4</option>
-                                    <option value="5">5</option>
-                                    <option value="6">6</option>
-                                    <option value="8">8</option>
-                                    <option value="10">10</option>
-                                </select>
-                                <small>Limited by server capacity</small>
-                            </div>
-                            <div class="form-group">
-                                <label for="cfg-tts-workers-rhvoice">RHVoice (Self-hosted)</label>
-                                <select id="cfg-tts-workers-rhvoice">
-                                    <option value="1">1</option>
-                                    <option value="2">2</option>
-                                    <option value="3" selected>3</option>
-                                    <option value="4">4</option>
-                                    <option value="5">5</option>
-                                    <option value="6">6</option>
-                                    <option value="8">8</option>
-                                    <option value="10">10</option>
-                                </select>
-                                <small>Limited by server capacity</small>
-                            </div>
-                            <div class="form-group">
-                                <label for="cfg-tts-workers-silero">Silero (Self-hosted)</label>
-                                <select id="cfg-tts-workers-silero">
-                                    <option value="1">1</option>
-                                    <option value="2">2</option>
-                                    <option value="3" selected>3</option>
-                                    <option value="4">4</option>
-                                    <option value="5">5</option>
-                                    <option value="6">6</option>
-                                    <option value="8">8</option>
-                                    <option value="10">10</option>
-                                </select>
-                                <small>Limited by server capacity</small>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="cfg-tts-workers-openai">OpenAI (Cloud)</label>
-                                <select id="cfg-tts-workers-openai">
-                                    <option value="1">1</option>
-                                    <option value="2">2</option>
-                                    <option value="3" selected>3</option>
-                                    <option value="4">4</option>
-                                    <option value="5">5</option>
-                                    <option value="6">6</option>
-                                    <option value="8">8</option>
-                                    <option value="10">10</option>
-                                </select>
-                                <small>API rate limits may apply</small>
-                            </div>
-                            <div class="form-group">
-                                <label for="cfg-tts-workers-google">Google Cloud (Cloud)</label>
-                                <select id="cfg-tts-workers-google">
-                                    <option value="1">1</option>
-                                    <option value="2">2</option>
-                                    <option value="3" selected>3</option>
-                                    <option value="4">4</option>
-                                    <option value="5">5</option>
-                                    <option value="6">6</option>
-                                    <option value="8">8</option>
-                                    <option value="10">10</option>
-                                </select>
-                                <small>API rate limits may apply</small>
-                            </div>
-                            <div class="form-group">
-                                <label for="cfg-tts-workers-azure">Azure (Cloud)</label>
-                                <select id="cfg-tts-workers-azure">
-                                    <option value="1">1</option>
-                                    <option value="2">2</option>
-                                    <option value="3" selected>3</option>
-                                    <option value="4">4</option>
-                                    <option value="5">5</option>
-                                    <option value="6">6</option>
-                                    <option value="8">8</option>
-                                    <option value="10">10</option>
-                                </select>
-                                <small>API rate limits may apply</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="settings-section">
-                        <h3>🔧 M4B Encoding</h3>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="cfg-concurrent-encoders">M4B Encoders</label>
-                                <select id="cfg-concurrent-encoders">
-                                    <option value="1">1 (Sequential)</option>
-                                    <option value="2" selected>2</option>
-                                    <option value="3">3</option>
-                                    <option value="4">4</option>
-                                    <option value="5">5</option>
-                                </select>
-                                <small>Number of M4B parts to build simultaneously</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Cloud TTS Tab -->
-                <div class="tab-content" id="tab-cloud">
-                    <div class="settings-section">
-                        <h3>🤖 OpenAI TTS</h3>
-                        <p class="section-description">
-                            Configure OpenAI Text-to-Speech API for natural-sounding voices.
-                            Get your API key from the <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>.
-                        </p>
-                        <div class="form-group">
-                            <label for="cfg-openai-api-key">OpenAI API Key</label>
-                            <input type="password" id="cfg-openai-api-key" placeholder="sk-...">
-                            <small>Your OpenAI API key with TTS access</small>
-                        </div>
-                        <div class="settings-subsection">
-                            <h4>🎤 Available Voices</h4>
-                            <p class="voice-list">alloy, echo, fable, onyx, nova, shimmer</p>
-                            <h4>💰 Pricing (per 1 million characters)</h4>
-                            <ul class="pricing-list">
-                                <li><strong>tts-1 (Standard):</strong> $15.00</li>
-                                <li><strong>tts-1-hd (HD):</strong> $30.00</li>
-                            </ul>
-                        </div>
-                    </div>
-                    <div class="settings-section">
-                        <h3>☁️ Google Cloud TTS</h3>
-                        <p class="section-description">
-                            Configure Google Cloud Text-to-Speech API for high-quality voices.
-                            Get your API key from the <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</a>.
-                        </p>
-                        <div class="form-group">
-                            <label for="cfg-google-api-key">Google Cloud API Key</label>
-                            <input type="password" id="cfg-google-api-key" placeholder="AIza...">
-                            <small>Enable the Cloud Text-to-Speech API in your Google Cloud project</small>
-                        </div>
-                        <div class="settings-subsection">
-                            <h4>💰 Pricing (per 1 million characters)</h4>
-                            <ul class="pricing-list">
-                                <li><strong>Standard voices:</strong> $4.00</li>
-                                <li><strong>WaveNet voices:</strong> $16.00</li>
-                                <li><strong>Neural2 voices:</strong> $16.00</li>
-                                <li><strong>Studio voices:</strong> $160.00</li>
-                            </ul>
-                            <small>First 1M characters/month free for Standard, 1M for WaveNet/Neural2</small>
-                        </div>
-                    </div>
-                    <div class="settings-section">
-                        <h3>🔷 Azure Cognitive Services TTS</h3>
-                        <p class="section-description">
-                            Configure Azure Cognitive Services Speech API for neural voices.
-                            Get your subscription key from the <a href="https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices" target="_blank">Azure Portal</a>.
-                        </p>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="cfg-azure-tts-key">Subscription Key</label>
-                                <input type="password" id="cfg-azure-tts-key" placeholder="Your Azure subscription key">
-                            </div>
-                            <div class="form-group">
-                                <label for="cfg-azure-tts-region">Region</label>
-                                <input type="text" id="cfg-azure-tts-region" placeholder="eastus">
-                                <small>e.g., eastus, westus2, westeurope</small>
-                            </div>
-                        </div>
-                        <div class="settings-subsection">
-                            <h4>💰 Pricing (per 1 million characters)</h4>
-                            <ul class="pricing-list">
-                                <li><strong>Standard voices:</strong> $4.00</li>
-                                <li><strong>Neural voices:</strong> $16.00</li>
-                            </ul>
-                            <small>500K characters/month free tier available</small>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- OpenTTS Tab -->
-                <div class="tab-content" id="tab-opentts">
-                    <div class="settings-section">
-                        <h3>🔊 OpenTTS Server</h3>
-                        <p class="section-description">
-                            Configure connection to your self-hosted OpenTTS server for high-quality neural TTS voices.
-                            OpenTTS supports multiple engines including Larynx, MaryTTS, NanoTTS, and more.
-                        </p>
-                        <div class="form-group">
-                            <label for="cfg-opentts-url">Server URL</label>
-                            <input type="text" id="cfg-opentts-url" placeholder="http://localhost:5500">
-                            <small>Leave empty to disable OpenTTS</small>
-                        </div>
-                        <div class="form-group">
-                            <button class="btn btn-secondary" id="test-opentts-connection">
-                                🔌 Test Connection
-                            </button>
-                            <span class="connection-result" id="opentts-connection-result"></span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- RHVoice Tab -->
-                <div class="tab-content" id="tab-rhvoice">
-                    <div class="settings-section">
-                        <h3>🗣️ RHVoice Server</h3>
-                        <p class="section-description">
-                            Configure connection to your self-hosted RHVoice REST server for high-quality speech synthesis.
-                            RHVoice supports Russian, Ukrainian, English, Polish, and many other languages.
-                        </p>
-                        <div class="form-group">
-                            <label for="cfg-rhvoice-url">Server URL</label>
-                            <input type="text" id="cfg-rhvoice-url" placeholder="http://localhost:8080">
-                            <small>Leave empty to disable RHVoice</small>
-                        </div>
-                        <div class="form-group">
-                            <button class="btn btn-secondary" id="test-rhvoice-connection">
-                                🔌 Test Connection
-                            </button>
-                            <span class="connection-result" id="rhvoice-connection-result"></span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Silero Tab -->
-                <div class="tab-content" id="tab-silero">
-                    <div class="settings-section">
-                        <h3>🔊 Silero TTS Server</h3>
-                        <p class="section-description">
-                            Configure connection to your self-hosted Silero TTS server for high-quality neural speech synthesis.
-                            Silero supports Russian, English, German, Spanish, French, and many other languages with multiple voice models.
-                        </p>
-                        <div class="form-group">
-                            <label for="cfg-silero-url">Server URL</label>
-                            <input type="text" id="cfg-silero-url" placeholder="http://localhost:5555">
-                            <small>Leave empty to disable Silero TTS</small>
-                        </div>
-                        <div class="form-group">
-                            <button class="btn btn-secondary" id="test-silero-connection">
-                                🔌 Test Connection
-                            </button>
-                            <span class="connection-result" id="silero-connection-result"></span>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Audiobookshelf Tab -->
                 <div class="tab-content" id="tab-audiobookshelf">
                     <div class="settings-section">
@@ -807,39 +503,26 @@
                 <!-- OPDS Sources Tab -->
                 <div class="tab-content" id="tab-opds">
                     <div class="settings-section">
-                        <h3>📖 OPDS Catalog Sources</h3>
-                        <p class="section-description">
-                            Configure OPDS catalog sources for browsing and downloading ebooks.
-                        </p>
-                        <div class="opds-sources-list" id="opds-sources-list">
-                            <!-- Sources will be populated by JS -->
-                        </div>
-                    </div>
-                    <div class="settings-section">
-                        <h3>➕ Add New Source</h3>
-                        <div class="form-group">
-                            <label for="new-source-name">Name</label>
-                            <input type="text" id="new-source-name" placeholder="My OPDS Catalog">
-                        </div>
-                        <div class="form-group">
-                            <label for="new-source-url">URL</label>
-                            <input type="text" id="new-source-url" placeholder="https://example.com/opds">
-                        </div>
-                        <div class="form-group">
-                            <label for="new-source-desc">Description (optional)</label>
-                            <input type="text" id="new-source-desc" placeholder="Description">
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="new-source-username">Username (optional)</label>
-                                <input type="text" id="new-source-username" placeholder="For authenticated feeds">
+                        <div class="section-header-row">
+                            <div>
+                                <h3>📖 OPDS Catalog Sources</h3>
+                                <p class="section-description">Configure OPDS catalog sources for browsing and downloading ebooks.</p>
                             </div>
-                            <div class="form-group">
-                                <label for="new-source-password">Password (optional)</label>
-                                <input type="password" id="new-source-password" placeholder="Password">
-                            </div>
+                            <button class="btn btn-primary" id="add-opds-source-btn">➕ Add Source</button>
                         </div>
-                        <button class="btn btn-primary" id="add-source-btn">➕ Add Source</button>
+                        <table class="opds-sources-table" id="opds-sources-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>URL</th>
+                                    <th>Auth</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="opds-sources-tbody">
+                                <!-- Sources will be populated by JS -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -850,6 +533,133 @@
         </div>
     </div>
 
-    <script src="/assets/app.js?v=2"></script>
+    <!-- Provider Edit Modal -->
+    <div class="modal" id="provider-edit-modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-content provider-edit-modal">
+            <div class="modal-header">
+                <h2 id="provider-edit-title">Edit Provider</h2>
+                <button class="modal-close" id="provider-edit-close">×</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="provider-edit-id">
+                <div class="provider-edit-status" id="provider-edit-status"></div>
+                
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="provider-edit-enabled">
+                        Enabled
+                    </label>
+                </div>
+
+                <div class="form-group" id="provider-edit-url-group">
+                    <label for="provider-edit-url">Server URL</label>
+                    <input type="text" id="provider-edit-url" placeholder="http://localhost:5500" class="full-width">
+                </div>
+
+                <div class="form-group" id="provider-edit-apikey-group">
+                    <label for="provider-edit-apikey">API Key</label>
+                    <input type="password" id="provider-edit-apikey" placeholder="Enter API key" class="full-width">
+                </div>
+
+                <div class="form-group" id="provider-edit-region-group">
+                    <label for="provider-edit-region">Region</label>
+                    <input type="text" id="provider-edit-region" placeholder="e.g., eastus" class="full-width">
+                </div>
+
+                <div class="form-group">
+                    <label for="provider-edit-workers">TTS Workers</label>
+                    <select id="provider-edit-workers" class="full-width">
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="8">8</option>
+                        <option value="10">10</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="provider-edit-normalize">
+                        Normalize Numbers
+                    </label>
+                    <small>Convert numbers to words before TTS</small>
+                </div>
+
+                <div class="form-group">
+                    <button class="btn btn-secondary full-width" id="provider-edit-test">
+                        🔌 Test Connection
+                    </button>
+                    <span class="connection-result" id="provider-edit-test-result"></span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="provider-edit-cancel">Cancel</button>
+                <button class="btn btn-primary" id="provider-edit-save">💾 Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- OPDS Source Edit Modal -->
+    <div class="modal" id="opds-source-modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-content opds-source-modal">
+            <div class="modal-header">
+                <h2 id="opds-source-modal-title">Add OPDS Source</h2>
+                <button class="modal-close" id="opds-source-modal-close">×</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="opds-source-edit-id">
+                
+                <div class="form-group">
+                    <label for="opds-source-name">Name *</label>
+                    <input type="text" id="opds-source-name" placeholder="My OPDS Catalog">
+                </div>
+
+                <div class="form-group">
+                    <label for="opds-source-url">URL *</label>
+                    <input type="text" id="opds-source-url" placeholder="https://example.com/opds">
+                </div>
+
+                <div class="form-group">
+                    <label for="opds-source-desc">Description</label>
+                    <input type="text" id="opds-source-desc" placeholder="Optional description">
+                </div>
+
+                <div class="form-group">
+                    <label for="opds-source-username">Username</label>
+                    <input type="text" id="opds-source-username" placeholder="For authenticated feeds">
+                </div>
+
+                <div class="form-group">
+                    <label for="opds-source-password">Password</label>
+                    <input type="password" id="opds-source-password" placeholder="Password">
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="opds-source-enabled" checked>
+                        Enabled
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <button class="btn btn-secondary full-width" id="opds-source-test">
+                        🔌 Test Connection
+                    </button>
+                    <span class="connection-result" id="opds-source-test-result"></span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="opds-source-modal-cancel">Cancel</button>
+                <button class="btn btn-primary" id="opds-source-modal-save">💾 Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/assets/app.js?v=3"></script>
 </body>
 </html>

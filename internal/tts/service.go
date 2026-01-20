@@ -6,6 +6,7 @@ import (
 
 	"abb_tts/internal/config"
 	"abb_tts/internal/logger"
+	"abb_tts/internal/storage"
 )
 
 // Service interface defines methods for text-to-speech conversion
@@ -19,6 +20,21 @@ type Service interface {
 	GetAvailableProviders() []string
 	GetAdapter(providerName string) (*Adapter, error)
 	ReloadProviders()
+	GetProviderInfo(providerID string) *ProviderInfo
+}
+
+// ProviderInfo contains runtime information about a provider
+type ProviderInfo struct {
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	Type             string `json:"type"`
+	Enabled          bool   `json:"enabled"`
+	Available        bool   `json:"available"`
+	TTSWorkers       int    `json:"tts_workers"`
+	NormalizeNumbers bool   `json:"normalize_numbers"`
+	IsDefault        bool   `json:"is_default"`
+	VoiceCount       int    `json:"voice_count"`
+	Error            string `json:"error,omitempty"`
 }
 
 // ConversionOptions contains settings for TTS conversion
@@ -40,71 +56,96 @@ type Voice struct {
 }
 
 type service struct {
-	cfg       *config.Config
-	providers map[string]Provider
+	cfg           *config.Config
+	db            *storage.DB
+	providers     map[string]Provider
+	providerInfos map[string]*storage.TTSProvider // Cached provider info from DB
 }
 
 // NewService creates a new TTS service instance
 func NewService(cfg *config.Config) Service {
+	return NewServiceWithDB(cfg, nil)
+}
+
+// NewServiceWithDB creates a new TTS service instance with database support
+func NewServiceWithDB(cfg *config.Config, db *storage.DB) Service {
 	s := &service{
-		cfg:       cfg,
-		providers: make(map[string]Provider),
+		cfg:           cfg,
+		db:            db,
+		providers:     make(map[string]Provider),
+		providerInfos: make(map[string]*storage.TTSProvider),
 	}
 
-	// Initialize local providers
-	s.providers["espeak"] = NewLocalProvider("espeak")
-
-	// Initialize Google Cloud TTS if API key is configured
-	if cfg.GoogleAPIKey != "" {
-		s.providers["google"] = NewGoogleProvider(cfg.GoogleAPIKey)
-	}
-
-	// Initialize OpenTTS if URL is configured
-	if cfg.OpenTTSURL != "" {
-		logger.Debug("Initializing OpenTTS provider with URL: %s", cfg.OpenTTSURL)
-		s.providers["opentts"] = NewOpenTTSProvider(cfg.OpenTTSURL)
-	} else {
-		logger.Debug("OpenTTS URL not configured, skipping OpenTTS provider")
-	}
-
-	// Initialize RHVoice if URL is configured
-	if cfg.RHVoiceURL != "" {
-		logger.Debug("Initializing RHVoice provider with URL: %s", cfg.RHVoiceURL)
-		s.providers["rhvoice"] = NewRHVoiceProvider(cfg.RHVoiceURL)
-	} else {
-		logger.Debug("RHVoice URL not configured, skipping RHVoice provider")
-	}
-
-	// Initialize Silero TTS if URL is configured
-	if cfg.SileroURL != "" {
-		logger.Debug("Initializing Silero TTS provider with URL: %s", cfg.SileroURL)
-		s.providers["silero"] = NewSileroProvider(cfg.SileroURL)
-	} else {
-		logger.Debug("Silero URL not configured, skipping Silero provider")
-	}
-
-	// Initialize OpenAI TTS if API key is configured
-	if cfg.OpenAIAPIKey != "" {
-		logger.Debug("Initializing OpenAI TTS provider")
-		s.providers["openai"] = NewOpenAIProvider(cfg.OpenAIAPIKey)
-	} else {
-		logger.Debug("OpenAI API key not configured, skipping OpenAI provider")
-	}
-
-	// Initialize Azure TTS if subscription key and region are configured
-	if cfg.AzureTTSKey != "" && cfg.AzureTTSRegion != "" {
-		logger.Debug("Initializing Azure TTS provider with region: %s", cfg.AzureTTSRegion)
-		s.providers["azure"] = NewAzureProvider(cfg.AzureTTSKey, cfg.AzureTTSRegion)
-	} else {
-		logger.Debug("Azure TTS key or region not configured, skipping Azure provider")
-	}
-
-	// If no providers are available, add espeak as default
-	if len(s.providers) == 0 {
-		s.providers["espeak"] = NewLocalProvider("espeak")
-	}
-
+	s.loadProviders()
 	return s
+}
+
+// loadProviders loads and initializes providers from the database or config
+func (s *service) loadProviders() {
+	s.providers = make(map[string]Provider)
+	s.providerInfos = make(map[string]*storage.TTSProvider)
+
+	// Load from database
+	if s.db != nil {
+		dbProviders, err := s.db.ListProviders(true) // Only enabled providers
+		if err == nil && len(dbProviders) > 0 {
+			for _, dbProv := range dbProviders {
+				s.providerInfos[dbProv.ID] = dbProv
+				s.initializeProviderFromDB(dbProv)
+			}
+			logger.Debug("Loaded %d providers from database", len(s.providers))
+			return
+		}
+	}
+
+	// Fallback: initialize espeak as default if no database
+	s.providers["espeak"] = NewLocalProvider("espeak")
+	logger.Debug("No database available, initialized espeak as default provider")
+}
+
+// initializeProviderFromDB initializes a TTS provider from database config
+func (s *service) initializeProviderFromDB(dbProv *storage.TTSProvider) {
+	switch dbProv.ID {
+	case "espeak":
+		s.providers["espeak"] = NewLocalProvider("espeak")
+		logger.Debug("Initialized espeak provider")
+
+	case "google":
+		if dbProv.APIKey != "" {
+			s.providers["google"] = NewGoogleProvider(dbProv.APIKey)
+			logger.Debug("Initialized Google TTS provider")
+		}
+
+	case "openai":
+		if dbProv.APIKey != "" {
+			s.providers["openai"] = NewOpenAIProvider(dbProv.APIKey)
+			logger.Debug("Initialized OpenAI TTS provider")
+		}
+
+	case "azure":
+		if dbProv.APIKey != "" && dbProv.Region != "" {
+			s.providers["azure"] = NewAzureProvider(dbProv.APIKey, dbProv.Region)
+			logger.Debug("Initialized Azure TTS provider with region: %s", dbProv.Region)
+		}
+
+	case "opentts":
+		if dbProv.URL != "" {
+			s.providers["opentts"] = NewOpenTTSProvider(dbProv.URL)
+			logger.Debug("Initialized OpenTTS provider with URL: %s", dbProv.URL)
+		}
+
+	case "rhvoice":
+		if dbProv.URL != "" {
+			s.providers["rhvoice"] = NewRHVoiceProvider(dbProv.URL)
+			logger.Debug("Initialized RHVoice provider with URL: %s", dbProv.URL)
+		}
+
+	case "silero":
+		if dbProv.URL != "" {
+			s.providers["silero"] = NewSileroProvider(dbProv.URL)
+			logger.Debug("Initialized Silero TTS provider with URL: %s", dbProv.URL)
+		}
+	}
 }
 
 // ConvertToSpeech converts text to speech using specified options
@@ -353,40 +394,82 @@ func (s *service) GetAvailableModels(providerName, language string) []string {
 	return models
 }
 
-// ReloadProviders reinitializes providers based on current config
+// ReloadProviders reinitializes providers based on current config or database
 func (s *service) ReloadProviders() {
-	s.providers = make(map[string]Provider)
+	s.loadProviders()
+}
 
-	// Initialize local providers
-	s.providers["espeak"] = NewLocalProvider("espeak")
-
-	// Initialize Google Cloud TTS if API key is configured
-	if s.cfg.GoogleAPIKey != "" {
-		s.providers["google"] = NewGoogleProvider(s.cfg.GoogleAPIKey)
+// GetProviderInfo returns runtime information about a specific provider
+func (s *service) GetProviderInfo(providerID string) *ProviderInfo {
+	info := &ProviderInfo{
+		ID:        providerID,
+		Available: false,
 	}
 
-	// Initialize OpenTTS if URL is configured
-	if s.cfg.OpenTTSURL != "" {
-		s.providers["opentts"] = NewOpenTTSProvider(s.cfg.OpenTTSURL)
+	// Check if provider is loaded from database
+	if dbProv, ok := s.providerInfos[providerID]; ok {
+		info.Name = dbProv.Name
+		info.Type = dbProv.Type
+		info.Enabled = dbProv.Enabled
+		info.TTSWorkers = dbProv.TTSWorkers
+		info.NormalizeNumbers = dbProv.NormalizeNumbers
+		info.IsDefault = dbProv.IsDefault
 	}
 
-	// Initialize RHVoice if URL is configured
-	if s.cfg.RHVoiceURL != "" {
-		s.providers["rhvoice"] = NewRHVoiceProvider(s.cfg.RHVoiceURL)
+	// Check if provider is actually available (initialized)
+	if provider, ok := s.providers[providerID]; ok {
+		info.Available = true
+		info.VoiceCount = len(provider.GetAvailableVoices())
+		if info.Name == "" {
+			info.Name = provider.GetName()
+		}
 	}
 
-	// Initialize Silero TTS if URL is configured
-	if s.cfg.SileroURL != "" {
-		s.providers["silero"] = NewSileroProvider(s.cfg.SileroURL)
+	return info
+}
+
+// GetAllProviderInfos returns runtime information about all providers
+func (s *service) GetAllProviderInfos() []*ProviderInfo {
+	var infos []*ProviderInfo
+
+	// If we have database providers, use them as the source of truth
+	if s.db != nil {
+		dbProviders, err := s.db.ListProviders(false) // All providers
+		if err == nil {
+			for _, dbProv := range dbProviders {
+				info := &ProviderInfo{
+					ID:               dbProv.ID,
+					Name:             dbProv.Name,
+					Type:             dbProv.Type,
+					Enabled:          dbProv.Enabled,
+					TTSWorkers:       dbProv.TTSWorkers,
+					NormalizeNumbers: dbProv.NormalizeNumbers,
+					IsDefault:        dbProv.IsDefault,
+					Available:        false,
+				}
+
+				// Check if provider is actually available
+				if provider, ok := s.providers[dbProv.ID]; ok {
+					info.Available = true
+					info.VoiceCount = len(provider.GetAvailableVoices())
+				}
+
+				infos = append(infos, info)
+			}
+			return infos
+		}
 	}
 
-	// Initialize OpenAI TTS if API key is configured
-	if s.cfg.OpenAIAPIKey != "" {
-		s.providers["openai"] = NewOpenAIProvider(s.cfg.OpenAIAPIKey)
+	// Fallback: return info for loaded providers only
+	for id, provider := range s.providers {
+		info := &ProviderInfo{
+			ID:         id,
+			Name:       provider.GetName(),
+			Available:  true,
+			VoiceCount: len(provider.GetAvailableVoices()),
+		}
+		infos = append(infos, info)
 	}
 
-	// Initialize Azure TTS if subscription key and region are configured
-	if s.cfg.AzureTTSKey != "" && s.cfg.AzureTTSRegion != "" {
-		s.providers["azure"] = NewAzureProvider(s.cfg.AzureTTSKey, s.cfg.AzureTTSRegion)
-	}
+	return infos
 }

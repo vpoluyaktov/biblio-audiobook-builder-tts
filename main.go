@@ -128,9 +128,9 @@ func main() {
 		cancel()
 	}()
 
-	// Create TTS service
-	logger.Debug("Creating TTS service with OpenTTS URL: '%s'", cfg.OpenTTSURL)
-	ttsService := tts.NewService(cfg)
+	// Create TTS service with database support
+	logger.Debug("Creating TTS service with database provider support")
+	ttsService := tts.NewServiceWithDB(cfg, db)
 
 	// Create and start server
 	addr := fmt.Sprintf("%s:%s", cfg.ServerHost, cfg.ServerPort)

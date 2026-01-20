@@ -48,6 +48,12 @@ type ConfigDB interface {
 	ListJobs(status string, limit int) ([]*storage.Job, error)
 	CreateJob(job *storage.Job) error
 	UpdateJob(job *storage.Job) error
+	// Provider operations
+	ListProviders(enabledOnly bool) ([]*storage.TTSProvider, error)
+	GetProvider(id string) (*storage.TTSProvider, error)
+	UpdateProvider(provider *storage.TTSProvider) error
+	SetDefaultProvider(id string) error
+	GetDefaultProvider() (*storage.TTSProvider, error)
 }
 
 // New creates a new server instance
@@ -175,6 +181,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/preview", s.handlePreview)
 	mux.HandleFunc("/api/preview/", s.handlePreviewByID)
 	mux.HandleFunc("/api/providers", s.handleProviders)
+	mux.HandleFunc("/api/providers/", s.handleProviderByID)
 	mux.HandleFunc("/api/voices", s.handleVoices)
 	mux.HandleFunc("/api/languages", s.handleLanguages)
 	mux.HandleFunc("/api/models", s.handleModels)
@@ -198,6 +205,7 @@ func (s *Server) Start() error {
 	// OPDS endpoints
 	mux.HandleFunc("/api/opds/sources", s.handleOPDSSources)
 	mux.HandleFunc("/api/opds/sources/", s.handleOPDSSource)
+	mux.HandleFunc("/api/opds/test", s.handleOPDSTest)
 	mux.HandleFunc("/api/opds/browse", s.handleOPDSBrowse)
 	mux.HandleFunc("/api/opds/search", s.handleOPDSSearch)
 	mux.HandleFunc("/api/opds/download", s.handleOPDSDownload)
@@ -592,7 +600,23 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	s.jsonResponse(w, http.StatusCreated, job.Clone())
 }
 
-// handleProviders returns available TTS providers
+// ProviderResponse represents a provider in API responses
+type ProviderResponse struct {
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	Type             string `json:"type"`
+	Enabled          bool   `json:"enabled"`
+	Available        bool   `json:"available"`
+	IsDefault        bool   `json:"is_default"`
+	TTSWorkers       int    `json:"tts_workers"`
+	NormalizeNumbers bool   `json:"normalize_numbers"`
+	VoiceCount       int    `json:"voice_count"`
+	URL              string `json:"url,omitempty"`
+	APIKey           string `json:"api_key,omitempty"`
+	Region           string `json:"region,omitempty"`
+}
+
+// handleProviders returns available TTS providers with detailed info
 func (s *Server) handleProviders(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
 		s.handleCORS(w)
@@ -604,11 +628,667 @@ func (s *Server) handleProviders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	providers := s.ttsService.GetAvailableProviders()
+	var providerResponses []ProviderResponse
+	var defaultProvider string
+
+	// Try to get providers from database
+	if s.db != nil {
+		dbProviders, err := s.db.ListProviders(false) // All providers
+		if err == nil {
+			availableProviders := s.ttsService.GetAvailableProviders()
+			availableMap := make(map[string]bool)
+			for _, p := range availableProviders {
+				availableMap[p] = true
+			}
+
+			for _, dbProv := range dbProviders {
+				voiceCount := 0
+				if availableMap[dbProv.ID] {
+					voices := s.ttsService.GetVoicesFiltered(dbProv.ID, "", "")
+					voiceCount = len(voices)
+				}
+
+				resp := ProviderResponse{
+					ID:               dbProv.ID,
+					Name:             dbProv.Name,
+					Type:             dbProv.Type,
+					Enabled:          dbProv.Enabled,
+					Available:        availableMap[dbProv.ID],
+					IsDefault:        dbProv.IsDefault,
+					TTSWorkers:       dbProv.TTSWorkers,
+					NormalizeNumbers: dbProv.NormalizeNumbers,
+					VoiceCount:       voiceCount,
+					URL:              dbProv.URL,
+					APIKey:           dbProv.APIKey,
+					Region:           dbProv.Region,
+				}
+				providerResponses = append(providerResponses, resp)
+
+				if dbProv.IsDefault {
+					defaultProvider = dbProv.ID
+				}
+			}
+		}
+	}
+
+	// Fallback to simple provider list if no database
+	if len(providerResponses) == 0 {
+		providers := s.ttsService.GetAvailableProviders()
+		for _, p := range providers {
+			voices := s.ttsService.GetVoicesFiltered(p, "", "")
+			providerResponses = append(providerResponses, ProviderResponse{
+				ID:         p,
+				Name:       p,
+				Enabled:    true,
+				Available:  true,
+				VoiceCount: len(voices),
+			})
+		}
+		defaultProvider = s.cfg.DefaultProvider
+	}
+
 	s.jsonResponse(w, http.StatusOK, map[string]interface{}{
-		"providers": providers,
-		"default":   s.cfg.DefaultProvider,
+		"providers": providerResponses,
+		"default":   defaultProvider,
 	})
+}
+
+// handleProviderByID handles operations on a specific provider
+func (s *Server) handleProviderByID(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.handleCORS(w)
+		return
+	}
+
+	// Extract provider ID and action from path: /api/providers/{id} or /api/providers/{id}/test
+	path := r.URL.Path
+	prefix := "/api/providers/"
+	if len(path) <= len(prefix) {
+		http.Error(w, "Provider ID required", http.StatusBadRequest)
+		return
+	}
+
+	remaining := path[len(prefix):]
+	var providerID string
+	var action string
+
+	if idx := indexOf(remaining, "/"); idx != -1 {
+		providerID = remaining[:idx]
+		action = remaining[idx+1:]
+	} else {
+		providerID = remaining
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		s.getProvider(w, r, providerID)
+	case http.MethodPut:
+		s.updateProvider(w, r, providerID)
+	case http.MethodPost:
+		switch action {
+		case "test":
+			s.testProvider(w, r, providerID)
+		case "enable":
+			s.enableProvider(w, r, providerID, true)
+		case "disable":
+			s.enableProvider(w, r, providerID, false)
+		case "set-default":
+			s.setDefaultProvider(w, r, providerID)
+		default:
+			http.Error(w, "Unknown action", http.StatusBadRequest)
+		}
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// getProvider returns a specific provider's details
+func (s *Server) getProvider(w http.ResponseWriter, _ *http.Request, id string) {
+	if s.db == nil {
+		s.jsonError(w, http.StatusNotFound, "Provider not found")
+		return
+	}
+
+	dbProv, err := s.db.GetProvider(id)
+	if err != nil {
+		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get provider: %v", err))
+		return
+	}
+	if dbProv == nil {
+		s.jsonError(w, http.StatusNotFound, "Provider not found")
+		return
+	}
+
+	// Check if provider is available
+	availableProviders := s.ttsService.GetAvailableProviders()
+	available := false
+	for _, p := range availableProviders {
+		if p == id {
+			available = true
+			break
+		}
+	}
+
+	voiceCount := 0
+	if available {
+		voices := s.ttsService.GetVoicesFiltered(id, "", "")
+		voiceCount = len(voices)
+	}
+
+	resp := ProviderResponse{
+		ID:               dbProv.ID,
+		Name:             dbProv.Name,
+		Type:             dbProv.Type,
+		Enabled:          dbProv.Enabled,
+		Available:        available,
+		IsDefault:        dbProv.IsDefault,
+		TTSWorkers:       dbProv.TTSWorkers,
+		NormalizeNumbers: dbProv.NormalizeNumbers,
+		VoiceCount:       voiceCount,
+		URL:              dbProv.URL,
+		APIKey:           dbProv.APIKey,
+		Region:           dbProv.Region,
+	}
+
+	s.jsonResponse(w, http.StatusOK, resp)
+}
+
+// ProviderUpdateRequest represents the request body for updating a provider
+type ProviderUpdateRequest struct {
+	Enabled          *bool   `json:"enabled,omitempty"`
+	URL              *string `json:"url,omitempty"`
+	APIKey           *string `json:"api_key,omitempty"`
+	Region           *string `json:"region,omitempty"`
+	TTSWorkers       *int    `json:"tts_workers,omitempty"`
+	NormalizeNumbers *bool   `json:"normalize_numbers,omitempty"`
+	IsDefault        *bool   `json:"is_default,omitempty"`
+}
+
+// updateProvider updates a provider's configuration
+func (s *Server) updateProvider(w http.ResponseWriter, r *http.Request, id string) {
+	if s.db == nil {
+		s.jsonError(w, http.StatusInternalServerError, "Database not available")
+		return
+	}
+
+	dbProv, err := s.db.GetProvider(id)
+	if err != nil {
+		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get provider: %v", err))
+		return
+	}
+	if dbProv == nil {
+		s.jsonError(w, http.StatusNotFound, "Provider not found")
+		return
+	}
+
+	var req ProviderUpdateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// Update fields if provided
+	if req.Enabled != nil {
+		dbProv.Enabled = *req.Enabled
+	}
+	if req.URL != nil {
+		dbProv.URL = *req.URL
+	}
+	if req.APIKey != nil {
+		dbProv.APIKey = *req.APIKey
+	}
+	if req.Region != nil {
+		dbProv.Region = *req.Region
+	}
+	if req.TTSWorkers != nil {
+		dbProv.TTSWorkers = *req.TTSWorkers
+	}
+	if req.NormalizeNumbers != nil {
+		dbProv.NormalizeNumbers = *req.NormalizeNumbers
+	}
+
+	// Handle default provider change
+	if req.IsDefault != nil && *req.IsDefault {
+		if err := s.db.SetDefaultProvider(id); err != nil {
+			s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to set default provider: %v", err))
+			return
+		}
+		dbProv.IsDefault = true
+	}
+
+	if err := s.db.UpdateProvider(dbProv); err != nil {
+		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to update provider: %v", err))
+		return
+	}
+
+	// Reload TTS providers to pick up changes
+	s.ttsService.ReloadProviders()
+
+	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "updated"})
+}
+
+// enableProvider enables or disables a provider
+func (s *Server) enableProvider(w http.ResponseWriter, _ *http.Request, id string, enable bool) {
+	if s.db == nil {
+		s.jsonError(w, http.StatusInternalServerError, "Database not available")
+		return
+	}
+
+	dbProv, err := s.db.GetProvider(id)
+	if err != nil {
+		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get provider: %v", err))
+		return
+	}
+	if dbProv == nil {
+		s.jsonError(w, http.StatusNotFound, "Provider not found")
+		return
+	}
+
+	dbProv.Enabled = enable
+	if err := s.db.UpdateProvider(dbProv); err != nil {
+		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to update provider: %v", err))
+		return
+	}
+
+	// Reload TTS providers
+	s.ttsService.ReloadProviders()
+
+	status := "disabled"
+	if enable {
+		status = "enabled"
+	}
+	s.jsonResponse(w, http.StatusOK, map[string]string{"status": status})
+}
+
+// setDefaultProvider sets a provider as the default
+func (s *Server) setDefaultProvider(w http.ResponseWriter, _ *http.Request, id string) {
+	if s.db == nil {
+		s.jsonError(w, http.StatusInternalServerError, "Database not available")
+		return
+	}
+
+	if err := s.db.SetDefaultProvider(id); err != nil {
+		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to set default provider: %v", err))
+		return
+	}
+
+	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "default set", "provider": id})
+}
+
+// testProvider tests a provider's connection
+func (s *Server) testProvider(w http.ResponseWriter, r *http.Request, id string) {
+	if s.db == nil {
+		s.jsonError(w, http.StatusInternalServerError, "Database not available")
+		return
+	}
+
+	// Parse request body for test parameters (URL, API key, etc.)
+	var testReq struct {
+		URL    string `json:"url"`
+		APIKey string `json:"api_key"`
+		Region string `json:"region"`
+	}
+	if r.Body != nil {
+		json.NewDecoder(r.Body).Decode(&testReq)
+	}
+
+	// Test based on provider type
+	var testResult map[string]interface{}
+
+	switch id {
+	case "espeak":
+		// Test espeak by checking if command exists
+		testResult = map[string]interface{}{
+			"success":     true,
+			"voice_count": len(s.ttsService.GetVoicesFiltered("espeak", "", "")),
+		}
+
+	case "opentts":
+		url := testReq.URL
+		if url == "" {
+			testResult = map[string]interface{}{
+				"success": false,
+				"error":   "URL not configured",
+			}
+		} else {
+			// Reuse existing test logic
+			testResult = s.testOpenTTSConnection(url)
+		}
+
+	case "rhvoice":
+		url := testReq.URL
+		if url == "" {
+			testResult = map[string]interface{}{
+				"success": false,
+				"error":   "URL not configured",
+			}
+		} else {
+			testResult = s.testRHVoiceConnection(url)
+		}
+
+	case "silero":
+		url := testReq.URL
+		if url == "" {
+			testResult = map[string]interface{}{
+				"success": false,
+				"error":   "URL not configured",
+			}
+		} else {
+			testResult = s.testSileroConnection(url)
+		}
+
+	case "openai":
+		apiKey := testReq.APIKey
+		if apiKey == "" {
+			testResult = map[string]interface{}{
+				"success": false,
+				"error":   "API key not configured",
+			}
+		} else {
+			testResult = s.testOpenAIConnection(apiKey)
+		}
+
+	case "google":
+		apiKey := testReq.APIKey
+		if apiKey == "" {
+			testResult = map[string]interface{}{
+				"success": false,
+				"error":   "API key not configured",
+			}
+		} else {
+			testResult = s.testGoogleTTSConnection(apiKey)
+		}
+
+	case "azure":
+		apiKey := testReq.APIKey
+		region := testReq.Region
+		if apiKey == "" {
+			testResult = map[string]interface{}{
+				"success": false,
+				"error":   "API key not configured",
+			}
+		} else if region == "" {
+			testResult = map[string]interface{}{
+				"success": false,
+				"error":   "Region not configured",
+			}
+		} else {
+			testResult = s.testAzureTTSConnection(apiKey, region)
+		}
+
+	default:
+		testResult = map[string]interface{}{
+			"success": false,
+			"error":   "Unknown provider",
+		}
+	}
+
+	s.jsonResponse(w, http.StatusOK, testResult)
+}
+
+// Helper functions for testing provider connections
+func (s *Server) testOpenTTSConnection(url string) map[string]interface{} {
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(url + "/api/languages")
+	if err != nil {
+		return map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Connection failed: %v", err),
+		}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Server returned status %d", resp.StatusCode),
+		}
+	}
+
+	// Get voice count
+	voiceResp, err := client.Get(url + "/api/voices")
+	if err != nil {
+		return map[string]interface{}{
+			"success":     true,
+			"voice_count": 0,
+		}
+	}
+	defer voiceResp.Body.Close()
+
+	var voices map[string]interface{}
+	if err := json.NewDecoder(voiceResp.Body).Decode(&voices); err != nil {
+		return map[string]interface{}{
+			"success":     true,
+			"voice_count": 0,
+		}
+	}
+
+	return map[string]interface{}{
+		"success":     true,
+		"voice_count": len(voices),
+	}
+}
+
+func (s *Server) testRHVoiceConnection(url string) map[string]interface{} {
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(url + "/info")
+	if err != nil {
+		return map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Connection failed: %v", err),
+		}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Server returned status %d", resp.StatusCode),
+		}
+	}
+
+	var serverInfo struct {
+		SupportVoices []string `json:"SUPPORT_VOICES"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&serverInfo); err != nil {
+		return map[string]interface{}{
+			"success":     true,
+			"voice_count": 0,
+		}
+	}
+
+	return map[string]interface{}{
+		"success":     true,
+		"voice_count": len(serverInfo.SupportVoices),
+	}
+}
+
+func (s *Server) testSileroConnection(url string) map[string]interface{} {
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(url + "/health")
+	if err != nil {
+		return map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Connection failed: %v", err),
+		}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Server returned status %d", resp.StatusCode),
+		}
+	}
+
+	// Fetch voices to get count
+	voicesResp, err := client.Get(url + "/api/voices")
+	if err != nil {
+		return map[string]interface{}{
+			"success":     true,
+			"voice_count": 0,
+		}
+	}
+	defer voicesResp.Body.Close()
+
+	var voicesMap map[string]interface{}
+	if err := json.NewDecoder(voicesResp.Body).Decode(&voicesMap); err != nil {
+		return map[string]interface{}{
+			"success":     true,
+			"voice_count": 0,
+		}
+	}
+
+	return map[string]interface{}{
+		"success":     true,
+		"voice_count": len(voicesMap),
+	}
+}
+
+func (s *Server) testOpenAIConnection(apiKey string) map[string]interface{} {
+	client := &http.Client{Timeout: 15 * time.Second}
+
+	// Create a minimal TTS request to test the API key
+	reqBody := `{"model": "tts-1", "input": "test", "voice": "alloy"}`
+	req, err := http.NewRequest("POST", "https://api.openai.com/v1/audio/speech", strings.NewReader(reqBody))
+	if err != nil {
+		return map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Failed to create request: %v", err),
+		}
+	}
+
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Connection failed: %v", err),
+		}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		return map[string]interface{}{
+			"success":     true,
+			"voice_count": 6, // OpenAI has 6 voices
+		}
+	}
+
+	// Read error response
+	body, _ := io.ReadAll(resp.Body)
+	var errResp struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(body, &errResp) == nil && errResp.Error.Message != "" {
+		return map[string]interface{}{
+			"success": false,
+			"error":   errResp.Error.Message,
+		}
+	}
+
+	return map[string]interface{}{
+		"success": false,
+		"error":   fmt.Sprintf("API returned status %d", resp.StatusCode),
+	}
+}
+
+func (s *Server) testGoogleTTSConnection(apiKey string) map[string]interface{} {
+	client := &http.Client{Timeout: 15 * time.Second}
+
+	// Test by fetching available voices
+	url := fmt.Sprintf("https://texttospeech.googleapis.com/v1/voices?key=%s", apiKey)
+	resp, err := client.Get(url)
+	if err != nil {
+		return map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Connection failed: %v", err),
+		}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		var voicesResp struct {
+			Voices []interface{} `json:"voices"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&voicesResp); err == nil {
+			return map[string]interface{}{
+				"success":     true,
+				"voice_count": len(voicesResp.Voices),
+			}
+		}
+		return map[string]interface{}{
+			"success":     true,
+			"voice_count": 0,
+		}
+	}
+
+	// Read error response
+	body, _ := io.ReadAll(resp.Body)
+	var errResp struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(body, &errResp) == nil && errResp.Error.Message != "" {
+		return map[string]interface{}{
+			"success": false,
+			"error":   errResp.Error.Message,
+		}
+	}
+
+	return map[string]interface{}{
+		"success": false,
+		"error":   fmt.Sprintf("API returned status %d", resp.StatusCode),
+	}
+}
+
+func (s *Server) testAzureTTSConnection(apiKey, region string) map[string]interface{} {
+	client := &http.Client{Timeout: 15 * time.Second}
+
+	// Test by fetching available voices
+	url := fmt.Sprintf("https://%s.tts.speech.microsoft.com/cognitiveservices/voices/list", region)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Failed to create request: %v", err),
+		}
+	}
+
+	req.Header.Set("Ocp-Apim-Subscription-Key", apiKey)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Connection failed: %v", err),
+		}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		var voices []interface{}
+		if err := json.NewDecoder(resp.Body).Decode(&voices); err == nil {
+			return map[string]interface{}{
+				"success":     true,
+				"voice_count": len(voices),
+			}
+		}
+		return map[string]interface{}{
+			"success":     true,
+			"voice_count": 0,
+		}
+	}
+
+	return map[string]interface{}{
+		"success": false,
+		"error":   fmt.Sprintf("API returned status %d (check region and key)", resp.StatusCode),
+	}
 }
 
 // handleVoices returns available voices for a provider

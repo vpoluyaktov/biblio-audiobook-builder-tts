@@ -246,6 +246,61 @@ func (s *Server) deleteOPDSSource(w http.ResponseWriter, _ *http.Request, db OPD
 	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
+// handleOPDSTest tests connection to an OPDS catalog URL
+func (s *Server) handleOPDSTest(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.handleCORS(w)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		URL      string `json:"url"`
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.jsonError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.URL == "" {
+		s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+			"success": false,
+			"error":   "URL is required",
+		})
+		return
+	}
+
+	// Create client with auth if provided
+	var client *opds.Client
+	if req.Username != "" {
+		client = opds.NewClientWithAuth(req.Username, req.Password)
+	} else {
+		client = opds.NewClient()
+	}
+
+	// Try to fetch the catalog
+	catalog, err := client.FetchCatalog(req.URL)
+	if err != nil {
+		s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Connection failed: %v", err),
+		})
+		return
+	}
+
+	s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"title":   catalog.Title,
+	})
+}
+
 // handleOPDSBrowse handles browsing an OPDS catalog
 func (s *Server) handleOPDSBrowse(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
