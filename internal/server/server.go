@@ -610,6 +610,7 @@ type ProviderResponse struct {
 	IsDefault        bool   `json:"is_default"`
 	TTSWorkers       int    `json:"tts_workers"`
 	NormalizeNumbers bool   `json:"normalize_numbers"`
+	SSMLSupport      bool   `json:"ssml_support"`
 	VoiceCount       int    `json:"voice_count"`
 	URL              string `json:"url,omitempty"`
 	APIKey           string `json:"api_key,omitempty"`
@@ -657,6 +658,7 @@ func (s *Server) handleProviders(w http.ResponseWriter, r *http.Request) {
 					IsDefault:        dbProv.IsDefault,
 					TTSWorkers:       dbProv.TTSWorkers,
 					NormalizeNumbers: dbProv.NormalizeNumbers,
+					SSMLSupport:      dbProv.SSMLSupport,
 					VoiceCount:       voiceCount,
 					URL:              dbProv.URL,
 					APIKey:           dbProv.APIKey,
@@ -784,6 +786,7 @@ func (s *Server) getProvider(w http.ResponseWriter, _ *http.Request, id string) 
 		IsDefault:        dbProv.IsDefault,
 		TTSWorkers:       dbProv.TTSWorkers,
 		NormalizeNumbers: dbProv.NormalizeNumbers,
+		SSMLSupport:      dbProv.SSMLSupport,
 		VoiceCount:       voiceCount,
 		URL:              dbProv.URL,
 		APIKey:           dbProv.APIKey,
@@ -801,6 +804,7 @@ type ProviderUpdateRequest struct {
 	Region           *string `json:"region,omitempty"`
 	TTSWorkers       *int    `json:"tts_workers,omitempty"`
 	NormalizeNumbers *bool   `json:"normalize_numbers,omitempty"`
+	SSMLSupport      *bool   `json:"ssml_support,omitempty"`
 	IsDefault        *bool   `json:"is_default,omitempty"`
 }
 
@@ -845,6 +849,9 @@ func (s *Server) updateProvider(w http.ResponseWriter, r *http.Request, id strin
 	}
 	if req.NormalizeNumbers != nil {
 		dbProv.NormalizeNumbers = *req.NormalizeNumbers
+	}
+	if req.SSMLSupport != nil {
+		dbProv.SSMLSupport = *req.SSMLSupport
 	}
 
 	// Handle default provider change

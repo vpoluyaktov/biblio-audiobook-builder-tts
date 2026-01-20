@@ -32,6 +32,7 @@ type ProviderInfo struct {
 	Available        bool   `json:"available"`
 	TTSWorkers       int    `json:"tts_workers"`
 	NormalizeNumbers bool   `json:"normalize_numbers"`
+	SSMLSupport      bool   `json:"ssml_support"`
 	IsDefault        bool   `json:"is_default"`
 	VoiceCount       int    `json:"voice_count"`
 	Error            string `json:"error,omitempty"`
@@ -39,11 +40,12 @@ type ProviderInfo struct {
 
 // ConversionOptions contains settings for TTS conversion
 type ConversionOptions struct {
-	Voice    string
-	Provider string
-	Speed    float64
-	Pitch    float64
-	Language string // ISO 639-1 language code (e.g., "en", "ru")
+	Voice       string
+	Provider    string
+	Speed       float64
+	Pitch       float64
+	Language    string // ISO 639-1 language code (e.g., "en", "ru")
+	SSMLSupport bool   // Whether to wrap chunks in SSML tags
 }
 
 // Voice represents a TTS voice
@@ -413,6 +415,7 @@ func (s *service) GetProviderInfo(providerID string) *ProviderInfo {
 		info.Enabled = dbProv.Enabled
 		info.TTSWorkers = dbProv.TTSWorkers
 		info.NormalizeNumbers = dbProv.NormalizeNumbers
+		info.SSMLSupport = dbProv.SSMLSupport
 		info.IsDefault = dbProv.IsDefault
 	}
 
@@ -444,6 +447,7 @@ func (s *service) GetAllProviderInfos() []*ProviderInfo {
 					Enabled:          dbProv.Enabled,
 					TTSWorkers:       dbProv.TTSWorkers,
 					NormalizeNumbers: dbProv.NormalizeNumbers,
+					SSMLSupport:      dbProv.SSMLSupport,
 					IsDefault:        dbProv.IsDefault,
 					Available:        false,
 				}

@@ -50,22 +50,22 @@ func TestTextForTTS_ReplacesProblematicCharacters(t *testing.T) {
 		t.Errorf("En dash not replaced: %q", result)
 	}
 
-	// Curly double quotes U+201C U+201D
+	// Curly double quotes U+201C U+201D - removed to avoid SSML issues
 	result = TextForTTS("\u201cHello\u201d")
-	if result != "\"Hello\"" {
-		t.Errorf("Curly quotes not replaced: %q", result)
+	if result != "Hello" {
+		t.Errorf("Curly quotes not removed: %q", result)
 	}
 
-	// Curly single quotes U+2018 U+2019
+	// Curly single quotes U+2018 U+2019 - removed to avoid SSML issues
 	result = TextForTTS("\u2018Hello\u2019")
-	if result != "'Hello'" {
-		t.Errorf("Curly single quotes not replaced: %q", result)
+	if result != "Hello" {
+		t.Errorf("Curly single quotes not removed: %q", result)
 	}
 
-	// Guillemets U+00AB U+00BB
+	// Guillemets U+00AB U+00BB - removed to avoid SSML issues
 	result = TextForTTS("\u00abHello\u00bb")
-	if result != "\"Hello\"" {
-		t.Errorf("Guillemets not replaced: %q", result)
+	if result != "Hello" {
+		t.Errorf("Guillemets not removed: %q", result)
 	}
 
 	// Ellipsis U+2026
@@ -128,28 +128,28 @@ func TestTextForTTS_ReplacesProblematicCharacters(t *testing.T) {
 		t.Errorf("Fraction not expanded: %q", result)
 	}
 
-	// Right single quotation mark U+2019 (from HTML entity &#8217;)
+	// Right single quotation mark U+2019 (from HTML entity &#8217;) - removed to avoid SSML issues
 	result = TextForTTS("Hello\u2019s World")
-	if result != "Hello's World" {
-		t.Errorf("Right single quote (U+2019) not converted to ASCII apostrophe: %q", result)
+	if result != "Hellos World" {
+		t.Errorf("Right single quote (U+2019) not removed: %q", result)
 	}
 
-	// Double low-9 quotation mark U+201E (German/Polish opening quote)
+	// Double low-9 quotation mark U+201E (German/Polish opening quote) - removed
 	result = TextForTTS("\u201eHello\u201c")
-	if result != "\"Hello\"" {
-		t.Errorf("Double low-9 quote not replaced: %q", result)
+	if result != "Hello" {
+		t.Errorf("Double low-9 quote not removed: %q", result)
 	}
 
-	// Single low-9 quotation mark U+201A
+	// Single low-9 quotation mark U+201A - removed
 	result = TextForTTS("\u201aHello\u2018")
-	if result != "'Hello'" {
-		t.Errorf("Single low-9 quote not replaced: %q", result)
+	if result != "Hello" {
+		t.Errorf("Single low-9 quote not removed: %q", result)
 	}
 
-	// Single guillemets U+2039 U+203A
+	// Single guillemets U+2039 U+203A - removed
 	result = TextForTTS("\u2039Hello\u203a")
-	if result != "'Hello'" {
-		t.Errorf("Single guillemets not replaced: %q", result)
+	if result != "Hello" {
+		t.Errorf("Single guillemets not removed: %q", result)
 	}
 
 	// Four-per-em space U+2005 (from HTML entity &#8197;)
@@ -188,10 +188,10 @@ func TestTextForTTS_ReplacesProblematicCharacters(t *testing.T) {
 		t.Errorf("Subscript numbers not converted: %q", result)
 	}
 
-	// Prime marks (feet/inches)
+	// Prime marks (feet/inches) - removed to avoid SSML issues
 	result = TextForTTS("5\u2032 10\u2033")
-	if result != "5' 10\"" {
-		t.Errorf("Prime marks not converted: %q", result)
+	if result != "5 10" {
+		t.Errorf("Prime marks not removed: %q", result)
 	}
 
 	// Soft hyphen (should be removed)
@@ -292,15 +292,15 @@ func TestTextForTTS_RealWorldExamples(t *testing.T) {
 		t.Errorf("Russian em dashes: %q", result)
 	}
 
-	// Russian text with guillemets
+	// Russian text with guillemets - removed to avoid SSML issues
 	result = TextForTTS("Он сказал: \u00abПривет!\u00bb")
-	if result != "Он сказал: \"Привет!\"" {
+	if result != "Он сказал: Привет!" {
 		t.Errorf("Russian guillemets: %q", result)
 	}
 
-	// English with smart quotes
+	// English with smart quotes - removed to avoid SSML issues
 	result = TextForTTS("\u201cHello,\u201d she said")
-	if result != "\"Hello,\" she said" {
+	if result != "Hello, she said" {
 		t.Errorf("Smart quotes: %q", result)
 	}
 

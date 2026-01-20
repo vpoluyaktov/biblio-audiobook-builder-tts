@@ -1,6 +1,7 @@
 package tts
 
 import (
+	"abb_tts/internal/logger"
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
@@ -319,11 +320,19 @@ func (p *GoogleProvider) ConvertToSpeech(text string, voice string, options *Con
 	// Extract language code from voice name (e.g., "en-US-Wavenet-A" -> "en-US")
 	languageCode := extractLanguageCode(voice)
 
-	// Build request
+	// Build request - check if text is already SSML-wrapped
+	var input GoogleTTSInput
+	trimmedText := strings.TrimSpace(text)
+	if strings.HasPrefix(trimmedText, "<speak>") && strings.HasSuffix(trimmedText, "</speak>") {
+		// Text is already SSML - use SSML input
+		input = GoogleTTSInput{SSML: trimmedText}
+	} else {
+		// Plain text
+		input = GoogleTTSInput{Text: text}
+	}
+
 	request := GoogleTTSRequest{
-		Input: GoogleTTSInput{
-			Text: text,
-		},
+		Input: input,
 		Voice: GoogleTTSVoice{
 			LanguageCode: languageCode,
 			Name:         voice,
@@ -350,6 +359,15 @@ func (p *GoogleProvider) ConvertToSpeech(text string, voice string, options *Con
 	requestBody, err := json.Marshal(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	// Log the text being sent
+	if request.Input.SSML != "" {
+		logger.Debug("GoogleProvider.ConvertToSpeech: voice='%s', ssml_len=%d", voice, len(request.Input.SSML))
+		logger.Debug("GoogleProvider SSML text: %s", request.Input.SSML)
+	} else {
+		logger.Debug("GoogleProvider.ConvertToSpeech: voice='%s', text_len=%d", voice, len(request.Input.Text))
+		logger.Debug("GoogleProvider text: %s", request.Input.Text)
 	}
 
 	// Create HTTP request

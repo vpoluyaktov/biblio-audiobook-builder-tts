@@ -41,11 +41,20 @@ class App {
     // Save TTS settings to localStorage
     saveTTSSettings() {
         try {
+            // Preserve existing testVoiceText if current textarea is empty
+            // (prevents overwriting saved text during page load cascades)
+            const currentTestText = this.testVoiceText?.value;
+            const existingTestText = this.savedTTSSettings?.testVoiceText;
+            const testVoiceText = currentTestText || existingTestText || '';
+
             const settings = {
                 provider: this.providerSelect.value,
                 language: this.languageSelect.value,
                 model: this.modelSelect.value,
-                voice: this.voiceSelect.value
+                voice: this.voiceSelect.value,
+                speed: this.speedInput.value,
+                pitch: this.pitchInput.value,
+                testVoiceText: testVoiceText
             };
             localStorage.setItem(TTS_SETTINGS_KEY, JSON.stringify(settings));
             this.savedTTSSettings = settings;
@@ -159,6 +168,9 @@ class App {
         // OPDS Sources (in Settings tab)
         this.opdsSourcesTbody = document.getElementById('opds-sources-tbody');
         this.addOpdsSourceBtn = document.getElementById('add-opds-source-btn');
+
+        // Test Voice Modal elements
+        this.testVoiceText = document.getElementById('test-voice-text');
         
         // OPDS Source Modal
         this.opdsSourceModal = document.getElementById('opds-source-modal');
@@ -191,12 +203,14 @@ class App {
         // Save settings when voice is changed directly (without cascade)
         this.voiceSelect.addEventListener('change', () => this.saveTTSSettings());
 
-        // Range inputs
+        // Range inputs - save to localStorage on change
         this.speedInput.addEventListener('input', () => {
             this.speedValue.textContent = this.speedInput.value + 'x';
+            this.saveTTSSettings();
         });
         this.pitchInput.addEventListener('input', () => {
             this.pitchValue.textContent = this.pitchInput.value + 'x';
+            this.saveTTSSettings();
         });
 
         // Preview and Upload buttons
@@ -240,7 +254,6 @@ class App {
         this.testVoiceClose = document.getElementById('test-voice-close');
         this.testVoiceDone = document.getElementById('test-voice-done');
         this.testVoiceGenerateBtn = document.getElementById('test-voice-generate-btn');
-        this.testVoiceText = document.getElementById('test-voice-text');
         this.testVoiceStatus = document.getElementById('test-voice-status');
         this.testVoiceAudio = document.getElementById('test-voice-audio');
         this.testVoiceProviderDisplay = document.getElementById('test-voice-provider-display');
@@ -262,6 +275,9 @@ class App {
         }
         if (this.testVoiceGenerateBtn) {
             this.testVoiceGenerateBtn.addEventListener('click', () => this.generateTestVoice());
+        }
+        if (this.testVoiceText) {
+            this.testVoiceText.addEventListener('input', () => this.saveTTSSettings());
         }
 
         // Main tab navigation
@@ -383,8 +399,13 @@ class App {
         try {
             const response = await fetch('/api/config');
             const config = await response.json();
-            this.speedInput.value = config.default_speed || 1.0;
-            this.pitchInput.value = config.default_pitch || 1.0;
+            
+            // Use saved speed/pitch from localStorage if available, otherwise use server defaults
+            const savedSpeed = this.savedTTSSettings?.speed;
+            const savedPitch = this.savedTTSSettings?.pitch;
+            
+            this.speedInput.value = savedSpeed || config.default_speed || 1.0;
+            this.pitchInput.value = savedPitch || config.default_pitch || 1.0;
             this.speedValue.textContent = this.speedInput.value + 'x';
             this.pitchValue.textContent = this.pitchInput.value + 'x';
         } catch (e) {
@@ -1234,6 +1255,7 @@ class App {
                         <td><span class="status-badge ${statusClass}">${statusText}</span></td>
                         <td>${p.tts_workers}</td>
                         <td>${p.normalize_numbers ? '✓' : '—'}</td>
+                        <td>${p.ssml_support ? '✓' : '—'}</td>
                         <td>${p.is_default ? '<span class="default-badge">Default</span>' : ''}</td>
                     </tr>
                 `;
@@ -1245,7 +1267,7 @@ class App {
             });
         } catch (error) {
             console.error('Failed to load providers:', error);
-            tbody.innerHTML = '<tr><td colspan="6">Failed to load providers</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7">Failed to load providers</td></tr>';
         }
     }
     
@@ -1276,6 +1298,7 @@ class App {
         document.getElementById('provider-edit-enabled').checked = provider.enabled;
         document.getElementById('provider-edit-workers').value = provider.tts_workers || 3;
         document.getElementById('provider-edit-normalize').checked = provider.normalize_numbers;
+        document.getElementById('provider-edit-ssml').checked = provider.ssml_support;
         
         // Show/hide fields based on provider type
         const urlGroup = document.getElementById('provider-edit-url-group');
@@ -1329,7 +1352,8 @@ class App {
         const updateData = {
             enabled: document.getElementById('provider-edit-enabled').checked,
             tts_workers: parseInt(document.getElementById('provider-edit-workers').value),
-            normalize_numbers: document.getElementById('provider-edit-normalize').checked
+            normalize_numbers: document.getElementById('provider-edit-normalize').checked,
+            ssml_support: document.getElementById('provider-edit-ssml').checked
         };
         
         // Add URL or API key based on provider type
@@ -1618,6 +1642,12 @@ class App {
         this.testVoiceSpeedDisplay.textContent = speed + 'x';
         this.testVoicePitchDisplay.textContent = pitch + 'x';
 
+        // Restore saved test voice text from localStorage
+        const savedText = this.savedTTSSettings?.testVoiceText;
+        if (this.testVoiceText && savedText) {
+            this.testVoiceText.value = savedText;
+        }
+
         // Reset audio player and status
         this.testVoiceAudio.src = '';
         this.testVoiceAudio.style.display = 'none';
@@ -1642,6 +1672,9 @@ class App {
         const text = this.testVoiceText?.value || 'Hello, this is a test of the text to speech voice.';
         const speed = parseFloat(this.speedInput.value || '1.0');
         const pitch = parseFloat(this.pitchInput.value || '1.0');
+
+        // Save test voice text to localStorage
+        this.saveTTSSettings();
 
         if (!provider || !voice) {
             this.showToast('Please select a provider and voice first', 'error');

@@ -3,6 +3,7 @@ package tts
 import (
 	"abb_tts/internal/logger"
 	"abb_tts/internal/sanitize"
+	"abb_tts/internal/ssml"
 	"bytes"
 	"fmt"
 	"io"
@@ -131,6 +132,13 @@ func (a *Adapter) ConvertToSpeech(text string, voice string, options *Conversion
 			continue
 		}
 
+		// Apply SSML wrapping per-chunk if provider supports it
+		chunkToConvert := chunk
+		if options != nil && options.SSMLSupport {
+			chunkToConvert = ssml.WrapTextInSSML(chunk)
+			logger.Debug("Applied SSML wrapping to chunk %d/%d", i+1, len(chunks))
+		}
+
 		// Convert this chunk with retry logic for transient failures
 		var audioData []byte
 		var lastErr error
@@ -143,7 +151,7 @@ func (a *Adapter) ConvertToSpeech(text string, voice string, options *Conversion
 
 			// Text is already sanitized by the worker before reaching here
 			// Use watchdog timeout to prevent hanging on stuck TTS backend
-			reader, err := a.convertWithTimeout(chunk, voice, options)
+			reader, err := a.convertWithTimeout(chunkToConvert, voice, options)
 			if err != nil {
 				lastErr = err
 				// Check if this is a retryable error (server errors, tensor errors, etc.)
@@ -214,6 +222,13 @@ func (a *Adapter) ConvertToSpeechWithChunks(text string, voice string, options *
 			continue
 		}
 
+		// Apply SSML wrapping per-chunk if provider supports it
+		chunkToConvert := chunk
+		if options != nil && options.SSMLSupport {
+			chunkToConvert = ssml.WrapTextInSSML(chunk)
+			logger.Debug("Applied SSML wrapping to chunk %d/%d", i+1, len(chunks))
+		}
+
 		// Convert this chunk with retry logic for transient failures
 		var reader io.Reader
 		var lastErr error
@@ -227,7 +242,7 @@ func (a *Adapter) ConvertToSpeechWithChunks(text string, voice string, options *
 			// Text is already sanitized by the worker before reaching here
 			// Use watchdog timeout to prevent hanging on stuck TTS backend
 			var err error
-			reader, err = a.convertWithTimeout(chunk, voice, options)
+			reader, err = a.convertWithTimeout(chunkToConvert, voice, options)
 			if err != nil {
 				lastErr = err
 				if isRetryableError(err) {

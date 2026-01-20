@@ -1,6 +1,7 @@
 package tts
 
 import (
+	"abb_tts/internal/logger"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -321,14 +322,29 @@ func (p *AzureProvider) ConvertToSpeech(text string, voice string, options *Conv
 	// Extract language from voice name (e.g., "en-US-GuyNeural" -> "en-US")
 	language := extractAzureLanguage(voice)
 
-	// Escape text for XML/SSML
-	escapedText := html.EscapeString(text)
+	// Build SSML - check if text is already SSML-wrapped
+	var ssml string
+	trimmedText := strings.TrimSpace(text)
+	if strings.HasPrefix(trimmedText, "<speak>") && strings.HasSuffix(trimmedText, "</speak>") {
+		// Text is already SSML - extract inner content and wrap with Azure's required attributes
+		innerContent := strings.TrimPrefix(trimmedText, "<speak>")
+		innerContent = strings.TrimSuffix(innerContent, "</speak>")
+		innerContent = strings.TrimSpace(innerContent)
+		ssml = fmt.Sprintf(
+			`<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='%s'><voice name='%s'>%s</voice></speak>`,
+			language, voice, innerContent,
+		)
+	} else {
+		// Plain text - escape and wrap
+		escapedText := html.EscapeString(text)
+		ssml = fmt.Sprintf(
+			`<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='%s'><voice name='%s'>%s</voice></speak>`,
+			language, voice, escapedText,
+		)
+	}
 
-	// Build SSML
-	ssml := fmt.Sprintf(
-		`<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='%s'><voice name='%s'>%s</voice></speak>`,
-		language, voice, escapedText,
-	)
+	logger.Debug("AzureProvider.ConvertToSpeech: voice='%s', ssml_len=%d", voice, len(ssml))
+	logger.Debug("AzureProvider SSML text: %s", ssml)
 
 	// Create request
 	req, err := http.NewRequest("POST", p.getTTSURL(), bytes.NewBufferString(ssml))
