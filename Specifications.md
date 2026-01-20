@@ -1732,20 +1732,19 @@ lint: fmt vet
 
 **Root Cause**: The default pronunciation rule in `internal/sanitize/text.go` used the regex pattern `\s+` to normalize whitespace. This pattern matches ALL whitespace characters including newlines (`\n`), replacing them with a single space and destroying paragraph structure.
 
-**Location**: `internal/sanitize/text.go`, function `GetDefaultRules()`, line ~431
-
 **Fix**: Changed the regex pattern from `\s+` to `[ \t]+` to only match horizontal whitespace (spaces and tabs), preserving newlines for paragraph breaks.
-
-**Implementation**:
-- [x] Investigate parser (`internal/parser/fb2.go`) - correctly adds `\n\n` for `</p>` tags
-- [x] Investigate sanitizer (`internal/sanitize/text.go`) - `TextForTTS()` preserves newlines correctly
-- [x] Investigate default pronunciation rules - **found the bug** in `GetDefaultRules()`
-- [x] Fix: Change `\s+` → `[ \t]+` in whitespace normalization rule
-- [x] Run existing tests - all pass
-- [x] Test with FB2 book - output now has proper paragraph breaks
 
 **Files Changed**:
 - `internal/sanitize/text.go`: Fixed whitespace normalization regex
+
+#### Enhancement: Single Newline Between Paragraphs
+
+**Change**: Reduced paragraph spacing from double newline (`\n\n`) to single newline (`\n`) for tighter, more compact text output.
+
+**Files Changed**:
+- `internal/parser/fb2.go`: Changed `</p>`, `<title>`, `<subtitle>`, `<empty-line>` to use single newline; updated `reFB2Newlines` pattern from `\n{3,}` to `\n{2,}`
+- `internal/parser/epub.go`: Updated `reNewlines` pattern from `\n{3,}` to `\n{2,}`
+- `internal/parser/fb2_test.go`: Updated test expectations for single newline
 
 ---
 

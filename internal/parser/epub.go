@@ -23,7 +23,7 @@ var (
 	reBr       = regexp.MustCompile(`(?i)<br\s*/?>`)
 	reTags     = regexp.MustCompile(`<[^>]+>`)
 	reSpaces   = regexp.MustCompile(`[ \t]+`)
-	reNewlines = regexp.MustCompile(`\n{3,}`)
+	reNewlines = regexp.MustCompile(`\n{2,}`)
 )
 
 type epubParser struct{}
@@ -435,9 +435,9 @@ func htmlToText(html string) string {
 	// Replace non-breaking space with regular space
 	text = strings.ReplaceAll(text, "\u00A0", " ")
 
-	// Clean up whitespace
+	// Clean up whitespace (collapse 3+ newlines to single newline for tighter spacing)
 	text = reSpaces.ReplaceAllString(text, " ")
-	text = reNewlines.ReplaceAllString(text, "\n\n")
+	text = reNewlines.ReplaceAllString(text, "\n")
 
 	// Add period at end of paragraphs if missing
 	text = addPeriodToText(text)
