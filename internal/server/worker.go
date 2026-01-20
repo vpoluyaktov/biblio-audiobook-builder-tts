@@ -15,6 +15,7 @@ import (
 	"abb_tts/internal/audiobookshelf"
 	"abb_tts/internal/config"
 	"abb_tts/internal/logger"
+	"abb_tts/internal/normalize"
 	"abb_tts/internal/parser"
 	"abb_tts/internal/sanitize"
 	"abb_tts/internal/storage"
@@ -38,6 +39,7 @@ type Worker struct {
 	ttsService tts.Service
 	cfg        *config.Config
 	sanitizer  *sanitize.TextSanitizer
+	normalizer *normalize.Processor
 	ctx        context.Context
 	cancel     context.CancelFunc
 	wg         sync.WaitGroup
@@ -71,6 +73,7 @@ func NewWorker(db JobDB, hub *Hub, ttsService tts.Service, cfg *config.Config) *
 		ttsService: ttsService,
 		cfg:        cfg,
 		sanitizer:  textSanitizer,
+		normalizer: normalize.NewProcessor(),
 		ctx:        ctx,
 		cancel:     cancel,
 	}
@@ -371,8 +374,17 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index int, outputDir string, workerID int) ChapterResult {
 	result := ChapterResult{Index: index}
 
-	// Apply text sanitization (TTS normalization + pronunciation rules) to chapter content
-	content := w.sanitizer.Sanitize(chapter.Content)
+	content := chapter.Content
+
+	// Apply number normalization if provider needs it
+	if w.cfg.NeedsNormalization(job.Provider) {
+		lang := extractLanguageCode(job.Voice)
+		content = w.normalizer.Process(content, lang)
+		logger.Debug("Applied number normalization for provider %s (lang: %s)", job.Provider, lang)
+	}
+
+	// Apply text sanitization (pronunciation rules) to chapter content
+	content = w.sanitizer.Sanitize(content)
 
 	// Save chapter text file for debugging
 	textFileName := fmt.Sprintf("%02d_%s.txt", index+1, sanitizeFileName(chapter.Title))
@@ -611,6 +623,33 @@ func (w *Worker) uploadToAudiobookshelf(job *Job, book *parser.Book) error {
 // or problematic for ffmpeg/shell on different operating systems
 func sanitizeFileName(name string) string {
 	return sanitize.FileName(name)
+}
+
+// extractLanguageCode extracts the ISO 639-1 language code from a voice ID.
+// Examples: "en-US" -> "en", "ru-RU" -> "ru", "en_US_wavenet" -> "en"
+func extractLanguageCode(voice string) string {
+	if voice == "" {
+		return "en" // Default to English
+	}
+
+	// Handle formats like "en-US", "ru-RU", "en_US"
+	voice = strings.ToLower(voice)
+
+	// Try splitting by common separators
+	for _, sep := range []string{"-", "_"} {
+		parts := strings.Split(voice, sep)
+		if len(parts) >= 1 && len(parts[0]) == 2 {
+			return parts[0]
+		}
+	}
+
+	// If voice is already a 2-letter code
+	if len(voice) == 2 {
+		return voice
+	}
+
+	// Default to English
+	return "en"
 }
 
 // Broadcast helpers

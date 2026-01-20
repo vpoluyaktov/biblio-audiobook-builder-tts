@@ -893,7 +893,7 @@ func (c *Config) NeedsNormalization(provider string) bool
 - [x] Create `internal/normalize/processor_test.go` with tests
 - [x] Add per-provider `normalize_<provider>` config fields
 - [x] Add `NeedsNormalization(provider)` config method with sensible defaults
-- [ ] Integrate processor into TTS pipeline
+- [x] Integrate processor into TTS pipeline (worker.go)
 - [ ] Add normalization toggle to Settings UI (per provider)
 
 ---
