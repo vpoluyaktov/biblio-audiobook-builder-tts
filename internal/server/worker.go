@@ -409,6 +409,7 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		Provider: job.Provider,
 		Speed:    job.Speed,
 		Pitch:    job.Pitch,
+		Language: job.Language,
 	}, progressCb)
 	if err != nil {
 		result.Error = fmt.Errorf("TTS conversion failed: %v", err)

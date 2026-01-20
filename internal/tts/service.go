@@ -27,6 +27,7 @@ type ConversionOptions struct {
 	Provider string
 	Speed    float64
 	Pitch    float64
+	Language string // ISO 639-1 language code (e.g., "en", "ru")
 }
 
 // Voice represents a TTS voice

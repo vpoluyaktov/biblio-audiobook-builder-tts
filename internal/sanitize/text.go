@@ -20,6 +20,50 @@ func HasSpeakableContent(text string) bool {
 	return false
 }
 
+// HasSpeakableContentForLanguage checks if text contains speakable content for a specific language.
+// For Russian (ru), text must contain at least one Cyrillic letter.
+// For English (en), text must contain at least one Latin letter.
+// For other languages, falls back to HasSpeakableContent.
+func HasSpeakableContentForLanguage(text, lang string) bool {
+	if !HasSpeakableContent(text) {
+		return false
+	}
+
+	switch lang {
+	case "ru":
+		// Russian TTS requires Cyrillic characters
+		for _, r := range text {
+			if isCyrillic(r) {
+				return true
+			}
+		}
+		return false
+	case "en":
+		// English TTS requires Latin characters
+		for _, r := range text {
+			if isLatin(r) {
+				return true
+			}
+		}
+		return false
+	default:
+		return HasSpeakableContent(text)
+	}
+}
+
+// isCyrillic checks if a rune is a Cyrillic letter
+func isCyrillic(r rune) bool {
+	return (r >= 0x0400 && r <= 0x04FF) || // Cyrillic
+		(r >= 0x0500 && r <= 0x052F) // Cyrillic Supplement
+}
+
+// isLatin checks if a rune is a Latin letter
+func isLatin(r rune) bool {
+	return (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') ||
+		(r >= 0x00C0 && r <= 0x00FF) || // Latin-1 Supplement
+		(r >= 0x0100 && r <= 0x017F) // Latin Extended-A
+}
+
 // TextForTTS sanitizes text for TTS processing by normalizing problematic
 // Unicode characters while preserving all readable text from any language.
 // This should be applied during parsing stage so sanitized text is visible
