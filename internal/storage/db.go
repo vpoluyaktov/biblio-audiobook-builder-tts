@@ -97,6 +97,7 @@ type Job struct {
 	FilePath           string           `json:"file_path"`
 	Provider           string           `json:"provider"`
 	Voice              string           `json:"voice"`
+	Language           string           `json:"language"`
 	Speed              float64          `json:"speed"`
 	Pitch              float64          `json:"pitch"`
 	BookTitle          string           `json:"book_title"`
@@ -161,6 +162,7 @@ func (db *DB) migrate() error {
 		file_path TEXT,
 		provider TEXT,
 		voice TEXT,
+		language TEXT DEFAULT 'en',
 		speed REAL DEFAULT 1.0,
 		pitch REAL DEFAULT 1.0,
 		book_title TEXT,
@@ -491,11 +493,11 @@ func (db *DB) CreateJob(job *Job) error {
 	workerProgressJSON, _ := json.Marshal(job.WorkerProgress)
 
 	_, err := db.conn.Exec(`
-		INSERT INTO jobs (id, status, file_name, file_path, provider, voice, speed, pitch,
+		INSERT INTO jobs (id, status, file_name, file_path, provider, voice, language, speed, pitch,
 			book_title, book_author, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
 			current_chapter, total_chapters, current_chapter_num, worker_progress, num_workers, error, created_at, started_at, completed_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, job.ID, job.Status, job.FileName, job.FilePath, job.Provider, job.Voice,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, job.ID, job.Status, job.FileName, job.FilePath, job.Provider, job.Voice, job.Language,
 		job.Speed, job.Pitch, job.BookTitle, job.BookAuthor, job.OutputPath,
 		job.M4BFile, string(m4bFilesJSON), job.ConversionProgress, job.BuildProgress, job.CurrentChapter,
 		job.TotalChapters, job.CurrentChapterNum, string(workerProgressJSON), job.NumWorkers, job.Error, job.CreatedAt,
@@ -513,12 +515,12 @@ func (db *DB) UpdateJob(job *Job) error {
 	workerProgressJSON, _ := json.Marshal(job.WorkerProgress)
 
 	_, err := db.conn.Exec(`
-		UPDATE jobs SET status = ?, file_name = ?, file_path = ?, provider = ?, voice = ?,
+		UPDATE jobs SET status = ?, file_name = ?, file_path = ?, provider = ?, voice = ?, language = ?,
 			speed = ?, pitch = ?, book_title = ?, book_author = ?, output_path = ?,
 			m4b_file = ?, m4b_files = ?, conversion_progress = ?, build_progress = ?, current_chapter = ?,
 			total_chapters = ?, current_chapter_num = ?, worker_progress = ?, num_workers = ?, error = ?, started_at = ?, completed_at = ?
 		WHERE id = ?
-	`, job.Status, job.FileName, job.FilePath, job.Provider, job.Voice,
+	`, job.Status, job.FileName, job.FilePath, job.Provider, job.Voice, job.Language,
 		job.Speed, job.Pitch, job.BookTitle, job.BookAuthor, job.OutputPath,
 		job.M4BFile, string(m4bFilesJSON), job.ConversionProgress, job.BuildProgress, job.CurrentChapter,
 		job.TotalChapters, job.CurrentChapterNum, string(workerProgressJSON), job.NumWorkers, job.Error, job.StartedAt,
@@ -537,16 +539,20 @@ func (db *DB) GetJob(id string) (*Job, error) {
 	var workerProgressJSON sql.NullString
 	var startedAt, completedAt sql.NullTime
 
+	var language sql.NullString
 	err := db.conn.QueryRow(`
-		SELECT id, status, file_name, file_path, provider, voice, speed, pitch,
+		SELECT id, status, file_name, file_path, provider, voice, language, speed, pitch,
 			book_title, book_author, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
 			current_chapter, total_chapters, current_chapter_num, worker_progress, num_workers, error, created_at, started_at, completed_at
 		FROM jobs WHERE id = ?
 	`, id).Scan(&job.ID, &job.Status, &job.FileName, &job.FilePath, &job.Provider,
-		&job.Voice, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor,
+		&job.Voice, &language, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor,
 		&job.OutputPath, &job.M4BFile, &m4bFilesJSON, &job.ConversionProgress, &job.BuildProgress,
 		&job.CurrentChapter, &job.TotalChapters, &job.CurrentChapterNum,
 		&workerProgressJSON, &job.NumWorkers, &job.Error, &job.CreatedAt, &startedAt, &completedAt)
+	if language.Valid {
+		job.Language = language.String
+	}
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -576,7 +582,7 @@ func (db *DB) ListJobs(status string, limit int) ([]*Job, error) {
 	defer db.mu.RUnlock()
 
 	query := `
-		SELECT id, status, file_name, file_path, provider, voice, speed, pitch,
+		SELECT id, status, file_name, file_path, provider, voice, language, speed, pitch,
 			book_title, book_author, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
 			current_chapter, total_chapters, current_chapter_num, worker_progress, num_workers, error, created_at, started_at, completed_at
 		FROM jobs
@@ -607,9 +613,10 @@ func (db *DB) ListJobs(status string, limit int) ([]*Job, error) {
 		var m4bFilesJSON string
 		var workerProgressJSON sql.NullString
 		var startedAt, completedAt sql.NullTime
+		var language sql.NullString
 
 		err := rows.Scan(&job.ID, &job.Status, &job.FileName, &job.FilePath, &job.Provider,
-			&job.Voice, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor,
+			&job.Voice, &language, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor,
 			&job.OutputPath, &job.M4BFile, &m4bFilesJSON, &job.ConversionProgress, &job.BuildProgress,
 			&job.CurrentChapter, &job.TotalChapters, &job.CurrentChapterNum,
 			&workerProgressJSON, &job.NumWorkers, &job.Error, &job.CreatedAt, &startedAt, &completedAt)
@@ -617,6 +624,9 @@ func (db *DB) ListJobs(status string, limit int) ([]*Job, error) {
 			return nil, err
 		}
 
+		if language.Valid {
+			job.Language = language.String
+		}
 		if startedAt.Valid {
 			job.StartedAt = &startedAt.Time
 		}

@@ -828,6 +828,7 @@ class App {
         formData.append('file', this.selectedFile);
         formData.append('provider', this.providerSelect.value);
         formData.append('voice', this.voiceSelect.value);
+        formData.append('language', this.languageSelect.value);
         formData.append('speed', this.speedInput.value);
         formData.append('pitch', this.pitchInput.value);
 

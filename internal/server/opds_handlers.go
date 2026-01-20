@@ -482,6 +482,7 @@ func (s *Server) handleOPDSConvert(w http.ResponseWriter, r *http.Request) {
 		PreviewID string  `json:"preview_id"`
 		Provider  string  `json:"provider"`
 		Voice     string  `json:"voice"`
+		Language  string  `json:"language"`
 		Speed     float64 `json:"speed"`
 		Pitch     float64 `json:"pitch"`
 	}
@@ -517,6 +518,10 @@ func (s *Server) handleOPDSConvert(w http.ResponseWriter, r *http.Request) {
 	if voice == "" {
 		voice = s.cfg.DefaultVoice
 	}
+	language := req.Language
+	if language == "" {
+		language = "en" // Default to English
+	}
 	speed := req.Speed
 	if speed == 0 {
 		speed = s.cfg.DefaultSpeed
@@ -527,7 +532,7 @@ func (s *Server) handleOPDSConvert(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create job
-	job := NewJob(preview.FileName, preview.FilePath, provider, voice, speed, pitch)
+	job := NewJob(preview.FileName, preview.FilePath, provider, voice, language, speed, pitch)
 
 	// Save to database
 	if s.db != nil {

@@ -378,7 +378,10 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 
 	// Apply number normalization if provider needs it
 	if w.cfg.NeedsNormalization(job.Provider) {
-		lang := extractLanguageCode(job.Voice)
+		lang := job.Language
+		if lang == "" {
+			lang = "en" // Fallback to English if not set
+		}
 		content = w.normalizer.Process(content, lang)
 		logger.Debug("Applied number normalization for provider %s (lang: %s)", job.Provider, lang)
 	}

@@ -88,6 +88,7 @@ type Job struct {
 	// TTS settings
 	Provider string  `json:"provider"`
 	Voice    string  `json:"voice"`
+	Language string  `json:"language"` // ISO 639-1 language code (e.g., "en", "ru")
 	Speed    float64 `json:"speed"`
 	Pitch    float64 `json:"pitch"`
 
@@ -116,7 +117,7 @@ type Job struct {
 }
 
 // NewJob creates a new conversion job
-func NewJob(fileName, filePath, provider, voice string, speed, pitch float64) *Job {
+func NewJob(fileName, filePath, provider, voice, language string, speed, pitch float64) *Job {
 	return &Job{
 		ID:                 uuid.New().String(),
 		FileName:           fileName,
@@ -126,6 +127,7 @@ func NewJob(fileName, filePath, provider, voice string, speed, pitch float64) *J
 		BuildProgress:      0,
 		Provider:           provider,
 		Voice:              voice,
+		Language:           language,
 		Speed:              speed,
 		Pitch:              pitch,
 		CreatedAt:          time.Now(),
