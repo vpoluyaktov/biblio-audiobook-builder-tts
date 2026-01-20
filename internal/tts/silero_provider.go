@@ -211,8 +211,15 @@ func (p *SileroProvider) ConvertToSpeech(text string, voice string, options *Con
 	// Default to 48000 for best quality
 	params.Set("sample_rate", "48000")
 
-	// Note: Silero TTS doesn't support speed/pitch parameters directly
-	// Speed/pitch would need SSML or post-processing
+	// Pass speed and pitch parameters (server will map to SSML prosody)
+	if options != nil {
+		if options.Speed != 0 && options.Speed != 1.0 {
+			params.Set("speed", fmt.Sprintf("%.2f", options.Speed))
+		}
+		if options.Pitch != 0 && options.Pitch != 1.0 {
+			params.Set("pitch", fmt.Sprintf("%.2f", options.Pitch))
+		}
+	}
 
 	reqURL := fmt.Sprintf("%s/api/tts?%s", p.serverURL, params.Encode())
 
