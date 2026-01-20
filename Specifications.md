@@ -859,12 +859,27 @@ func (s *Service) ConvertToSpeech(text, lang string) ([]byte, error) {
 
 #### -0.25.9 Configuration
 
-New config fields:
+Per-provider normalization settings in config:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `normalize_numbers` | bool | true | Enable number-to-words conversion |
-| `normalize_lang` | string | "auto" | Language for normalization ("auto" uses TTS voice language) |
+| `normalize_espeak` | bool | true | Enable normalization for espeak (reads digits, needs it) |
+| `normalize_rhvoice` | bool | true | Enable normalization for RHVoice |
+| `normalize_silero` | bool | true | Enable normalization for Silero |
+| `normalize_opentts` | bool | true | Enable normalization for OpenTTS |
+| `normalize_google` | bool | false | Disable for Google (handles numbers well) |
+| `normalize_openai` | bool | false | Disable for OpenAI (handles numbers well) |
+| `normalize_azure` | bool | false | Disable for Azure (handles numbers well) |
+
+**Default behavior by provider:**
+- **espeak, rhvoice, silero, opentts**: Normalization ON (these providers read numbers as digits)
+- **google, openai, azure**: Normalization OFF (these providers handle numbers natively)
+
+**Config method:**
+```go
+// NeedsNormalization returns whether text normalization should be applied
+func (c *Config) NeedsNormalization(provider string) bool
+```
 
 #### -0.25.10 Implementation Tasks
 
@@ -876,9 +891,10 @@ New config fields:
 - [x] Create `internal/normalize/nouns.go` with noun database
 - [x] Create `internal/normalize/processor.go` with text processor
 - [x] Create `internal/normalize/processor_test.go` with tests
-- [ ] Add `normalize_numbers` config field
+- [x] Add per-provider `normalize_<provider>` config fields
+- [x] Add `NeedsNormalization(provider)` config method with sensible defaults
 - [ ] Integrate processor into TTS pipeline
-- [ ] Add normalization toggle to Settings UI
+- [ ] Add normalization toggle to Settings UI (per provider)
 
 ---
 

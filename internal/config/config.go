@@ -22,17 +22,18 @@ type Config struct {
 	OpenBrowser bool   `mapstructure:"open_browser"`
 
 	// TTS settings
-	BitRateKbs              int            `mapstructure:"bit_rate_kbs"`
-	SampleRateHz            int            `mapstructure:"sample_rate_hz"`
-	DefaultSpeed            float64        `mapstructure:"default_speed"`
-	DefaultPitch            float64        `mapstructure:"default_pitch"`
-	ChapterGapSeconds       int            `mapstructure:"chapter_gap_seconds"`       // Silence between chapters
-	PronunciationDictFile   string         `mapstructure:"pronunciation_dict_file"`   // Path to pronunciation dictionary
-	UseDefaultPronunciation bool           `mapstructure:"use_default_pronunciation"` // Use built-in pronunciation rules
-	MaxFileSizeMB           int            `mapstructure:"max_file_size_mb"`          // Max M4B file size before splitting
-	ConcurrentTTSWorkers    int            `mapstructure:"concurrent_tts_workers"`    // Default number of parallel TTS workers (legacy)
-	ProviderTTSWorkers      map[string]int `mapstructure:"provider_tts_workers"`      // Per-provider TTS worker counts
-	ConcurrentEncoders      int            `mapstructure:"concurrent_encoders"`       // Number of parallel M4B encoders
+	BitRateKbs              int             `mapstructure:"bit_rate_kbs"`
+	SampleRateHz            int             `mapstructure:"sample_rate_hz"`
+	DefaultSpeed            float64         `mapstructure:"default_speed"`
+	DefaultPitch            float64         `mapstructure:"default_pitch"`
+	ChapterGapSeconds       int             `mapstructure:"chapter_gap_seconds"`       // Silence between chapters
+	PronunciationDictFile   string          `mapstructure:"pronunciation_dict_file"`   // Path to pronunciation dictionary
+	UseDefaultPronunciation bool            `mapstructure:"use_default_pronunciation"` // Use built-in pronunciation rules
+	MaxFileSizeMB           int             `mapstructure:"max_file_size_mb"`          // Max M4B file size before splitting
+	ConcurrentTTSWorkers    int             `mapstructure:"concurrent_tts_workers"`    // Default number of parallel TTS workers (legacy)
+	ProviderTTSWorkers      map[string]int  `mapstructure:"provider_tts_workers"`      // Per-provider TTS worker counts
+	ConcurrentEncoders      int             `mapstructure:"concurrent_encoders"`       // Number of parallel M4B encoders
+	ProviderNormalization   map[string]bool `mapstructure:"provider_normalization"`    // Per-provider text normalization (numbers to words)
 
 	// Cloud provider settings
 	CloudAPIKey       string `mapstructure:"cloud_api_key"`
@@ -216,6 +217,14 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 	} else if v, ok := dbConfig["concurrent_encoders"].(int); ok {
 		cfg.ConcurrentEncoders = v
 	}
+	// Load per-provider normalization settings
+	cfg.ProviderNormalization = make(map[string]bool)
+	for _, p := range providers {
+		key := "normalize_" + p
+		if v, ok := dbConfig[key].(bool); ok {
+			cfg.ProviderNormalization[p] = v
+		}
+	}
 	if v, ok := dbConfig["cloud_api_key"].(string); ok {
 		cfg.CloudAPIKey = v
 	}
@@ -274,4 +283,36 @@ func (c *Config) GetTTSWorkersForProvider(provider string) int {
 		return c.ConcurrentTTSWorkers
 	}
 	return 3 // Default
+}
+
+// providerNormalizationDefaults defines which providers need text normalization by default.
+// Providers that handle numbers well natively don't need normalization.
+var providerNormalizationDefaults = map[string]bool{
+	"espeak":  true,  // espeak reads numbers as digits, needs normalization
+	"rhvoice": true,  // RHVoice needs normalization for proper number pronunciation
+	"silero":  true,  // Silero models need normalization
+	"opentts": true,  // OpenTTS engines generally need normalization
+	"google":  false, // Google Cloud TTS handles numbers well
+	"openai":  false, // OpenAI TTS handles numbers well
+	"azure":   false, // Azure TTS handles numbers well
+}
+
+// NeedsNormalization returns whether text normalization (numbers to words) should be
+// applied for the given provider. Returns the configured value if set, otherwise
+// uses sensible defaults based on provider capabilities.
+func (c *Config) NeedsNormalization(provider string) bool {
+	// Check if explicitly configured
+	if c.ProviderNormalization != nil {
+		if enabled, ok := c.ProviderNormalization[provider]; ok {
+			return enabled
+		}
+	}
+
+	// Use default based on provider
+	if defaultVal, ok := providerNormalizationDefaults[provider]; ok {
+		return defaultVal
+	}
+
+	// Unknown provider: default to enabling normalization (safer)
+	return true
 }
