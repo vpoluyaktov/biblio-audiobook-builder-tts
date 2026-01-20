@@ -1,22 +1,116 @@
 package normalize
 
 import (
+	"bufio"
+	"embed"
+	"io"
 	"strings"
 )
+
+//go:embed data/*.csv
+var embeddedData embed.FS
 
 // NounDatabase stores grammatical information about nouns for context detection.
 type NounDatabase struct {
 	nouns map[string]map[string]NounInfo // language -> normalized_noun -> info
 }
 
-// NewNounDatabase creates a new noun database with built-in entries.
+// NewNounDatabase creates a new noun database with built-in entries from embedded CSV files.
 func NewNounDatabase() *NounDatabase {
 	db := &NounDatabase{
 		nouns: make(map[string]map[string]NounInfo),
 	}
-	db.loadEnglishNouns()
-	db.loadRussianNouns()
+	db.loadEmbeddedData()
 	return db
+}
+
+// loadEmbeddedData loads noun data from embedded CSV files.
+func (db *NounDatabase) loadEmbeddedData() {
+	// Load English nouns
+	if data, err := embeddedData.Open("data/en.csv"); err == nil {
+		db.LoadFromReader("en", data)
+		data.Close()
+	}
+
+	// Load Russian nouns
+	if data, err := embeddedData.Open("data/ru.csv"); err == nil {
+		db.LoadFromReader("ru", data)
+		data.Close()
+	}
+}
+
+// LoadFromReader loads noun data from a CSV reader.
+// CSV format: noun,gender,form,singular,plurals (pipe-separated)
+// gender: m=masculine, f=feminine, n=neuter
+// form: o=ordinal, c=cardinal
+func (db *NounDatabase) LoadFromReader(lang string, r io.Reader) error {
+	if db.nouns[lang] == nil {
+		db.nouns[lang] = make(map[string]NounInfo)
+	}
+
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		info, err := parseCSVLine(line)
+		if err != nil {
+			continue // Skip malformed lines
+		}
+
+		db.nouns[lang][strings.ToLower(info.SingularForm)] = info
+	}
+
+	return scanner.Err()
+}
+
+// parseCSVLine parses a single CSV line into NounInfo.
+func parseCSVLine(line string) (NounInfo, error) {
+	parts := strings.Split(line, ",")
+	if len(parts) < 5 {
+		return NounInfo{}, io.EOF // Not enough fields
+	}
+
+	// Parse gender
+	var gender Gender
+	switch strings.ToLower(strings.TrimSpace(parts[1])) {
+	case "m":
+		gender = Masculine
+	case "f":
+		gender = Feminine
+	case "n":
+		gender = Neuter
+	default:
+		gender = Masculine
+	}
+
+	// Parse form
+	var form Form
+	switch strings.ToLower(strings.TrimSpace(parts[2])) {
+	case "o":
+		form = Ordinal
+	case "c":
+		form = Cardinal
+	default:
+		form = Cardinal
+	}
+
+	// Parse plural forms (pipe-separated)
+	plurals := strings.Split(parts[4], "|")
+	for i := range plurals {
+		plurals[i] = strings.TrimSpace(plurals[i])
+	}
+
+	return NounInfo{
+		Gender:       gender,
+		TriggerForm:  form,
+		SingularForm: strings.TrimSpace(parts[3]),
+		PluralForms:  plurals,
+	}, nil
 }
 
 // Lookup finds noun information by language and noun form.
@@ -27,7 +121,7 @@ func (db *NounDatabase) Lookup(lang, noun string) (NounInfo, bool) {
 		return NounInfo{}, false
 	}
 
-	// Normalize: lowercase for English, lowercase for Russian
+	// Normalize: lowercase
 	normalized := strings.ToLower(noun)
 
 	// Direct lookup
@@ -55,414 +149,39 @@ func (db *NounDatabase) Add(lang string, noun string, info NounInfo) {
 	db.nouns[lang][strings.ToLower(noun)] = info
 }
 
-// loadEnglishNouns loads built-in English nouns.
-func (db *NounDatabase) loadEnglishNouns() {
-	db.nouns["en"] = map[string]NounInfo{
-		// Ordinal triggers (chapter, page, etc.)
-		"chapter": {
-			Gender:       Masculine, // English doesn't use gender, but we need a default
-			TriggerForm:  Ordinal,
-			SingularForm: "chapter",
-			PluralForms:  []string{"chapters"},
-		},
-		"page": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "page",
-			PluralForms:  []string{"pages"},
-		},
-		"part": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "part",
-			PluralForms:  []string{"parts"},
-		},
-		"section": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "section",
-			PluralForms:  []string{"sections"},
-		},
-		"volume": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "volume",
-			PluralForms:  []string{"volumes"},
-		},
-		"book": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "book",
-			PluralForms:  []string{"books"},
-		},
-		"episode": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "episode",
-			PluralForms:  []string{"episodes"},
-		},
-		"act": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "act",
-			PluralForms:  []string{"acts"},
-		},
-		"scene": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "scene",
-			PluralForms:  []string{"scenes"},
-		},
-		"lesson": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "lesson",
-			PluralForms:  []string{"lessons"},
-		},
-		"step": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "step",
-			PluralForms:  []string{"steps"},
-		},
-		"level": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "level",
-			PluralForms:  []string{"levels"},
-		},
-		"floor": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "floor",
-			PluralForms:  []string{"floors"},
-		},
-		"grade": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "grade",
-			PluralForms:  []string{"grades"},
-		},
+// GetNouns returns all nouns for a language.
+func (db *NounDatabase) GetNouns(lang string) map[string]NounInfo {
+	if langNouns, ok := db.nouns[lang]; ok {
+		// Return a copy to prevent modification
+		result := make(map[string]NounInfo, len(langNouns))
+		for k, v := range langNouns {
+			result[k] = v
+		}
+		return result
+	}
+	return nil
+}
 
-		// Cardinal triggers (quantities)
-		"dollar": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "dollar",
-			PluralForms:  []string{"dollars"},
-		},
-		"cent": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "cent",
-			PluralForms:  []string{"cents"},
-		},
-		"pound": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "pound",
-			PluralForms:  []string{"pounds"},
-		},
-		"euro": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "euro",
-			PluralForms:  []string{"euros"},
-		},
-		"year": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "year",
-			PluralForms:  []string{"years"},
-		},
-		"month": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "month",
-			PluralForms:  []string{"months"},
-		},
-		"day": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "day",
-			PluralForms:  []string{"days"},
-		},
-		"hour": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "hour",
-			PluralForms:  []string{"hours"},
-		},
-		"minute": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "minute",
-			PluralForms:  []string{"minutes"},
-		},
-		"second": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "second",
-			PluralForms:  []string{"seconds"},
-		},
-		"percent": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "percent",
-			PluralForms:  []string{"percents"},
-		},
-		"mile": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "mile",
-			PluralForms:  []string{"miles"},
-		},
-		"kilometer": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "kilometer",
-			PluralForms:  []string{"kilometers"},
-		},
-		"meter": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "meter",
-			PluralForms:  []string{"meters"},
-		},
-		"foot": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "foot",
-			PluralForms:  []string{"feet"},
-		},
-		"inch": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "inch",
-			PluralForms:  []string{"inches"},
-		},
-		"person": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "person",
-			PluralForms:  []string{"people", "persons"},
-		},
-		"time": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "time",
-			PluralForms:  []string{"times"},
-		},
+// GetLanguages returns all languages in the database.
+func (db *NounDatabase) GetLanguages() []string {
+	langs := make([]string, 0, len(db.nouns))
+	for lang := range db.nouns {
+		langs = append(langs, lang)
+	}
+	return langs
+}
+
+// Remove removes a noun from the database.
+func (db *NounDatabase) Remove(lang, noun string) {
+	if langNouns, ok := db.nouns[lang]; ok {
+		delete(langNouns, strings.ToLower(noun))
 	}
 }
 
-// loadRussianNouns loads built-in Russian nouns.
-func (db *NounDatabase) loadRussianNouns() {
-	db.nouns["ru"] = map[string]NounInfo{
-		// Ordinal triggers (feminine)
-		"глава": {
-			Gender:       Feminine,
-			TriggerForm:  Ordinal,
-			SingularForm: "глава",
-			PluralForms:  []string{"главы", "глав"},
-		},
-		"страница": {
-			Gender:       Feminine,
-			TriggerForm:  Ordinal,
-			SingularForm: "страница",
-			PluralForms:  []string{"страницы", "страниц"},
-		},
-		"часть": {
-			Gender:       Feminine,
-			TriggerForm:  Ordinal,
-			SingularForm: "часть",
-			PluralForms:  []string{"части", "частей"},
-		},
-		"книга": {
-			Gender:       Feminine,
-			TriggerForm:  Ordinal,
-			SingularForm: "книга",
-			PluralForms:  []string{"книги", "книг"},
-		},
-		"серия": {
-			Gender:       Feminine,
-			TriggerForm:  Ordinal,
-			SingularForm: "серия",
-			PluralForms:  []string{"серии", "серий"},
-		},
-		"сцена": {
-			Gender:       Feminine,
-			TriggerForm:  Ordinal,
-			SingularForm: "сцена",
-			PluralForms:  []string{"сцены", "сцен"},
-		},
-
-		// Ordinal triggers (masculine)
-		"том": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "том",
-			PluralForms:  []string{"тома", "томов"},
-		},
-		"раздел": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "раздел",
-			PluralForms:  []string{"раздела", "разделов"},
-		},
-		"акт": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "акт",
-			PluralForms:  []string{"акта", "актов"},
-		},
-		"эпизод": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "эпизод",
-			PluralForms:  []string{"эпизода", "эпизодов"},
-		},
-		"урок": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "урок",
-			PluralForms:  []string{"урока", "уроков"},
-		},
-		"этаж": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "этаж",
-			PluralForms:  []string{"этажа", "этажей"},
-		},
-		"класс": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "класс",
-			PluralForms:  []string{"класса", "классов"},
-		},
-		"уровень": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "уровень",
-			PluralForms:  []string{"уровня", "уровней"},
-		},
-		"шаг": {
-			Gender:       Masculine,
-			TriggerForm:  Ordinal,
-			SingularForm: "шаг",
-			PluralForms:  []string{"шага", "шагов"},
-		},
-
-		// Cardinal triggers (masculine)
-		"рубль": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "рубль",
-			PluralForms:  []string{"рубля", "рублей"},
-		},
-		"доллар": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "доллар",
-			PluralForms:  []string{"доллара", "долларов"},
-		},
-		"евро": {
-			Gender:       Neuter,
-			TriggerForm:  Cardinal,
-			SingularForm: "евро",
-			PluralForms:  []string{"евро"},
-		},
-		"год": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "год",
-			PluralForms:  []string{"года", "лет"},
-		},
-		"месяц": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "месяц",
-			PluralForms:  []string{"месяца", "месяцев"},
-		},
-		"день": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "день",
-			PluralForms:  []string{"дня", "дней"},
-		},
-		"час": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "час",
-			PluralForms:  []string{"часа", "часов"},
-		},
-		"человек": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "человек",
-			PluralForms:  []string{"человека", "человек"},
-		},
-		"раз": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "раз",
-			PluralForms:  []string{"раза", "раз"},
-		},
-		"процент": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "процент",
-			PluralForms:  []string{"процента", "процентов"},
-		},
-		"километр": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "километр",
-			PluralForms:  []string{"километра", "километров"},
-		},
-		"метр": {
-			Gender:       Masculine,
-			TriggerForm:  Cardinal,
-			SingularForm: "метр",
-			PluralForms:  []string{"метра", "метров"},
-		},
-
-		// Cardinal triggers (feminine)
-		"копейка": {
-			Gender:       Feminine,
-			TriggerForm:  Cardinal,
-			SingularForm: "копейка",
-			PluralForms:  []string{"копейки", "копеек"},
-		},
-		"минута": {
-			Gender:       Feminine,
-			TriggerForm:  Cardinal,
-			SingularForm: "минута",
-			PluralForms:  []string{"минуты", "минут"},
-		},
-		"секунда": {
-			Gender:       Feminine,
-			TriggerForm:  Cardinal,
-			SingularForm: "секунда",
-			PluralForms:  []string{"секунды", "секунд"},
-		},
-		"неделя": {
-			Gender:       Feminine,
-			TriggerForm:  Cardinal,
-			SingularForm: "неделя",
-			PluralForms:  []string{"недели", "недель"},
-		},
-		"штука": {
-			Gender:       Feminine,
-			TriggerForm:  Cardinal,
-			SingularForm: "штука",
-			PluralForms:  []string{"штуки", "штук"},
-		},
-		"миля": {
-			Gender:       Feminine,
-			TriggerForm:  Cardinal,
-			SingularForm: "миля",
-			PluralForms:  []string{"мили", "миль"},
-		},
+// Count returns the number of nouns for a language.
+func (db *NounDatabase) Count(lang string) int {
+	if langNouns, ok := db.nouns[lang]; ok {
+		return len(langNouns)
 	}
+	return 0
 }

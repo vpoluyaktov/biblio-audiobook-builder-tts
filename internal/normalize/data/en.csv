@@ -1,0 +1,40 @@
+# English nouns for number normalization
+# Format: noun,gender,form,singular,plurals (pipe-separated)
+# gender: m=masculine, f=feminine, n=neuter
+# form: o=ordinal, c=cardinal
+#
+# Ordinal triggers (chapter, page, etc.)
+chapter,m,o,chapter,chapters
+page,m,o,page,pages
+part,m,o,part,parts
+section,m,o,section,sections
+volume,m,o,volume,volumes
+book,m,o,book,books
+episode,m,o,episode,episodes
+act,m,o,act,acts
+scene,m,o,scene,scenes
+lesson,m,o,lesson,lessons
+step,m,o,step,steps
+level,m,o,level,levels
+floor,m,o,floor,floors
+grade,m,o,grade,grades
+#
+# Cardinal triggers (quantities)
+dollar,m,c,dollar,dollars
+cent,m,c,cent,cents
+pound,m,c,pound,pounds
+euro,m,c,euro,euros
+year,m,c,year,years
+month,m,c,month,months
+day,m,c,day,days
+hour,m,c,hour,hours
+minute,m,c,minute,minutes
+second,m,c,second,seconds
+percent,m,c,percent,percents
+mile,m,c,mile,miles
+kilometer,m,c,kilometer,kilometers
+meter,m,c,meter,meters
+foot,m,c,foot,feet
+inch,m,c,inch,inches
+person,m,c,person,people|persons
+time,m,c,time,times
