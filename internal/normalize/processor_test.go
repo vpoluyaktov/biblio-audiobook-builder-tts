@@ -463,3 +463,53 @@ func BenchmarkProcess(b *testing.B) {
 		}
 	})
 }
+
+func TestRussianOrdinalSuffixes(t *testing.T) {
+	p := NewProcessor()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "year with -м suffix",
+			input:    "В 1996-м году",
+			expected: "В одна тысяча девятьсот девяносто шестом году",
+		},
+		{
+			name:     "year with -го suffix",
+			input:    "до 1996-го года",
+			expected: "до одна тысяча девятьсот девяносто шестого года",
+		},
+		{
+			name:     "ordinal with -й suffix masculine",
+			input:    "это был 5-й раз",
+			expected: "это был пятый раз",
+		},
+		{
+			name:     "ordinal with -я suffix feminine",
+			input:    "это была 5-я попытка",
+			expected: "это была пятая попытка",
+		},
+		{
+			name:     "ordinal with -е suffix neuter",
+			input:    "это было 5-е место",
+			expected: "это было пятое место",
+		},
+		{
+			name:     "multiple ordinal suffixes",
+			input:    "с 1990-го по 2000-й год",
+			expected: "с одна тысяча девятьсот девяностого по две тысячный год",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := p.Process(tt.input, "ru")
+			if result != tt.expected {
+				t.Errorf("Process(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
