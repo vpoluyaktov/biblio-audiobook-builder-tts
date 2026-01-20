@@ -788,6 +788,7 @@ class App {
                     preview_id: this.currentPreview.id,
                     provider: this.providerSelect.value,
                     voice: this.voiceSelect.value,
+                    language: this.languageSelect.value,
                     speed: parseFloat(this.speedInput.value),
                     pitch: parseFloat(this.pitchInput.value)
                 })
