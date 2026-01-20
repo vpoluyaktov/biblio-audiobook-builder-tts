@@ -157,13 +157,19 @@ class App {
         this.opdsBookCancel = document.getElementById('opds-book-cancel');
 
         // OPDS Sources (in Settings tab)
-        this.opdsSourcesList = document.getElementById('opds-sources-list');
-        this.newSourceName = document.getElementById('new-source-name');
-        this.newSourceUrl = document.getElementById('new-source-url');
-        this.newSourceDesc = document.getElementById('new-source-desc');
-        this.newSourceUsername = document.getElementById('new-source-username');
-        this.newSourcePassword = document.getElementById('new-source-password');
-        this.addSourceBtn = document.getElementById('add-source-btn');
+        this.opdsSourcesTbody = document.getElementById('opds-sources-tbody');
+        this.addOpdsSourceBtn = document.getElementById('add-opds-source-btn');
+        
+        // OPDS Source Modal
+        this.opdsSourceModal = document.getElementById('opds-source-modal');
+        this.opdsSourceModalTitle = document.getElementById('opds-source-modal-title');
+        this.opdsSourceEditId = document.getElementById('opds-source-edit-id');
+        this.opdsSourceName = document.getElementById('opds-source-name');
+        this.opdsSourceUrl = document.getElementById('opds-source-url');
+        this.opdsSourceDesc = document.getElementById('opds-source-desc');
+        this.opdsSourceUsername = document.getElementById('opds-source-username');
+        this.opdsSourcePassword = document.getElementById('opds-source-password');
+        this.opdsSourceEnabled = document.getElementById('opds-source-enabled');
     }
 
     bindEvents() {
@@ -218,19 +224,14 @@ class App {
             this.testAbsBtn.addEventListener('click', () => this.testAudiobookshelfConnection());
         }
 
-        // Test OpenTTS connection
-        if (this.testOpenTTSBtn) {
-            this.testOpenTTSBtn.addEventListener('click', () => this.testOpenTTSConnection());
-        }
-
-        // Test RHVoice connection
-        if (this.testRHVoiceBtn) {
-            this.testRHVoiceBtn.addEventListener('click', () => this.testRHVoiceConnection());
-        }
-
-        // Test Silero connection
-        if (this.testSileroBtn) {
-            this.testSileroBtn.addEventListener('click', () => this.testSileroConnection());
+        // Provider edit modal events
+        const providerEditModal = document.getElementById('provider-edit-modal');
+        if (providerEditModal) {
+            document.getElementById('provider-edit-close').addEventListener('click', () => this.closeProviderEdit());
+            document.getElementById('provider-edit-cancel').addEventListener('click', () => this.closeProviderEdit());
+            document.getElementById('provider-edit-save').addEventListener('click', () => this.saveProviderEdit());
+            document.getElementById('provider-edit-test').addEventListener('click', () => this.testProviderConnection());
+            providerEditModal.querySelector('.modal-overlay').addEventListener('click', () => this.closeProviderEdit());
         }
 
         // Test Voice Modal events
@@ -292,8 +293,15 @@ class App {
         }
 
         // OPDS Sources (in Settings tab)
-        if (this.addSourceBtn) {
-            this.addSourceBtn.addEventListener('click', () => this.addOPDSSource());
+        if (this.addOpdsSourceBtn) {
+            this.addOpdsSourceBtn.addEventListener('click', () => this.openOpdsSourceModal());
+        }
+        if (this.opdsSourceModal) {
+            document.getElementById('opds-source-modal-close').addEventListener('click', () => this.closeOpdsSourceModal());
+            document.getElementById('opds-source-modal-cancel').addEventListener('click', () => this.closeOpdsSourceModal());
+            document.getElementById('opds-source-modal-save').addEventListener('click', () => this.saveOpdsSource());
+            document.getElementById('opds-source-test').addEventListener('click', () => this.testOpdsSourceConnection());
+            this.opdsSourceModal.querySelector('.modal-overlay').addEventListener('click', () => this.closeOpdsSourceModal());
         }
     }
 
@@ -390,15 +398,21 @@ class App {
             const data = await response.json();
             this.providers = data.providers || [];
             
+            // Filter to only enabled and available providers for the dropdown
+            const availableProviders = this.providers.filter(p => p.enabled && p.available);
+            const providerIds = availableProviders.map(p => p.id);
+            
             // Use saved provider if available and valid, otherwise use server default
             const savedProvider = this.savedTTSSettings?.provider;
-            const defaultProvider = (savedProvider && this.providers.includes(savedProvider)) 
+            const defaultProvider = (savedProvider && providerIds.includes(savedProvider)) 
                 ? savedProvider 
                 : data.default;
             
-            this.providerSelect.innerHTML = this.providers.map(p => 
-                `<option value="${p}" ${p === defaultProvider ? 'selected' : ''}>${p}</option>`
-            ).join('');
+            this.providerSelect.innerHTML = availableProviders.map(p => {
+                const label = p.name || p.id;
+                const voiceInfo = p.voice_count > 0 ? ` (${p.voice_count} voices)` : '';
+                return `<option value="${p.id}" ${p.id === defaultProvider ? 'selected' : ''}>${label}${voiceInfo}</option>`;
+            }).join('');
 
             await this.loadLanguages();
         } catch (e) {
@@ -1184,54 +1198,209 @@ class App {
         document.getElementById('cfg-use-default-pronunciation').checked = s.use_default_pronunciation !== false;
         document.getElementById('cfg-pronunciation-dict').value = s.pronunciation_dict_file || '';
         
-        // Number Normalization (per provider)
-        const providerNorm = s.provider_normalization || {};
-        document.getElementById('cfg-normalize-espeak').checked = providerNorm.espeak !== false;
-        document.getElementById('cfg-normalize-opentts').checked = providerNorm.opentts !== false;
-        document.getElementById('cfg-normalize-rhvoice').checked = providerNorm.rhvoice !== false;
-        document.getElementById('cfg-normalize-silero').checked = providerNorm.silero !== false;
-        document.getElementById('cfg-normalize-google').checked = providerNorm.google === true;
-        document.getElementById('cfg-normalize-openai').checked = providerNorm.openai === true;
-        document.getElementById('cfg-normalize-azure').checked = providerNorm.azure === true;
-        
         // Output tab
         document.getElementById('cfg-bit-rate').value = s.bit_rate_kbs || 128;
         document.getElementById('cfg-sample-rate').value = s.sample_rate_hz || 44100;
         document.getElementById('cfg-chapter-gap').value = s.chapter_gap_seconds || 2;
         document.getElementById('cfg-max-file-size').value = s.max_file_size_mb || 250;
         
-        // Performance tab - per-provider TTS workers
-        const defaultWorkers = s.concurrent_tts_workers || 3;
-        const providerWorkers = s.provider_tts_workers || {};
-        document.getElementById('cfg-tts-workers-espeak').value = providerWorkers.espeak || defaultWorkers;
-        document.getElementById('cfg-tts-workers-opentts').value = providerWorkers.opentts || defaultWorkers;
-        document.getElementById('cfg-tts-workers-rhvoice').value = providerWorkers.rhvoice || defaultWorkers;
-        document.getElementById('cfg-tts-workers-silero').value = providerWorkers.silero || defaultWorkers;
-        document.getElementById('cfg-tts-workers-openai').value = providerWorkers.openai || defaultWorkers;
-        document.getElementById('cfg-tts-workers-google').value = providerWorkers.google || defaultWorkers;
-        document.getElementById('cfg-tts-workers-azure').value = providerWorkers.azure || defaultWorkers;
-        document.getElementById('cfg-concurrent-encoders').value = s.concurrent_encoders || 2;
-        
-        // Cloud TTS tab
-        document.getElementById('cfg-openai-api-key').value = s.openai_api_key || '';
-        document.getElementById('cfg-google-api-key').value = s.google_api_key || '';
-        document.getElementById('cfg-azure-tts-key').value = s.azure_tts_key || '';
-        document.getElementById('cfg-azure-tts-region').value = s.azure_tts_region || '';
-        
-        // OpenTTS tab
-        document.getElementById('cfg-opentts-url').value = s.opentts_url || '';
-        
-        // RHVoice tab
-        document.getElementById('cfg-rhvoice-url').value = s.rhvoice_url || '';
-        
-        // Silero tab
-        document.getElementById('cfg-silero-url').value = s.silero_url || '';
-        
         // Audiobookshelf tab
         document.getElementById('cfg-abs-url').value = s.audiobookshelf_url || '';
         document.getElementById('cfg-abs-user').value = s.audiobookshelf_user || 'admin';
         document.getElementById('cfg-abs-password').value = s.audiobookshelf_password || '';
         document.getElementById('cfg-abs-library').value = s.audiobookshelf_library || 'TTS books';
+        
+        // Providers tab - populate table
+        this.populateProvidersTable();
+    }
+    
+    async populateProvidersTable() {
+        const tbody = document.getElementById('providers-table-body');
+        if (!tbody) return;
+        
+        try {
+            const response = await fetch('/api/providers');
+            const data = await response.json();
+            this.providersData = data.providers || [];
+            
+            tbody.innerHTML = this.providersData.map(p => {
+                const statusClass = !p.enabled ? 'disabled' : (p.available ? 'available' : 'unavailable');
+                const statusText = !p.enabled ? 'Disabled' : (p.available ? 'Available' : 'Not configured');
+                
+                return `
+                    <tr data-provider-id="${p.id}">
+                        <td class="provider-name">${p.name}</td>
+                        <td class="provider-type">${p.type}</td>
+                        <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                        <td>${p.tts_workers}</td>
+                        <td>${p.normalize_numbers ? '✓' : '—'}</td>
+                        <td>${p.is_default ? '<span class="default-badge">Default</span>' : ''}</td>
+                    </tr>
+                `;
+            }).join('');
+            
+            // Add click handlers to rows
+            tbody.querySelectorAll('tr').forEach(row => {
+                row.addEventListener('click', () => this.openProviderEdit(row.dataset.providerId));
+            });
+        } catch (error) {
+            console.error('Failed to load providers:', error);
+            tbody.innerHTML = '<tr><td colspan="6">Failed to load providers</td></tr>';
+        }
+    }
+    
+    openProviderEdit(providerId) {
+        const provider = this.providersData.find(p => p.id === providerId);
+        if (!provider) return;
+        
+        this.currentEditProvider = provider;
+        
+        // Set modal title
+        document.getElementById('provider-edit-title').textContent = `Edit ${provider.name}`;
+        document.getElementById('provider-edit-id').value = provider.id;
+        
+        // Set status
+        const statusEl = document.getElementById('provider-edit-status');
+        if (!provider.enabled) {
+            statusEl.className = 'provider-edit-status disabled';
+            statusEl.textContent = '⚪ Provider is disabled';
+        } else if (provider.available) {
+            statusEl.className = 'provider-edit-status available';
+            statusEl.textContent = `✓ Available (${provider.voice_count} voices)`;
+        } else {
+            statusEl.className = 'provider-edit-status unavailable';
+            statusEl.textContent = '✗ Not configured or unavailable';
+        }
+        
+        // Set form values
+        document.getElementById('provider-edit-enabled').checked = provider.enabled;
+        document.getElementById('provider-edit-workers').value = provider.tts_workers || 3;
+        document.getElementById('provider-edit-normalize').checked = provider.normalize_numbers;
+        
+        // Show/hide fields based on provider type
+        const urlGroup = document.getElementById('provider-edit-url-group');
+        const apikeyGroup = document.getElementById('provider-edit-apikey-group');
+        const regionGroup = document.getElementById('provider-edit-region-group');
+        
+        // Self-hosted providers need URL
+        if (['opentts', 'rhvoice', 'silero'].includes(provider.id)) {
+            urlGroup.style.display = 'block';
+            apikeyGroup.style.display = 'none';
+            regionGroup.style.display = 'none';
+            document.getElementById('provider-edit-url').value = provider.url || '';
+        }
+        // Cloud providers need API key
+        else if (['google', 'openai'].includes(provider.id)) {
+            urlGroup.style.display = 'none';
+            apikeyGroup.style.display = 'block';
+            regionGroup.style.display = 'none';
+            document.getElementById('provider-edit-apikey').value = provider.api_key || '';
+        }
+        // Azure needs API key and region
+        else if (provider.id === 'azure') {
+            urlGroup.style.display = 'none';
+            apikeyGroup.style.display = 'block';
+            regionGroup.style.display = 'block';
+            document.getElementById('provider-edit-apikey').value = provider.api_key || '';
+            document.getElementById('provider-edit-region').value = provider.region || '';
+        }
+        // Local providers (espeak) don't need config
+        else {
+            urlGroup.style.display = 'none';
+            apikeyGroup.style.display = 'none';
+            regionGroup.style.display = 'none';
+        }
+        
+        // Clear test result
+        document.getElementById('provider-edit-test-result').textContent = '';
+        
+        // Show modal
+        document.getElementById('provider-edit-modal').classList.add('active');
+    }
+    
+    closeProviderEdit() {
+        document.getElementById('provider-edit-modal').classList.remove('active');
+        this.currentEditProvider = null;
+    }
+    
+    async saveProviderEdit() {
+        const providerId = document.getElementById('provider-edit-id').value;
+        
+        const updateData = {
+            enabled: document.getElementById('provider-edit-enabled').checked,
+            tts_workers: parseInt(document.getElementById('provider-edit-workers').value),
+            normalize_numbers: document.getElementById('provider-edit-normalize').checked
+        };
+        
+        // Add URL or API key based on provider type
+        if (['opentts', 'rhvoice', 'silero'].includes(providerId)) {
+            updateData.url = document.getElementById('provider-edit-url').value;
+        } else if (['google', 'openai'].includes(providerId)) {
+            updateData.api_key = document.getElementById('provider-edit-apikey').value;
+        } else if (providerId === 'azure') {
+            updateData.api_key = document.getElementById('provider-edit-apikey').value;
+            updateData.region = document.getElementById('provider-edit-region').value;
+        }
+        
+        try {
+            const response = await fetch(`/api/providers/${providerId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updateData)
+            });
+            
+            if (response.ok) {
+                this.showToast('Provider updated successfully', 'success');
+                this.closeProviderEdit();
+                await this.populateProvidersTable();
+                await this.loadProviders(); // Refresh main provider list
+            } else {
+                const error = await response.json();
+                this.showToast(error.error || 'Failed to update provider', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to save provider:', error);
+            this.showToast('Failed to save provider', 'error');
+        }
+    }
+    
+    async testProviderConnection() {
+        const providerId = document.getElementById('provider-edit-id').value;
+        const resultEl = document.getElementById('provider-edit-test-result');
+        
+        resultEl.textContent = 'Testing...';
+        resultEl.className = 'connection-result';
+        
+        // Build test data from current form values
+        const testData = {};
+        if (['opentts', 'rhvoice', 'silero'].includes(providerId)) {
+            testData.url = document.getElementById('provider-edit-url').value;
+        } else if (['google', 'openai'].includes(providerId)) {
+            testData.api_key = document.getElementById('provider-edit-apikey').value;
+        } else if (providerId === 'azure') {
+            testData.api_key = document.getElementById('provider-edit-apikey').value;
+            testData.region = document.getElementById('provider-edit-region').value;
+        }
+        
+        try {
+            const response = await fetch(`/api/providers/${providerId}/test`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(testData)
+            });
+            const result = await response.json();
+            
+            if (result.success) {
+                resultEl.textContent = result.message ? `✓ ${result.message}` : '✓ Connection successful';
+                resultEl.className = 'connection-result success';
+            } else {
+                resultEl.textContent = `✗ ${result.error || 'Connection failed'}`;
+                resultEl.className = 'connection-result error';
+            }
+        } catch (error) {
+            resultEl.textContent = '✗ Test failed';
+            resultEl.className = 'connection-result error';
+        }
     }
 
     collectSettingsForm() {
@@ -1252,49 +1421,11 @@ class App {
             use_default_pronunciation: document.getElementById('cfg-use-default-pronunciation').checked,
             pronunciation_dict_file: document.getElementById('cfg-pronunciation-dict').value,
             
-            // Number Normalization (per provider)
-            provider_normalization: {
-                espeak: document.getElementById('cfg-normalize-espeak').checked,
-                opentts: document.getElementById('cfg-normalize-opentts').checked,
-                rhvoice: document.getElementById('cfg-normalize-rhvoice').checked,
-                silero: document.getElementById('cfg-normalize-silero').checked,
-                google: document.getElementById('cfg-normalize-google').checked,
-                openai: document.getElementById('cfg-normalize-openai').checked,
-                azure: document.getElementById('cfg-normalize-azure').checked
-            },
-            
             // Output
             bit_rate_kbs: parseInt(document.getElementById('cfg-bit-rate').value),
             sample_rate_hz: parseInt(document.getElementById('cfg-sample-rate').value),
             chapter_gap_seconds: parseInt(document.getElementById('cfg-chapter-gap').value),
             max_file_size_mb: parseInt(document.getElementById('cfg-max-file-size').value),
-            
-            // Performance - per-provider TTS workers
-            provider_tts_workers: {
-                espeak: parseInt(document.getElementById('cfg-tts-workers-espeak').value),
-                opentts: parseInt(document.getElementById('cfg-tts-workers-opentts').value),
-                rhvoice: parseInt(document.getElementById('cfg-tts-workers-rhvoice').value),
-                silero: parseInt(document.getElementById('cfg-tts-workers-silero').value),
-                openai: parseInt(document.getElementById('cfg-tts-workers-openai').value),
-                google: parseInt(document.getElementById('cfg-tts-workers-google').value),
-                azure: parseInt(document.getElementById('cfg-tts-workers-azure').value)
-            },
-            concurrent_encoders: parseInt(document.getElementById('cfg-concurrent-encoders').value),
-            
-            // Cloud TTS
-            openai_api_key: document.getElementById('cfg-openai-api-key').value,
-            google_api_key: document.getElementById('cfg-google-api-key').value,
-            azure_tts_key: document.getElementById('cfg-azure-tts-key').value,
-            azure_tts_region: document.getElementById('cfg-azure-tts-region').value,
-            
-            // OpenTTS
-            opentts_url: document.getElementById('cfg-opentts-url').value,
-            
-            // RHVoice
-            rhvoice_url: document.getElementById('cfg-rhvoice-url').value,
-            
-            // Silero
-            silero_url: document.getElementById('cfg-silero-url').value,
             
             // Audiobookshelf
             audiobookshelf_url: document.getElementById('cfg-abs-url').value,
@@ -2026,36 +2157,64 @@ class App {
 
     // OPDS Sources Management
     renderSourcesList() {
-        if (!this.opdsSourcesList) return;
+        if (!this.opdsSourcesTbody) return;
         if (this.opdsSources.length === 0) {
-            this.opdsSourcesList.innerHTML = '<p style="padding: 1rem; color: var(--text-muted);">No sources configured</p>';
+            this.opdsSourcesTbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 2rem;">No sources configured. Click "Add Source" to add one.</td></tr>';
             return;
         }
 
-        this.opdsSourcesList.innerHTML = this.opdsSources.map(source => `
-            <div class="opds-source-item">
-                <div class="opds-source-info">
-                    <div class="opds-source-name">
-                        ${this.escapeHtml(source.name)}
-                        ${source.username ? '<span class="opds-source-badge">🔒 Auth</span>' : ''}
-                        ${source.is_default ? '<span class="opds-source-badge">Default</span>' : ''}
-                    </div>
-                    <div class="opds-source-url">${this.escapeHtml(source.url)}</div>
-                    ${source.description ? `<div class="opds-source-desc">${this.escapeHtml(source.description)}</div>` : ''}
-                </div>
-                <div class="opds-source-actions">
-                    ${!source.is_default ? `<button class="btn btn-danger" onclick="app.deleteOPDSSource('${source.id}')">🗑️</button>` : ''}
-                </div>
-            </div>
+        this.opdsSourcesTbody.innerHTML = this.opdsSources.map(source => `
+            <tr>
+                <td class="source-name">${this.escapeHtml(source.name)}${source.is_default ? ' <span class="auth-badge">Default</span>' : ''}</td>
+                <td class="source-url">${this.escapeHtml(source.url)}</td>
+                <td>${source.username ? '<span class="auth-badge">🔒</span>' : '<span class="no-auth">—</span>'}</td>
+                <td class="source-actions">
+                    <button class="btn btn-secondary" onclick="app.openOpdsSourceModal('${source.id}')">✏️</button>
+                    <button class="btn btn-danger" onclick="app.deleteOPDSSource('${source.id}')">🗑️</button>
+                </td>
+            </tr>
         `).join('');
     }
 
-    async addOPDSSource() {
-        const name = this.newSourceName.value.trim();
-        const url = this.newSourceUrl.value.trim();
-        const description = this.newSourceDesc.value.trim();
-        const username = this.newSourceUsername?.value.trim() || '';
-        const password = this.newSourcePassword?.value || '';
+    openOpdsSourceModal(sourceId = null) {
+        const isEdit = sourceId !== null;
+        this.opdsSourceModalTitle.textContent = isEdit ? 'Edit OPDS Source' : 'Add OPDS Source';
+        
+        if (isEdit) {
+            const source = this.opdsSources.find(s => s.id === sourceId);
+            if (!source) return;
+            this.opdsSourceEditId.value = source.id;
+            this.opdsSourceName.value = source.name || '';
+            this.opdsSourceUrl.value = source.url || '';
+            this.opdsSourceDesc.value = source.description || '';
+            this.opdsSourceUsername.value = source.username || '';
+            this.opdsSourcePassword.value = '';
+            this.opdsSourceEnabled.checked = source.enabled !== false;
+        } else {
+            this.opdsSourceEditId.value = '';
+            this.opdsSourceName.value = '';
+            this.opdsSourceUrl.value = '';
+            this.opdsSourceDesc.value = '';
+            this.opdsSourceUsername.value = '';
+            this.opdsSourcePassword.value = '';
+            this.opdsSourceEnabled.checked = true;
+        }
+        
+        this.opdsSourceModal.classList.add('active');
+    }
+
+    closeOpdsSourceModal() {
+        this.opdsSourceModal.classList.remove('active');
+    }
+
+    async saveOpdsSource() {
+        const id = this.opdsSourceEditId.value;
+        const name = this.opdsSourceName.value.trim();
+        const url = this.opdsSourceUrl.value.trim();
+        const description = this.opdsSourceDesc.value.trim();
+        const username = this.opdsSourceUsername.value.trim();
+        const password = this.opdsSourcePassword.value;
+        const enabled = this.opdsSourceEnabled.checked;
 
         if (!name || !url) {
             this.showToast('Name and URL are required', 'error');
@@ -2063,32 +2222,75 @@ class App {
         }
 
         try {
-            const response = await fetch('/api/opds/sources', {
-                method: 'POST',
+            const isEdit = id !== '';
+            const endpoint = isEdit ? `/api/opds/sources/${id}` : '/api/opds/sources';
+            const method = isEdit ? 'PUT' : 'POST';
+            
+            const body = { name, url, description, username, enabled };
+            if (password) body.password = password;
+
+            const response = await fetch(endpoint, {
+                method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, url, description, username, password, enabled: true })
+                body: JSON.stringify(body)
             });
 
             if (!response.ok) {
                 const data = await response.json();
-                throw new Error(data.error || 'Failed to add source');
+                throw new Error(data.error || 'Failed to save source');
             }
 
             const source = await response.json();
-            this.opdsSources.push(source);
+            
+            if (isEdit) {
+                const idx = this.opdsSources.findIndex(s => s.id === id);
+                if (idx >= 0) this.opdsSources[idx] = source;
+            } else {
+                this.opdsSources.push(source);
+            }
+            
             this.renderSourcesList();
             this.populateSourceSelect();
-
-            // Clear form
-            this.newSourceName.value = '';
-            this.newSourceUrl.value = '';
-            this.newSourceDesc.value = '';
-            if (this.newSourceUsername) this.newSourceUsername.value = '';
-            if (this.newSourcePassword) this.newSourcePassword.value = '';
-
-            this.showToast('Source added successfully', 'success');
+            this.closeOpdsSourceModal();
+            this.showToast(isEdit ? 'Source updated' : 'Source added', 'success');
         } catch (e) {
-            this.showToast('Failed to add source: ' + e.message, 'error');
+            this.showToast('Failed to save source: ' + e.message, 'error');
+        }
+    }
+
+    async testOpdsSourceConnection() {
+        const url = this.opdsSourceUrl.value.trim();
+        const username = this.opdsSourceUsername.value.trim();
+        const password = this.opdsSourcePassword.value;
+        const resultEl = document.getElementById('opds-source-test-result');
+
+        if (!url) {
+            resultEl.textContent = '✗ URL is required';
+            resultEl.className = 'connection-result error';
+            return;
+        }
+
+        resultEl.textContent = 'Testing...';
+        resultEl.className = 'connection-result';
+
+        try {
+            const response = await fetch('/api/opds/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, username, password })
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                resultEl.textContent = `✓ Connected${result.title ? ': ' + result.title : ''}`;
+                resultEl.className = 'connection-result success';
+            } else {
+                resultEl.textContent = `✗ ${result.error || 'Connection failed'}`;
+                resultEl.className = 'connection-result error';
+            }
+        } catch (error) {
+            resultEl.textContent = '✗ Test failed';
+            resultEl.className = 'connection-result error';
         }
     }
 

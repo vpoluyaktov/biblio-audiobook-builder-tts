@@ -45,31 +45,7 @@ type Config struct {
 	MaxFileSizeMB           int     `json:"max_file_size_mb"`
 
 	// Performance settings
-	ConcurrentTTSWorkers int            `json:"concurrent_tts_workers"`
-	ProviderTTSWorkers   map[string]int `json:"provider_tts_workers"`
-	ConcurrentEncoders   int            `json:"concurrent_encoders"`
-
-	// Cloud provider settings
-	CloudAPIKey       string `json:"cloud_api_key"`
-	GoogleTTSEndpoint string `json:"google_tts_endpoint"`
-	AzureTTSEndpoint  string `json:"azure_tts_endpoint"`
-	GoogleAPIKey      string `json:"google_api_key"`
-
-	// OpenTTS settings
-	OpenTTSURL string `json:"opentts_url"`
-
-	// RHVoice settings
-	RHVoiceURL string `json:"rhvoice_url"`
-
-	// Silero TTS settings
-	SileroURL string `json:"silero_url"`
-
-	// OpenAI TTS settings
-	OpenAIAPIKey string `json:"openai_api_key"`
-
-	// Azure TTS settings
-	AzureTTSKey    string `json:"azure_tts_key"`
-	AzureTTSRegion string `json:"azure_tts_region"`
+	ConcurrentEncoders int `json:"concurrent_encoders"`
 
 	// Audiobookshelf integration
 	AudiobookshelfURL      string `json:"audiobookshelf_url"`
@@ -216,6 +192,25 @@ func (db *DB) migrate() error {
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_nouns_lang ON nouns(lang);
+
+	CREATE TABLE IF NOT EXISTS providers (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL,
+		type TEXT NOT NULL,
+		enabled BOOLEAN DEFAULT 1,
+		url TEXT DEFAULT '',
+		api_key TEXT DEFAULT '',
+		region TEXT DEFAULT '',
+		tts_workers INTEGER DEFAULT 3,
+		normalize_numbers BOOLEAN DEFAULT 1,
+		is_default BOOLEAN DEFAULT 0,
+		display_order INTEGER DEFAULT 0,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_providers_enabled ON providers(enabled);
+	CREATE INDEX IF NOT EXISTS idx_providers_type ON providers(type);
 	`
 
 	_, err := db.conn.Exec(schema)
@@ -329,51 +324,8 @@ func (db *DB) GetAllConfig() (*Config, error) {
 	if v, ok := configMap["max_file_size_mb"]; ok {
 		fmt.Sscanf(v, "%d", &cfg.MaxFileSizeMB)
 	}
-	if v, ok := configMap["concurrent_tts_workers"]; ok {
-		fmt.Sscanf(v, "%d", &cfg.ConcurrentTTSWorkers)
-	}
-	// Load per-provider TTS workers
-	cfg.ProviderTTSWorkers = make(map[string]int)
-	providers := []string{"espeak", "google", "opentts", "rhvoice", "silero", "openai", "azure"}
-	for _, p := range providers {
-		if v, ok := configMap["tts_workers_"+p]; ok {
-			var workers int
-			fmt.Sscanf(v, "%d", &workers)
-			cfg.ProviderTTSWorkers[p] = workers
-		}
-	}
 	if v, ok := configMap["concurrent_encoders"]; ok {
 		fmt.Sscanf(v, "%d", &cfg.ConcurrentEncoders)
-	}
-	if v, ok := configMap["cloud_api_key"]; ok {
-		cfg.CloudAPIKey = v
-	}
-	if v, ok := configMap["google_tts_endpoint"]; ok {
-		cfg.GoogleTTSEndpoint = v
-	}
-	if v, ok := configMap["azure_tts_endpoint"]; ok {
-		cfg.AzureTTSEndpoint = v
-	}
-	if v, ok := configMap["google_api_key"]; ok {
-		cfg.GoogleAPIKey = v
-	}
-	if v, ok := configMap["opentts_url"]; ok {
-		cfg.OpenTTSURL = v
-	}
-	if v, ok := configMap["rhvoice_url"]; ok {
-		cfg.RHVoiceURL = v
-	}
-	if v, ok := configMap["silero_url"]; ok {
-		cfg.SileroURL = v
-	}
-	if v, ok := configMap["openai_api_key"]; ok {
-		cfg.OpenAIAPIKey = v
-	}
-	if v, ok := configMap["azure_tts_key"]; ok {
-		cfg.AzureTTSKey = v
-	}
-	if v, ok := configMap["azure_tts_region"]; ok {
-		cfg.AzureTTSRegion = v
 	}
 	if v, ok := configMap["audiobookshelf_url"]; ok {
 		cfg.AudiobookshelfURL = v
@@ -428,14 +380,7 @@ func (db *DB) SaveAllConfig(cfg *Config) error {
 		"pronunciation_dict_file":   cfg.PronunciationDictFile,
 		"use_default_pronunciation": fmt.Sprintf("%t", cfg.UseDefaultPronunciation),
 		"max_file_size_mb":          fmt.Sprintf("%d", cfg.MaxFileSizeMB),
-		"cloud_api_key":             cfg.CloudAPIKey,
-		"google_tts_endpoint":       cfg.GoogleTTSEndpoint,
-		"azure_tts_endpoint":        cfg.AzureTTSEndpoint,
-		"google_api_key":            cfg.GoogleAPIKey,
-		"opentts_url":               cfg.OpenTTSURL,
-		"openai_api_key":            cfg.OpenAIAPIKey,
-		"azure_tts_key":             cfg.AzureTTSKey,
-		"azure_tts_region":          cfg.AzureTTSRegion,
+		"concurrent_encoders":       fmt.Sprintf("%d", cfg.ConcurrentEncoders),
 		"audiobookshelf_url":        cfg.AudiobookshelfURL,
 		"audiobookshelf_user":       cfg.AudiobookshelfUser,
 		"audiobookshelf_password":   cfg.AudiobookshelfPassword,
@@ -470,14 +415,7 @@ func DefaultConfig() *Config {
 		PronunciationDictFile:   "",
 		UseDefaultPronunciation: true,
 		MaxFileSizeMB:           2000,
-		CloudAPIKey:             "",
-		GoogleTTSEndpoint:       "",
-		AzureTTSEndpoint:        "",
-		GoogleAPIKey:            "",
-		OpenTTSURL:              "",
-		OpenAIAPIKey:            "",
-		AzureTTSKey:             "",
-		AzureTTSRegion:          "",
+		ConcurrentEncoders:      2,
 		AudiobookshelfURL:       "",
 		AudiobookshelfUser:      "admin",
 		AudiobookshelfPassword:  "",
@@ -1010,6 +948,307 @@ func (db *DB) DeleteOPDSSource(id string) error {
 	return err
 }
 
+// TTSProvider represents a TTS provider configuration stored in the database
+type TTSProvider struct {
+	ID               string    `json:"id"`
+	Name             string    `json:"name"`
+	Type             string    `json:"type"` // "local", "cloud", "self-hosted"
+	Enabled          bool      `json:"enabled"`
+	URL              string    `json:"url"`
+	APIKey           string    `json:"api_key"`
+	Region           string    `json:"region"`
+	TTSWorkers       int       `json:"tts_workers"`
+	NormalizeNumbers bool      `json:"normalize_numbers"`
+	IsDefault        bool      `json:"is_default"`
+	DisplayOrder     int       `json:"display_order"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+// CreateProvider creates a new provider in the database
+func (db *DB) CreateProvider(provider *TTSProvider) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	_, err := db.conn.Exec(`
+		INSERT INTO providers (id, name, type, enabled, url, api_key, region, tts_workers, normalize_numbers, is_default, display_order, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			name = excluded.name,
+			type = excluded.type,
+			enabled = excluded.enabled,
+			url = excluded.url,
+			api_key = excluded.api_key,
+			region = excluded.region,
+			tts_workers = excluded.tts_workers,
+			normalize_numbers = excluded.normalize_numbers,
+			is_default = excluded.is_default,
+			display_order = excluded.display_order,
+			updated_at = excluded.updated_at
+	`, provider.ID, provider.Name, provider.Type, provider.Enabled, provider.URL, provider.APIKey, provider.Region,
+		provider.TTSWorkers, provider.NormalizeNumbers, provider.IsDefault, provider.DisplayOrder,
+		provider.CreatedAt, provider.UpdatedAt)
+
+	return err
+}
+
+// UpdateProvider updates an existing provider
+func (db *DB) UpdateProvider(provider *TTSProvider) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	_, err := db.conn.Exec(`
+		UPDATE providers SET name = ?, type = ?, enabled = ?, url = ?, api_key = ?, region = ?, tts_workers = ?,
+			normalize_numbers = ?, is_default = ?, display_order = ?, updated_at = ?
+		WHERE id = ?
+	`, provider.Name, provider.Type, provider.Enabled, provider.URL, provider.APIKey, provider.Region, provider.TTSWorkers,
+		provider.NormalizeNumbers, provider.IsDefault, provider.DisplayOrder, time.Now(), provider.ID)
+
+	return err
+}
+
+// GetProvider retrieves a provider by ID
+func (db *DB) GetProvider(id string) (*TTSProvider, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	provider := &TTSProvider{}
+	err := db.conn.QueryRow(`
+		SELECT id, name, type, enabled, url, api_key, region, tts_workers, normalize_numbers, is_default, display_order, created_at, updated_at
+		FROM providers WHERE id = ?
+	`, id).Scan(&provider.ID, &provider.Name, &provider.Type, &provider.Enabled, &provider.URL, &provider.APIKey, &provider.Region,
+		&provider.TTSWorkers, &provider.NormalizeNumbers, &provider.IsDefault, &provider.DisplayOrder,
+		&provider.CreatedAt, &provider.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return provider, nil
+}
+
+// ListProviders retrieves all providers, optionally filtered by enabled status
+func (db *DB) ListProviders(enabledOnly bool) ([]*TTSProvider, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	query := `SELECT id, name, type, enabled, url, api_key, region, tts_workers, normalize_numbers, is_default, display_order, created_at, updated_at FROM providers`
+	if enabledOnly {
+		query += " WHERE enabled = 1"
+	}
+	query += " ORDER BY display_order ASC, name ASC"
+
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var providers []*TTSProvider
+	for rows.Next() {
+		provider := &TTSProvider{}
+		err := rows.Scan(&provider.ID, &provider.Name, &provider.Type, &provider.Enabled, &provider.URL, &provider.APIKey, &provider.Region,
+			&provider.TTSWorkers, &provider.NormalizeNumbers, &provider.IsDefault, &provider.DisplayOrder,
+			&provider.CreatedAt, &provider.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		providers = append(providers, provider)
+	}
+
+	return providers, nil
+}
+
+// DeleteProvider deletes a provider by ID
+func (db *DB) DeleteProvider(id string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	_, err := db.conn.Exec("DELETE FROM providers WHERE id = ?", id)
+	return err
+}
+
+// SetDefaultProvider sets a provider as the default (and unsets others)
+func (db *DB) SetDefaultProvider(id string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Unset all defaults
+	if _, err := tx.Exec("UPDATE providers SET is_default = 0"); err != nil {
+		return err
+	}
+
+	// Set the new default
+	if _, err := tx.Exec("UPDATE providers SET is_default = 1, updated_at = ? WHERE id = ?", time.Now(), id); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// GetDefaultProvider returns the default provider
+func (db *DB) GetDefaultProvider() (*TTSProvider, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	provider := &TTSProvider{}
+	err := db.conn.QueryRow(`
+		SELECT id, name, type, enabled, url, api_key, region, tts_workers, normalize_numbers, is_default, display_order, created_at, updated_at
+		FROM providers WHERE is_default = 1 LIMIT 1
+	`).Scan(&provider.ID, &provider.Name, &provider.Type, &provider.Enabled, &provider.URL, &provider.APIKey, &provider.Region,
+		&provider.TTSWorkers, &provider.NormalizeNumbers, &provider.IsDefault, &provider.DisplayOrder,
+		&provider.CreatedAt, &provider.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return provider, nil
+}
+
+// InitializeDefaultProviders adds default TTS providers if none exist
+func (db *DB) InitializeDefaultProviders() error {
+	providers, err := db.ListProviders(false)
+	if err != nil {
+		return err
+	}
+
+	if len(providers) > 0 {
+		return nil // Already have providers
+	}
+
+	log.Println("Initializing default TTS providers")
+
+	now := time.Now()
+	defaults := []TTSProvider{
+		{
+			ID:               "espeak",
+			Name:             "eSpeak",
+			Type:             "local",
+			Enabled:          true,
+			URL:              "",
+			APIKey:           "",
+			Region:           "",
+			TTSWorkers:       3,
+			NormalizeNumbers: true,
+			IsDefault:        true,
+			DisplayOrder:     0,
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		},
+		{
+			ID:               "google",
+			Name:             "Google Cloud TTS",
+			Type:             "cloud",
+			Enabled:          false,
+			URL:              "",
+			APIKey:           "",
+			Region:           "",
+			TTSWorkers:       3,
+			NormalizeNumbers: false,
+			IsDefault:        false,
+			DisplayOrder:     1,
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		},
+		{
+			ID:               "openai",
+			Name:             "OpenAI TTS",
+			Type:             "cloud",
+			Enabled:          false,
+			URL:              "",
+			APIKey:           "",
+			Region:           "",
+			TTSWorkers:       3,
+			NormalizeNumbers: false,
+			IsDefault:        false,
+			DisplayOrder:     2,
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		},
+		{
+			ID:               "azure",
+			Name:             "Azure TTS",
+			Type:             "cloud",
+			Enabled:          false,
+			URL:              "",
+			APIKey:           "",
+			Region:           "",
+			TTSWorkers:       3,
+			NormalizeNumbers: false,
+			IsDefault:        false,
+			DisplayOrder:     3,
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		},
+		{
+			ID:               "opentts",
+			Name:             "OpenTTS",
+			Type:             "self-hosted",
+			Enabled:          false,
+			URL:              "",
+			APIKey:           "",
+			Region:           "",
+			TTSWorkers:       3,
+			NormalizeNumbers: true,
+			IsDefault:        false,
+			DisplayOrder:     4,
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		},
+		{
+			ID:               "rhvoice",
+			Name:             "RHVoice",
+			Type:             "self-hosted",
+			Enabled:          false,
+			URL:              "",
+			APIKey:           "",
+			Region:           "",
+			TTSWorkers:       3,
+			NormalizeNumbers: true,
+			IsDefault:        false,
+			DisplayOrder:     5,
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		},
+		{
+			ID:               "silero",
+			Name:             "Silero TTS",
+			Type:             "self-hosted",
+			Enabled:          false,
+			URL:              "",
+			APIKey:           "",
+			Region:           "",
+			TTSWorkers:       3,
+			NormalizeNumbers: true,
+			IsDefault:        false,
+			DisplayOrder:     6,
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		},
+	}
+
+	for _, provider := range defaults {
+		if err := db.CreateProvider(&provider); err != nil {
+			logger.Warn("Failed to create default provider %s: %v", provider.Name, err)
+		}
+	}
+
+	return nil
+}
+
 // InitializeDefaultOPDSSources adds default OPDS sources if none exist
 func (db *DB) InitializeDefaultOPDSSources() error {
 	sources, err := db.ListOPDSSources(false)
@@ -1092,12 +1331,17 @@ func (db *DB) InitializeDefaults() error {
 		logger.Warn("Failed to initialize OPDS sources: %v", err)
 	}
 
+	// Initialize default TTS providers
+	if err := db.InitializeDefaultProviders(); err != nil {
+		logger.Warn("Failed to initialize TTS providers: %v", err)
+	}
+
 	return nil
 }
 
 // ToAppConfig converts storage.Config to the application config format
 func (c *Config) ToAppConfig() map[string]interface{} {
-	result := map[string]interface{}{
+	return map[string]interface{}{
 		"log_file":                  c.LogFile,
 		"output_dir":                c.OutputDir,
 		"temp_dir":                  c.TempDir,
@@ -1114,26 +1358,10 @@ func (c *Config) ToAppConfig() map[string]interface{} {
 		"pronunciation_dict_file":   c.PronunciationDictFile,
 		"use_default_pronunciation": c.UseDefaultPronunciation,
 		"max_file_size_mb":          c.MaxFileSizeMB,
-		"concurrent_tts_workers":    c.ConcurrentTTSWorkers,
 		"concurrent_encoders":       c.ConcurrentEncoders,
-		"cloud_api_key":             c.CloudAPIKey,
-		"google_tts_endpoint":       c.GoogleTTSEndpoint,
-		"azure_tts_endpoint":        c.AzureTTSEndpoint,
-		"google_api_key":            c.GoogleAPIKey,
-		"opentts_url":               c.OpenTTSURL,
-		"rhvoice_url":               c.RHVoiceURL,
-		"silero_url":                c.SileroURL,
-		"openai_api_key":            c.OpenAIAPIKey,
-		"azure_tts_key":             c.AzureTTSKey,
-		"azure_tts_region":          c.AzureTTSRegion,
 		"audiobookshelf_url":        c.AudiobookshelfURL,
 		"audiobookshelf_user":       c.AudiobookshelfUser,
 		"audiobookshelf_password":   c.AudiobookshelfPassword,
 		"audiobookshelf_library":    c.AudiobookshelfLibrary,
 	}
-	// Add per-provider TTS workers
-	for provider, workers := range c.ProviderTTSWorkers {
-		result["tts_workers_"+provider] = workers
-	}
-	return result
 }

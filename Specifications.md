@@ -287,6 +287,159 @@ Flags:
 
 ## Future Enhancements
 
+### Phase -3: Providers Table Migration (High Priority)
+
+**Goal**: Move all TTS provider configurations from the `config` table to a dedicated `providers` table for better maintainability and extensibility.
+
+#### -3.1 Current State
+
+Currently, TTS provider configurations are stored as individual key-value pairs in the `config` table:
+- `google_api_key`, `opentts_url`, `rhvoice_url`, `silero_url`, `openai_api_key`, `azure_tts_key`, `azure_tts_region`
+- `tts_workers_<provider>` for per-provider worker counts
+- `normalize_<provider>` for per-provider normalization settings
+
+This approach has limitations:
+- Hard to add new providers without code changes
+- Configuration scattered across multiple keys
+- No unified way to enable/disable providers
+- Difficult to extend with provider-specific settings
+
+#### -3.2 New Providers Table Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS providers (
+    id TEXT PRIMARY KEY,           -- Provider identifier (e.g., "espeak", "google", "opentts")
+    name TEXT NOT NULL,            -- Display name (e.g., "Google Cloud TTS")
+    type TEXT NOT NULL,            -- Provider type: "local", "cloud", "self-hosted"
+    enabled BOOLEAN DEFAULT 1,     -- Whether provider is enabled
+    
+    -- Connection settings
+    url TEXT DEFAULT '',           -- Server URL for self-hosted providers
+    api_key TEXT DEFAULT '',       -- API key for cloud providers
+    region TEXT DEFAULT '',        -- Region for Azure TTS
+    
+    -- Performance settings
+    tts_workers INTEGER DEFAULT 3, -- Number of concurrent TTS workers
+    
+    -- Processing settings
+    normalize_numbers BOOLEAN DEFAULT 1,  -- Enable number normalization
+    
+    -- Metadata
+    is_default BOOLEAN DEFAULT 0,  -- Default provider for new jobs
+    display_order INTEGER DEFAULT 0, -- Order in UI dropdowns
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_providers_enabled ON providers(enabled);
+CREATE INDEX IF NOT EXISTS idx_providers_type ON providers(type);
+```
+
+#### -3.3 Provider Struct
+
+```go
+// TTSProvider represents a TTS provider configuration stored in the database
+type TTSProvider struct {
+    ID               string    `json:"id"`
+    Name             string    `json:"name"`
+    Type             string    `json:"type"`  // "local", "cloud", "self-hosted"
+    Enabled          bool      `json:"enabled"`
+    URL              string    `json:"url"`      // Server URL for self-hosted providers
+    APIKey           string    `json:"api_key"`  // API key for cloud providers
+    Region           string    `json:"region"`   // Region for Azure TTS
+    TTSWorkers       int       `json:"tts_workers"`
+    NormalizeNumbers bool      `json:"normalize_numbers"`
+    IsDefault        bool      `json:"is_default"`
+    DisplayOrder     int       `json:"display_order"`
+    CreatedAt        time.Time `json:"created_at"`
+    UpdatedAt        time.Time `json:"updated_at"`
+}
+```
+
+#### -3.4 Default Providers
+
+On first run, initialize with default providers:
+
+| ID | Name | Type | Enabled | URL | API Key |
+|----|------|------|---------|-----|---------|
+| espeak | eSpeak | local | true | - | - |
+| google | Google Cloud TTS | cloud | false | - | (required) |
+| openai | OpenAI TTS | cloud | false | - | (required) |
+| azure | Azure TTS | cloud | false | - | (required + region) |
+| opentts | OpenTTS | self-hosted | false | (required) | - |
+| rhvoice | RHVoice | self-hosted | false | (required) | - |
+| silero | Silero TTS | self-hosted | false | (required) | - |
+
+#### -3.5 API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/providers` | List all providers (with status) |
+| `GET` | `/api/providers/{id}` | Get provider details |
+| `PUT` | `/api/providers/{id}` | Update provider configuration |
+| `POST` | `/api/providers/{id}/test` | Test provider connection |
+| `POST` | `/api/providers/{id}/enable` | Enable provider |
+| `POST` | `/api/providers/{id}/disable` | Disable provider |
+
+#### -3.6 Migration Strategy
+
+1. Create new `providers` table
+2. Migrate existing config values to providers table
+3. Update TTS service to load providers from database
+4. Update settings API to use providers endpoints
+5. Update UI to use new providers management
+6. Remove old config keys (backward compatibility period)
+
+#### -3.7 UI Changes
+
+**Settings Modal - TTS Providers Tab:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  🔊 TTS Providers                                               │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │ ☑ eSpeak (Local)                              [Default] │   │
+│  │   Status: ✅ Available                                  │   │
+│  │   Workers: [3 ▼]  Normalize: [✓]                       │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │ ☐ Google Cloud TTS (Cloud)                              │   │
+│  │   API Key: [••••••••••••••••••••] [Test]               │   │
+│  │   Workers: [3 ▼]  Normalize: [  ]                       │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │ ☑ OpenTTS (Self-hosted)                                 │   │
+│  │   URL: [http://localhost:5500    ] [Test]               │   │
+│  │   Status: ✅ Connected (45 voices)                      │   │
+│  │   Workers: [3 ▼]  Normalize: [✓]                       │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### -3.8 Implementation Tasks
+
+- [x] Add `providers` table schema to db.go migrate()
+- [x] Create `Provider` struct in storage/db.go
+- [x] Implement CRUD operations: CreateProvider, GetProvider, UpdateProvider, ListProviders
+- [x] Add InitializeDefaultProviders() function
+- [x] Add migration logic to move config values to providers table
+- [ ] Update config.Config to remove provider-specific fields (deferred - backward compatibility)
+- [x] Update TTS service to load providers from database
+- [x] Add `/api/providers` endpoints in server.go
+- [x] Add `/api/providers/{id}/test` endpoint
+- [ ] Update settings.go to use providers API (existing settings still work via migration)
+- [ ] Update Settings UI with new Providers tab (future enhancement)
+- [x] Update main upload form provider dropdown
+- [x] Add provider status indicators to UI
+- [x] Test migration from existing config
+- [ ] Update TUI to show provider status from database (future enhancement)
+
+---
+
 ### Phase -2: Parallel Processing (High Priority)
 
 **Goal**: Improve conversion speed by processing multiple chapters and M4B parts concurrently using configurable worker pools.

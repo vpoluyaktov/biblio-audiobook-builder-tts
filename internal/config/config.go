@@ -22,40 +22,15 @@ type Config struct {
 	OpenBrowser bool   `mapstructure:"open_browser"`
 
 	// TTS settings
-	BitRateKbs              int             `mapstructure:"bit_rate_kbs"`
-	SampleRateHz            int             `mapstructure:"sample_rate_hz"`
-	DefaultSpeed            float64         `mapstructure:"default_speed"`
-	DefaultPitch            float64         `mapstructure:"default_pitch"`
-	ChapterGapSeconds       int             `mapstructure:"chapter_gap_seconds"`       // Silence between chapters
-	PronunciationDictFile   string          `mapstructure:"pronunciation_dict_file"`   // Path to pronunciation dictionary
-	UseDefaultPronunciation bool            `mapstructure:"use_default_pronunciation"` // Use built-in pronunciation rules
-	MaxFileSizeMB           int             `mapstructure:"max_file_size_mb"`          // Max M4B file size before splitting
-	ConcurrentTTSWorkers    int             `mapstructure:"concurrent_tts_workers"`    // Default number of parallel TTS workers (legacy)
-	ProviderTTSWorkers      map[string]int  `mapstructure:"provider_tts_workers"`      // Per-provider TTS worker counts
-	ConcurrentEncoders      int             `mapstructure:"concurrent_encoders"`       // Number of parallel M4B encoders
-	ProviderNormalization   map[string]bool `mapstructure:"provider_normalization"`    // Per-provider text normalization (numbers to words)
-
-	// Cloud provider settings
-	CloudAPIKey       string `mapstructure:"cloud_api_key"`
-	GoogleTTSEndpoint string `mapstructure:"google_tts_endpoint"`
-	AzureTTSEndpoint  string `mapstructure:"azure_tts_endpoint"`
-	GoogleAPIKey      string `mapstructure:"google_api_key"` // Google Cloud TTS API key
-
-	// OpenTTS settings
-	OpenTTSURL string `mapstructure:"opentts_url"` // OpenTTS server URL (e.g., http://localhost:5500)
-
-	// RHVoice settings
-	RHVoiceURL string `mapstructure:"rhvoice_url"` // RHVoice REST server URL (e.g., http://localhost:8080)
-
-	// Silero TTS settings
-	SileroURL string `mapstructure:"silero_url"` // Silero TTS server URL (e.g., http://localhost:5555)
-
-	// OpenAI TTS settings
-	OpenAIAPIKey string `mapstructure:"openai_api_key"` // OpenAI API key for TTS
-
-	// Azure TTS settings
-	AzureTTSKey    string `mapstructure:"azure_tts_key"`    // Azure Cognitive Services subscription key
-	AzureTTSRegion string `mapstructure:"azure_tts_region"` // Azure region (e.g., eastus, westus2)
+	BitRateKbs              int     `mapstructure:"bit_rate_kbs"`
+	SampleRateHz            int     `mapstructure:"sample_rate_hz"`
+	DefaultSpeed            float64 `mapstructure:"default_speed"`
+	DefaultPitch            float64 `mapstructure:"default_pitch"`
+	ChapterGapSeconds       int     `mapstructure:"chapter_gap_seconds"`       // Silence between chapters
+	PronunciationDictFile   string  `mapstructure:"pronunciation_dict_file"`   // Path to pronunciation dictionary
+	UseDefaultPronunciation bool    `mapstructure:"use_default_pronunciation"` // Use built-in pronunciation rules
+	MaxFileSizeMB           int     `mapstructure:"max_file_size_mb"`          // Max M4B file size before splitting
+	ConcurrentEncoders      int     `mapstructure:"concurrent_encoders"`       // Number of parallel M4B encoders
 
 	// Audiobookshelf integration
 	AudiobookshelfURL      string `mapstructure:"audiobookshelf_url"`
@@ -89,30 +64,7 @@ func Load(configFile string) (*Config, error) {
 	viper.SetDefault("pronunciation_dict_file", "")     // Custom pronunciation dictionary
 	viper.SetDefault("use_default_pronunciation", true) // Use built-in pronunciation rules
 	viper.SetDefault("max_file_size_mb", 2000)          // 2GB max file size before splitting
-	viper.SetDefault("concurrent_tts_workers", 3)       // 3 parallel TTS workers (legacy default)
 	viper.SetDefault("concurrent_encoders", 2)          // 2 parallel M4B encoders
-
-	// Cloud provider settings
-	viper.SetDefault("cloud_api_key", "")
-	viper.SetDefault("google_tts_endpoint", "")
-	viper.SetDefault("azure_tts_endpoint", "")
-	viper.SetDefault("google_api_key", "")
-
-	// OpenTTS settings
-	viper.SetDefault("opentts_url", "")
-
-	// RHVoice settings
-	viper.SetDefault("rhvoice_url", "")
-
-	// Silero TTS settings
-	viper.SetDefault("silero_url", "")
-
-	// OpenAI TTS settings
-	viper.SetDefault("openai_api_key", "")
-
-	// Azure TTS settings
-	viper.SetDefault("azure_tts_key", "")
-	viper.SetDefault("azure_tts_region", "")
 
 	// Audiobookshelf settings
 	viper.SetDefault("audiobookshelf_url", "")
@@ -196,64 +148,10 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 	} else if v, ok := dbConfig["max_file_size_mb"].(int); ok {
 		cfg.MaxFileSizeMB = v
 	}
-	if v, ok := dbConfig["concurrent_tts_workers"].(float64); ok {
-		cfg.ConcurrentTTSWorkers = int(v)
-	} else if v, ok := dbConfig["concurrent_tts_workers"].(int); ok {
-		cfg.ConcurrentTTSWorkers = v
-	}
-	// Load per-provider TTS workers
-	cfg.ProviderTTSWorkers = make(map[string]int)
-	providers := []string{"espeak", "google", "opentts", "rhvoice", "silero", "openai", "azure"}
-	for _, p := range providers {
-		key := "tts_workers_" + p
-		if v, ok := dbConfig[key].(float64); ok {
-			cfg.ProviderTTSWorkers[p] = int(v)
-		} else if v, ok := dbConfig[key].(int); ok {
-			cfg.ProviderTTSWorkers[p] = v
-		}
-	}
 	if v, ok := dbConfig["concurrent_encoders"].(float64); ok {
 		cfg.ConcurrentEncoders = int(v)
 	} else if v, ok := dbConfig["concurrent_encoders"].(int); ok {
 		cfg.ConcurrentEncoders = v
-	}
-	// Load per-provider normalization settings
-	cfg.ProviderNormalization = make(map[string]bool)
-	for _, p := range providers {
-		key := "normalize_" + p
-		if v, ok := dbConfig[key].(bool); ok {
-			cfg.ProviderNormalization[p] = v
-		}
-	}
-	if v, ok := dbConfig["cloud_api_key"].(string); ok {
-		cfg.CloudAPIKey = v
-	}
-	if v, ok := dbConfig["google_tts_endpoint"].(string); ok {
-		cfg.GoogleTTSEndpoint = v
-	}
-	if v, ok := dbConfig["azure_tts_endpoint"].(string); ok {
-		cfg.AzureTTSEndpoint = v
-	}
-	if v, ok := dbConfig["google_api_key"].(string); ok {
-		cfg.GoogleAPIKey = v
-	}
-	if v, ok := dbConfig["opentts_url"].(string); ok {
-		cfg.OpenTTSURL = v
-	}
-	if v, ok := dbConfig["rhvoice_url"].(string); ok {
-		cfg.RHVoiceURL = v
-	}
-	if v, ok := dbConfig["silero_url"].(string); ok {
-		cfg.SileroURL = v
-	}
-	if v, ok := dbConfig["openai_api_key"].(string); ok {
-		cfg.OpenAIAPIKey = v
-	}
-	if v, ok := dbConfig["azure_tts_key"].(string); ok {
-		cfg.AzureTTSKey = v
-	}
-	if v, ok := dbConfig["azure_tts_region"].(string); ok {
-		cfg.AzureTTSRegion = v
 	}
 	if v, ok := dbConfig["audiobookshelf_url"].(string); ok {
 		cfg.AudiobookshelfURL = v
@@ -269,50 +167,4 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 	}
 
 	return cfg
-}
-
-// GetTTSWorkersForProvider returns the number of TTS workers for a specific provider.
-// Falls back to ConcurrentTTSWorkers if not set, then to default of 3.
-func (c *Config) GetTTSWorkersForProvider(provider string) int {
-	if c.ProviderTTSWorkers != nil {
-		if workers, ok := c.ProviderTTSWorkers[provider]; ok && workers > 0 {
-			return workers
-		}
-	}
-	if c.ConcurrentTTSWorkers > 0 {
-		return c.ConcurrentTTSWorkers
-	}
-	return 3 // Default
-}
-
-// providerNormalizationDefaults defines which providers need text normalization by default.
-// Providers that handle numbers well natively don't need normalization.
-var providerNormalizationDefaults = map[string]bool{
-	"espeak":  true,  // espeak reads numbers as digits, needs normalization
-	"rhvoice": true,  // RHVoice needs normalization for proper number pronunciation
-	"silero":  true,  // Silero models need normalization
-	"opentts": true,  // OpenTTS engines generally need normalization
-	"google":  false, // Google Cloud TTS handles numbers well
-	"openai":  false, // OpenAI TTS handles numbers well
-	"azure":   false, // Azure TTS handles numbers well
-}
-
-// NeedsNormalization returns whether text normalization (numbers to words) should be
-// applied for the given provider. Returns the configured value if set, otherwise
-// uses sensible defaults based on provider capabilities.
-func (c *Config) NeedsNormalization(provider string) bool {
-	// Check if explicitly configured
-	if c.ProviderNormalization != nil {
-		if enabled, ok := c.ProviderNormalization[provider]; ok {
-			return enabled
-		}
-	}
-
-	// Use default based on provider
-	if defaultVal, ok := providerNormalizationDefaults[provider]; ok {
-		return defaultVal
-	}
-
-	// Unknown provider: default to enabling normalization (safer)
-	return true
 }

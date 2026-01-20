@@ -245,7 +245,10 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 	totalChapters := len(book.Chapters)
 
 	// Determine number of workers based on provider-specific setting
-	numWorkers := w.cfg.GetTTSWorkersForProvider(job.Provider)
+	numWorkers := 3 // Default
+	if providerInfo := w.ttsService.GetProviderInfo(job.Provider); providerInfo != nil && providerInfo.TTSWorkers > 0 {
+		numWorkers = providerInfo.TTSWorkers
+	}
 	if numWorkers > totalChapters {
 		numWorkers = totalChapters
 	}
@@ -377,7 +380,11 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 	content := chapter.Content
 
 	// Apply number normalization if provider needs it
-	if w.cfg.NeedsNormalization(job.Provider) {
+	needsNormalization := true // Default to true for safety
+	if providerInfo := w.ttsService.GetProviderInfo(job.Provider); providerInfo != nil {
+		needsNormalization = providerInfo.NormalizeNumbers
+	}
+	if needsNormalization {
 		lang := job.Language
 		if lang == "" {
 			lang = "en" // Fallback to English if not set

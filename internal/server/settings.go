@@ -28,9 +28,6 @@ type SettingsRequest struct {
 	UseDefaultPronunciation bool    `json:"use_default_pronunciation"`
 	PronunciationDictFile   string  `json:"pronunciation_dict_file"`
 
-	// Number Normalization (per provider)
-	ProviderNormalization map[string]bool `json:"provider_normalization"`
-
 	// Output
 	BitRateKbs        int `json:"bit_rate_kbs"`
 	SampleRateHz      int `json:"sample_rate_hz"`
@@ -38,24 +35,7 @@ type SettingsRequest struct {
 	MaxFileSizeMB     int `json:"max_file_size_mb"`
 
 	// Performance
-	ConcurrentTTSWorkers int            `json:"concurrent_tts_workers"` // Legacy, kept for backward compatibility
-	ProviderTTSWorkers   map[string]int `json:"provider_tts_workers"`   // Per-provider TTS worker counts
-	ConcurrentEncoders   int            `json:"concurrent_encoders"`
-
-	// Cloud TTS
-	OpenAIAPIKey   string `json:"openai_api_key"`
-	GoogleAPIKey   string `json:"google_api_key"`
-	AzureTTSKey    string `json:"azure_tts_key"`
-	AzureTTSRegion string `json:"azure_tts_region"`
-
-	// OpenTTS
-	OpenTTSURL string `json:"opentts_url"`
-
-	// RHVoice
-	RHVoiceURL string `json:"rhvoice_url"`
-
-	// Silero
-	SileroURL string `json:"silero_url"`
+	ConcurrentEncoders int `json:"concurrent_encoders"`
 
 	// Audiobookshelf
 	AudiobookshelfURL      string `json:"audiobookshelf_url"`
@@ -83,13 +63,6 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 
 // getSettings returns all configuration settings
 func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
-	// Build provider normalization map with current values
-	providerNormalization := make(map[string]bool)
-	providers := []string{"espeak", "opentts", "rhvoice", "silero", "google", "openai", "azure"}
-	for _, p := range providers {
-		providerNormalization[p] = s.cfg.NeedsNormalization(p)
-	}
-
 	settings := SettingsRequest{
 		// General
 		ServerHost:  s.cfg.ServerHost,
@@ -107,9 +80,6 @@ func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
 		UseDefaultPronunciation: s.cfg.UseDefaultPronunciation,
 		PronunciationDictFile:   s.cfg.PronunciationDictFile,
 
-		// Number Normalization
-		ProviderNormalization: providerNormalization,
-
 		// Output
 		BitRateKbs:        s.cfg.BitRateKbs,
 		SampleRateHz:      s.cfg.SampleRateHz,
@@ -117,24 +87,7 @@ func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
 		MaxFileSizeMB:     s.cfg.MaxFileSizeMB,
 
 		// Performance
-		ConcurrentTTSWorkers: s.cfg.ConcurrentTTSWorkers,
-		ProviderTTSWorkers:   s.cfg.ProviderTTSWorkers,
-		ConcurrentEncoders:   s.cfg.ConcurrentEncoders,
-
-		// Cloud TTS
-		OpenAIAPIKey:   s.cfg.OpenAIAPIKey,
-		GoogleAPIKey:   s.cfg.GoogleAPIKey,
-		AzureTTSKey:    s.cfg.AzureTTSKey,
-		AzureTTSRegion: s.cfg.AzureTTSRegion,
-
-		// OpenTTS
-		OpenTTSURL: s.cfg.OpenTTSURL,
-
-		// RHVoice
-		RHVoiceURL: s.cfg.RHVoiceURL,
-
-		// Silero
-		SileroURL: s.cfg.SileroURL,
+		ConcurrentEncoders: s.cfg.ConcurrentEncoders,
 
 		// Audiobookshelf
 		AudiobookshelfURL:      s.cfg.AudiobookshelfURL,
@@ -217,16 +170,6 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 		s.cfg.PronunciationDictFile = req.PronunciationDictFile
 	}
 
-	// Number Normalization (per provider)
-	if wasProvided("provider_normalization") {
-		if s.cfg.ProviderNormalization == nil {
-			s.cfg.ProviderNormalization = make(map[string]bool)
-		}
-		for provider, enabled := range req.ProviderNormalization {
-			s.cfg.ProviderNormalization[provider] = enabled
-		}
-	}
-
 	// Output
 	if wasProvided("bit_rate_kbs") {
 		s.cfg.BitRateKbs = req.BitRateKbs
@@ -242,48 +185,8 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Performance
-	if wasProvided("concurrent_tts_workers") {
-		s.cfg.ConcurrentTTSWorkers = req.ConcurrentTTSWorkers
-	}
-	if wasProvided("provider_tts_workers") {
-		if s.cfg.ProviderTTSWorkers == nil {
-			s.cfg.ProviderTTSWorkers = make(map[string]int)
-		}
-		for provider, workers := range req.ProviderTTSWorkers {
-			s.cfg.ProviderTTSWorkers[provider] = workers
-		}
-	}
 	if wasProvided("concurrent_encoders") {
 		s.cfg.ConcurrentEncoders = req.ConcurrentEncoders
-	}
-
-	// Cloud TTS
-	if wasProvided("openai_api_key") {
-		s.cfg.OpenAIAPIKey = req.OpenAIAPIKey
-	}
-	if wasProvided("google_api_key") {
-		s.cfg.GoogleAPIKey = req.GoogleAPIKey
-	}
-	if wasProvided("azure_tts_key") {
-		s.cfg.AzureTTSKey = req.AzureTTSKey
-	}
-	if wasProvided("azure_tts_region") {
-		s.cfg.AzureTTSRegion = req.AzureTTSRegion
-	}
-
-	// OpenTTS
-	if wasProvided("opentts_url") {
-		s.cfg.OpenTTSURL = req.OpenTTSURL
-	}
-
-	// RHVoice
-	if wasProvided("rhvoice_url") {
-		s.cfg.RHVoiceURL = req.RHVoiceURL
-	}
-
-	// Silero
-	if wasProvided("silero_url") {
-		s.cfg.SileroURL = req.SileroURL
 	}
 
 	// Audiobookshelf
@@ -322,19 +225,11 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 			"pronunciation_dict_file":   {req.PronunciationDictFile, wasProvided("pronunciation_dict_file")},
 			"use_default_pronunciation": {fmt.Sprintf("%t", req.UseDefaultPronunciation), wasProvided("use_default_pronunciation")},
 			"max_file_size_mb":          {fmt.Sprintf("%d", req.MaxFileSizeMB), wasProvided("max_file_size_mb")},
-			"concurrent_tts_workers":    {fmt.Sprintf("%d", req.ConcurrentTTSWorkers), wasProvided("concurrent_tts_workers")},
 			"concurrent_encoders":       {fmt.Sprintf("%d", req.ConcurrentEncoders), wasProvided("concurrent_encoders")},
 			"audiobookshelf_url":        {req.AudiobookshelfURL, wasProvided("audiobookshelf_url")},
 			"audiobookshelf_user":       {req.AudiobookshelfUser, wasProvided("audiobookshelf_user")},
 			"audiobookshelf_password":   {req.AudiobookshelfPassword, wasProvided("audiobookshelf_password")},
 			"audiobookshelf_library":    {req.AudiobookshelfLibrary, wasProvided("audiobookshelf_library")},
-			"openai_api_key":            {req.OpenAIAPIKey, wasProvided("openai_api_key")},
-			"google_api_key":            {req.GoogleAPIKey, wasProvided("google_api_key")},
-			"azure_tts_key":             {req.AzureTTSKey, wasProvided("azure_tts_key")},
-			"azure_tts_region":          {req.AzureTTSRegion, wasProvided("azure_tts_region")},
-			"opentts_url":               {req.OpenTTSURL, wasProvided("opentts_url")},
-			"rhvoice_url":               {req.RHVoiceURL, wasProvided("rhvoice_url")},
-			"silero_url":                {req.SileroURL, wasProvided("silero_url")},
 		}
 
 		for key, cfg := range configs {
@@ -344,30 +239,7 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-
-		// Save per-provider TTS workers
-		if wasProvided("provider_tts_workers") && req.ProviderTTSWorkers != nil {
-			for provider, workers := range req.ProviderTTSWorkers {
-				key := "tts_workers_" + provider
-				if err := s.db.SetConfig(key, fmt.Sprintf("%d", workers)); err != nil {
-					logger.Warn("Failed to save config %s: %v", key, err)
-				}
-			}
-		}
-
-		// Save per-provider normalization settings
-		if wasProvided("provider_normalization") && req.ProviderNormalization != nil {
-			for provider, enabled := range req.ProviderNormalization {
-				key := "normalize_" + provider
-				if err := s.db.SetConfig(key, fmt.Sprintf("%t", enabled)); err != nil {
-					logger.Warn("Failed to save config %s: %v", key, err)
-				}
-			}
-		}
 	}
-
-	// Reload TTS providers to pick up any API key changes
-	s.ttsService.ReloadProviders()
 
 	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "saved"})
 }

@@ -829,7 +829,7 @@ h1 .icon {
     background: var(--bg-primary);
     border-radius: 12px;
     border: 1px solid var(--border);
-    max-width: 700px;
+    max-width: 900px;
     width: 90%;
     max-height: 85vh;
     display: flex;
@@ -1722,4 +1722,277 @@ h1 .icon {
     .opds-book-categories {
         justify-content: center;
     }
+}
+
+/* Providers Table */
+.providers-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.providers-table th,
+.providers-table td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.providers-table th {
+    background: var(--bg-tertiary);
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.providers-table tbody tr {
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.providers-table tbody tr:hover {
+    background: var(--bg-tertiary);
+}
+
+.providers-table .provider-name {
+    font-weight: 500;
+}
+
+.providers-table .provider-type {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.providers-table .status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.providers-table .status-badge.available {
+    background: rgba(34, 197, 94, 0.2);
+    color: var(--success);
+}
+
+.providers-table .status-badge.unavailable {
+    background: rgba(239, 68, 68, 0.2);
+    color: var(--error);
+}
+
+.providers-table .status-badge.disabled {
+    background: rgba(100, 116, 139, 0.2);
+    color: var(--text-muted);
+}
+
+.providers-table .check-icon {
+    color: var(--success);
+}
+
+.providers-table .default-badge {
+    background: var(--accent);
+    color: white;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+
+/* Provider Edit Modal */
+.provider-edit-modal {
+    max-width: 450px;
+}
+
+.provider-edit-modal .modal-body {
+    padding: 1.5rem;
+}
+
+.provider-edit-modal .form-group {
+    margin-bottom: 1rem;
+}
+
+.provider-edit-modal .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.provider-edit-modal .form-group input[type="text"],
+.provider-edit-modal .form-group input[type="password"],
+.provider-edit-modal .form-group select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.provider-edit-modal .form-group small {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.provider-edit-modal .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+.provider-edit-modal .checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+}
+
+.full-width {
+    width: 100% !important;
+}
+
+.provider-edit-status {
+    padding: 0.75rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+.provider-edit-status.available {
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid var(--success);
+    color: var(--success);
+}
+
+.provider-edit-status.unavailable {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid var(--error);
+    color: var(--error);
+}
+
+.provider-edit-status.disabled {
+    background: rgba(100, 116, 139, 0.1);
+    border: 1px solid var(--text-muted);
+    color: var(--text-muted);
+}
+
+/* Section Header Row */
+.section-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+    gap: 1rem;
+}
+
+.section-header-row h3 {
+    margin-bottom: 0.25rem;
+}
+
+.section-header-row .section-description {
+    margin: 0;
+}
+
+/* OPDS Sources Table */
+.opds-sources-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.opds-sources-table th,
+.opds-sources-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.opds-sources-table th {
+    background: var(--bg-tertiary);
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.opds-sources-table tbody tr:hover {
+    background: var(--bg-tertiary);
+}
+
+.opds-sources-table .source-name {
+    font-weight: 500;
+}
+
+.opds-sources-table .source-url {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.opds-sources-table .source-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.opds-sources-table .source-actions .btn {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.8rem;
+}
+
+.opds-sources-table .auth-badge {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    background: var(--accent);
+    color: white;
+}
+
+.opds-sources-table .no-auth {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+/* OPDS Source Modal */
+.opds-source-modal {
+    max-width: 500px;
+}
+
+.opds-source-modal .modal-body {
+    padding: 1.5rem;
+}
+
+.opds-source-modal .form-group {
+    margin-bottom: 1rem;
+}
+
+.opds-source-modal .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.opds-source-modal .form-group input[type="text"],
+.opds-source-modal .form-group input[type="password"] {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.opds-source-modal .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
 }
