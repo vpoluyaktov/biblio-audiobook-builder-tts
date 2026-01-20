@@ -227,6 +227,9 @@ func (db *DB) migrate() error {
 	db.conn.Exec("ALTER TABLE jobs ADD COLUMN worker_progress TEXT")
 	db.conn.Exec("ALTER TABLE jobs ADD COLUMN num_workers INTEGER DEFAULT 0")
 
+	// Add language column if it doesn't exist (migration for existing DBs)
+	db.conn.Exec("ALTER TABLE jobs ADD COLUMN language TEXT DEFAULT 'en'")
+
 	return nil
 }
 
