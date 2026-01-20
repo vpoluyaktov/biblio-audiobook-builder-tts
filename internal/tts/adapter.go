@@ -112,8 +112,12 @@ func (a *Adapter) ConvertToSpeech(text string, voice string, options *Conversion
 			progressCb(i, len(chunks), chunk)
 		}
 
-		// Skip chunks with no speakable content (e.g., "* * *" section breaks)
-		// These would cause TTS engines to fail
+		// Skip empty chunks or chunks with no speakable content
+		chunk = strings.TrimSpace(chunk)
+		if chunk == "" {
+			logger.Debug("Skipping empty chunk %d/%d", i+1, len(chunks))
+			continue
+		}
 		if !sanitize.HasSpeakableContent(chunk) {
 			logger.Debug("Skipping chunk %d/%d with no speakable content: '%s'", i+1, len(chunks), chunk)
 			continue
@@ -183,8 +187,12 @@ func (a *Adapter) ConvertToSpeechWithChunks(text string, voice string, options *
 			progressCb(i, len(chunks), chunk)
 		}
 
-		// Skip chunks with no speakable content (e.g., "* * *" section breaks)
-		// These would cause TTS engines to fail
+		// Skip empty chunks or chunks with no speakable content
+		chunk = strings.TrimSpace(chunk)
+		if chunk == "" {
+			logger.Debug("Skipping empty chunk %d/%d", i+1, len(chunks))
+			continue
+		}
 		if !sanitize.HasSpeakableContent(chunk) {
 			logger.Debug("Skipping chunk %d/%d with no speakable content: '%s'", i+1, len(chunks), chunk)
 			continue
