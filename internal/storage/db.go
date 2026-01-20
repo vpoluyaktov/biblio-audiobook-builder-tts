@@ -418,7 +418,7 @@ func DefaultConfig() *Config {
 		ChapterGapSeconds:       2,
 		PronunciationDictFile:   "",
 		UseDefaultPronunciation: true,
-		MaxFileSizeMB:           2000,
+		MaxFileSizeMB:           250,
 		ConcurrentEncoders:      2,
 		AudiobookshelfURL:       "",
 		AudiobookshelfUser:      "admin",

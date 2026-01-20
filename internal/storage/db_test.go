@@ -273,7 +273,7 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.BitRateKbs != 128 {
 		t.Errorf("Expected default bit_rate_kbs 128, got %d", cfg.BitRateKbs)
 	}
-	if cfg.MaxFileSizeMB != 2000 {
-		t.Errorf("Expected default max_file_size_mb 2000, got %d", cfg.MaxFileSizeMB)
+	if cfg.MaxFileSizeMB != 250 {
+		t.Errorf("Expected default max_file_size_mb 250, got %d", cfg.MaxFileSizeMB)
 	}
 }

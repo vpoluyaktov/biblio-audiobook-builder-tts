@@ -63,7 +63,7 @@ func Load(configFile string) (*Config, error) {
 	viper.SetDefault("chapter_gap_seconds", 2)          // 2 seconds silence between chapters
 	viper.SetDefault("pronunciation_dict_file", "")     // Custom pronunciation dictionary
 	viper.SetDefault("use_default_pronunciation", true) // Use built-in pronunciation rules
-	viper.SetDefault("max_file_size_mb", 2000)          // 2GB max file size before splitting
+	viper.SetDefault("max_file_size_mb", 250)           // 250MB max file size before splitting
 	viper.SetDefault("concurrent_encoders", 2)          // 2 parallel M4B encoders
 
 	// Audiobookshelf settings
