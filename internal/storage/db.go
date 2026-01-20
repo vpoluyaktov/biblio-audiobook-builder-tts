@@ -664,19 +664,23 @@ func (db *DB) GetPendingJob() (*Job, error) {
 	job := &Job{}
 	var m4bFilesJSON string
 	var startedAt, completedAt sql.NullTime
+	var language sql.NullString
 
 	err := db.conn.QueryRow(`
-		SELECT id, status, file_name, file_path, provider, voice, speed, pitch,
+		SELECT id, status, file_name, file_path, provider, voice, language, speed, pitch,
 			book_title, book_author, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
 			current_chapter, total_chapters, current_chapter_num, error, created_at, started_at, completed_at
 		FROM jobs WHERE status = 'pending'
 		ORDER BY created_at ASC
 		LIMIT 1
 	`).Scan(&job.ID, &job.Status, &job.FileName, &job.FilePath, &job.Provider,
-		&job.Voice, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor,
+		&job.Voice, &language, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor,
 		&job.OutputPath, &job.M4BFile, &m4bFilesJSON, &job.ConversionProgress, &job.BuildProgress,
 		&job.CurrentChapter, &job.TotalChapters, &job.CurrentChapterNum,
 		&job.Error, &job.CreatedAt, &startedAt, &completedAt)
+	if language.Valid {
+		job.Language = language.String
+	}
 
 	if err == sql.ErrNoRows {
 		return nil, nil

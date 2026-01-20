@@ -519,8 +519,10 @@ func (s *Server) handleOPDSConvert(w http.ResponseWriter, r *http.Request) {
 		voice = s.cfg.DefaultVoice
 	}
 	language := req.Language
+	logger.Debug("OPDS convert received language: '%s'", language)
 	if language == "" {
 		language = "en" // Default to English
+		logger.Debug("Language was empty, defaulting to 'en'")
 	}
 	speed := req.Speed
 	if speed == 0 {
