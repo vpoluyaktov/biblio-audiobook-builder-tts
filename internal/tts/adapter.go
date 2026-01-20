@@ -2,6 +2,7 @@ package tts
 
 import (
 	"abb_tts/internal/logger"
+	"abb_tts/internal/sanitize"
 	"bytes"
 	"fmt"
 	"io"
@@ -111,6 +112,25 @@ func (a *Adapter) ConvertToSpeech(text string, voice string, options *Conversion
 			progressCb(i, len(chunks), chunk)
 		}
 
+		// Skip empty chunks or chunks with no speakable content for the target language
+		chunk = strings.TrimSpace(chunk)
+		if chunk == "" {
+			logger.Debug("Skipping empty chunk %d/%d", i+1, len(chunks))
+			continue
+		}
+		// Use language-aware check if language is specified
+		lang := ""
+		if options != nil {
+			lang = options.Language
+		}
+		if lang != "" && !sanitize.HasSpeakableContentForLanguage(chunk, lang) {
+			logger.Debug("Skipping chunk %d/%d with no speakable content for language '%s': '%s'", i+1, len(chunks), lang, chunk)
+			continue
+		} else if lang == "" && !sanitize.HasSpeakableContent(chunk) {
+			logger.Debug("Skipping chunk %d/%d with no speakable content: '%s'", i+1, len(chunks), chunk)
+			continue
+		}
+
 		// Convert this chunk with retry logic for transient failures
 		var audioData []byte
 		var lastErr error
@@ -173,6 +193,25 @@ func (a *Adapter) ConvertToSpeechWithChunks(text string, voice string, options *
 	for i, chunk := range chunks {
 		if progressCb != nil {
 			progressCb(i, len(chunks), chunk)
+		}
+
+		// Skip empty chunks or chunks with no speakable content for the target language
+		chunk = strings.TrimSpace(chunk)
+		if chunk == "" {
+			logger.Debug("Skipping empty chunk %d/%d", i+1, len(chunks))
+			continue
+		}
+		// Use language-aware check if language is specified
+		lang := ""
+		if options != nil {
+			lang = options.Language
+		}
+		if lang != "" && !sanitize.HasSpeakableContentForLanguage(chunk, lang) {
+			logger.Debug("Skipping chunk %d/%d with no speakable content for language '%s': '%s'", i+1, len(chunks), lang, chunk)
+			continue
+		} else if lang == "" && !sanitize.HasSpeakableContent(chunk) {
+			logger.Debug("Skipping chunk %d/%d with no speakable content: '%s'", i+1, len(chunks), chunk)
+			continue
 		}
 
 		// Convert this chunk with retry logic for transient failures

@@ -788,6 +788,7 @@ class App {
                     preview_id: this.currentPreview.id,
                     provider: this.providerSelect.value,
                     voice: this.voiceSelect.value,
+                    language: this.languageSelect.value,
                     speed: parseFloat(this.speedInput.value),
                     pitch: parseFloat(this.pitchInput.value)
                 })
@@ -828,6 +829,7 @@ class App {
         formData.append('file', this.selectedFile);
         formData.append('provider', this.providerSelect.value);
         formData.append('voice', this.voiceSelect.value);
+        formData.append('language', this.languageSelect.value);
         formData.append('speed', this.speedInput.value);
         formData.append('pitch', this.pitchInput.value);
 
@@ -1182,6 +1184,16 @@ class App {
         document.getElementById('cfg-use-default-pronunciation').checked = s.use_default_pronunciation !== false;
         document.getElementById('cfg-pronunciation-dict').value = s.pronunciation_dict_file || '';
         
+        // Number Normalization (per provider)
+        const providerNorm = s.provider_normalization || {};
+        document.getElementById('cfg-normalize-espeak').checked = providerNorm.espeak !== false;
+        document.getElementById('cfg-normalize-opentts').checked = providerNorm.opentts !== false;
+        document.getElementById('cfg-normalize-rhvoice').checked = providerNorm.rhvoice !== false;
+        document.getElementById('cfg-normalize-silero').checked = providerNorm.silero !== false;
+        document.getElementById('cfg-normalize-google').checked = providerNorm.google === true;
+        document.getElementById('cfg-normalize-openai').checked = providerNorm.openai === true;
+        document.getElementById('cfg-normalize-azure').checked = providerNorm.azure === true;
+        
         // Output tab
         document.getElementById('cfg-bit-rate').value = s.bit_rate_kbs || 128;
         document.getElementById('cfg-sample-rate').value = s.sample_rate_hz || 44100;
@@ -1239,6 +1251,17 @@ class App {
             default_pitch: parseFloat(document.getElementById('cfg-default-pitch').value),
             use_default_pronunciation: document.getElementById('cfg-use-default-pronunciation').checked,
             pronunciation_dict_file: document.getElementById('cfg-pronunciation-dict').value,
+            
+            // Number Normalization (per provider)
+            provider_normalization: {
+                espeak: document.getElementById('cfg-normalize-espeak').checked,
+                opentts: document.getElementById('cfg-normalize-opentts').checked,
+                rhvoice: document.getElementById('cfg-normalize-rhvoice').checked,
+                silero: document.getElementById('cfg-normalize-silero').checked,
+                google: document.getElementById('cfg-normalize-google').checked,
+                openai: document.getElementById('cfg-normalize-openai').checked,
+                azure: document.getElementById('cfg-normalize-azure').checked
+            },
             
             // Output
             bit_rate_kbs: parseInt(document.getElementById('cfg-bit-rate').value),

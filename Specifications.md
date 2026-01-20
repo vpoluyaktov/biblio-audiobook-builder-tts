@@ -676,6 +676,228 @@ curl -X POST --data "Hello world" "http://server:8080/rhasspy?voice=alan&rate=50
 
 ---
 
+### Phase -0.25: Text Normalization (High Priority)
+
+**Goal**: Preprocess text to convert numbers to words before TTS processing. Many TTS models don't handle numbers well, so converting "Chapter 5" to "Chapter five" or "глава 5" to "глава пятая" improves audio quality.
+
+#### -0.25.1 Feature Overview
+
+Text normalization converts numeric values to their word equivalents based on:
+- **Language**: Different languages have different number words
+- **Form**: Cardinal (one, two, three) vs Ordinal (first, second, third)
+- **Gender**: Required for languages like Russian (один/одна/одно)
+- **Case**: Required for languages like Russian (nominative, genitive, etc.)
+
+**Challenges for Russian:**
+- Gender agreement: "глава первая" (feminine) vs "том первый" (masculine)
+- Cardinal vs Ordinal: "2 рубля" (cardinal) vs "глава 2" → "глава вторая" (ordinal)
+- Case agreement: Different word endings based on grammatical case
+
+#### -0.25.2 Package Structure
+
+```
+internal/normalize/
+├── types.go           # Core types: Gender, Form, Case, Context, NumberConverter interface
+├── registry.go        # Language converter registry
+├── english.go         # English number-to-words implementation
+├── russian.go         # Russian number-to-words implementation (with gender/case)
+├── processor.go       # Text processor: finds numbers and replaces with words
+├── nouns.go           # Noun database for context detection (gender, ordinal triggers)
+├── english_test.go    # English converter tests
+├── russian_test.go    # Russian converter tests
+└── processor_test.go  # Text processor tests
+```
+
+#### -0.25.3 Core Types
+
+```go
+// Gender represents grammatical gender
+type Gender int
+const (
+    Masculine Gender = iota
+    Feminine
+    Neuter
+)
+
+// Form represents cardinal or ordinal
+type Form int
+const (
+    Cardinal Form = iota  // one, two, three
+    Ordinal               // first, second, third
+)
+
+// Case represents grammatical case
+type Case int
+const (
+    Nominative Case = iota
+    Genitive
+    Dative
+    Accusative
+    Instrumental
+    Prepositional
+)
+
+// Context provides grammatical context for number conversion
+type Context struct {
+    Form   Form
+    Gender Gender
+    Case   Case
+}
+
+// NumberConverter interface for language-specific implementations
+type NumberConverter interface {
+    ToWords(n int64, ctx Context) string
+    SupportsContext() bool
+    LanguageCode() string
+    LanguageName() string
+}
+```
+
+#### -0.25.4 English Implementation
+
+English is simpler - no gender/case, just cardinal/ordinal:
+
+| Number | Cardinal | Ordinal |
+|--------|----------|---------|
+| 1 | one | first |
+| 2 | two | second |
+| 3 | three | third |
+| 21 | twenty-one | twenty-first |
+| 100 | one hundred | one hundredth |
+
+**Coverage**: 0 to 999,999,999,999 (trillions)
+
+#### -0.25.5 Russian Implementation
+
+Russian requires gender and form awareness:
+
+| Number | Masculine Cardinal | Feminine Cardinal | Masculine Ordinal | Feminine Ordinal |
+|--------|-------------------|-------------------|-------------------|------------------|
+| 1 | один | одна | первый | первая |
+| 2 | два | две | второй | вторая |
+| 3 | три | три | третий | третья |
+| 21 | двадцать один | двадцать одна | двадцать первый | двадцать первая |
+
+**Ordinal Trigger Nouns** (use ordinal form):
+- глава (chapter) - feminine
+- страница (page) - feminine
+- часть (part) - feminine
+- раздел (section) - masculine
+- том (volume) - masculine
+- книга (book) - feminine
+
+**Cardinal Nouns** (use cardinal form):
+- рубль (ruble) - masculine
+- копейка (kopeck) - feminine
+- год (year) - masculine
+- день (day) - masculine
+
+#### -0.25.6 Text Processor
+
+The processor scans text for numbers and replaces them based on context:
+
+```go
+type Processor struct {
+    converters map[string]NumberConverter
+    nounDB     *NounDatabase
+}
+
+// Process replaces numbers in text with words
+func (p *Processor) Process(text, lang string) string
+
+// Example:
+// Input:  "Chapter 5 contains 42 pages"
+// Output: "Chapter five contains forty-two pages"
+
+// Russian example:
+// Input:  "Глава 5 содержит 42 страницы"
+// Output: "Глава пятая содержит сорок две страницы"
+```
+
+**Context Detection Algorithm:**
+1. Find number in text using regex `\d+`
+2. Look at surrounding words (before and after)
+3. Check noun database for known nouns
+4. Determine form (cardinal/ordinal) and gender from noun
+5. Convert number using appropriate context
+6. Replace in text
+
+#### -0.25.7 Noun Database
+
+```go
+type NounInfo struct {
+    Gender       Gender
+    TriggerForm  Form   // Cardinal or Ordinal
+    SingularForm string
+    PluralForms  []string
+}
+
+var russianNouns = map[string]NounInfo{
+    "глава":    {Feminine, Ordinal, "глава", []string{"главы", "глав"}},
+    "страница": {Feminine, Ordinal, "страница", []string{"страницы", "страниц"}},
+    "часть":    {Feminine, Ordinal, "часть", []string{"части", "частей"}},
+    "том":      {Masculine, Ordinal, "том", []string{"тома", "томов"}},
+    "рубль":    {Masculine, Cardinal, "рубль", []string{"рубля", "рублей"}},
+    // ... more nouns
+}
+```
+
+#### -0.25.8 Integration with TTS Pipeline
+
+The text processor will be called before text is sent to TTS:
+
+```go
+// In tts/adapter.go or tts/service.go
+func (s *Service) ConvertToSpeech(text, lang string) ([]byte, error) {
+    // Normalize text (convert numbers to words)
+    normalizedText := s.normalizer.Process(text, lang)
+    
+    // Send to TTS provider
+    return s.provider.Synthesize(normalizedText)
+}
+```
+
+#### -0.25.9 Configuration
+
+Per-provider normalization settings in config:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `normalize_espeak` | bool | true | Enable normalization for espeak (reads digits, needs it) |
+| `normalize_rhvoice` | bool | true | Enable normalization for RHVoice |
+| `normalize_silero` | bool | true | Enable normalization for Silero |
+| `normalize_opentts` | bool | true | Enable normalization for OpenTTS |
+| `normalize_google` | bool | false | Disable for Google (handles numbers well) |
+| `normalize_openai` | bool | false | Disable for OpenAI (handles numbers well) |
+| `normalize_azure` | bool | false | Disable for Azure (handles numbers well) |
+
+**Default behavior by provider:**
+- **espeak, rhvoice, silero, opentts**: Normalization ON (these providers read numbers as digits)
+- **google, openai, azure**: Normalization OFF (these providers handle numbers natively)
+
+**Config method:**
+```go
+// NeedsNormalization returns whether text normalization should be applied
+func (c *Config) NeedsNormalization(provider string) bool
+```
+
+#### -0.25.10 Implementation Tasks
+
+- [x] Create `internal/normalize/types.go` with core types and interfaces
+- [x] Create `internal/normalize/english.go` with English converter
+- [x] Create `internal/normalize/english_test.go` with tests
+- [x] Create `internal/normalize/russian.go` with Russian converter
+- [x] Create `internal/normalize/russian_test.go` with tests
+- [x] Create `internal/normalize/nouns.go` with noun database
+- [x] Create `internal/normalize/processor.go` with text processor
+- [x] Create `internal/normalize/processor_test.go` with tests
+- [x] Add per-provider `normalize_<provider>` config fields
+- [x] Add `NeedsNormalization(provider)` config method with sensible defaults
+- [x] Integrate processor into TTS pipeline (worker.go)
+- [ ] Add normalization toggle to Settings UI (per provider)
+
+---
+
 ### Phase 0: Book Preview & Cost Estimation (High Priority)
 
 **Goal**: After uploading a book, show a preview with metadata, chapters, and conversion cost estimate before starting the actual conversion.

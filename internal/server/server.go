@@ -103,6 +103,7 @@ func jobToStorageJob(job *Job) *storage.Job {
 		FilePath:           job.FilePath,
 		Provider:           job.Provider,
 		Voice:              job.Voice,
+		Language:           job.Language,
 		Speed:              job.Speed,
 		Pitch:              job.Pitch,
 		BookTitle:          job.BookTitle,
@@ -138,6 +139,7 @@ func storageJobToJob(dbJob *storage.Job) *Job {
 		CurrentChapterNum:  dbJob.CurrentChapterNum,
 		Provider:           dbJob.Provider,
 		Voice:              dbJob.Voice,
+		Language:           dbJob.Language,
 		Speed:              dbJob.Speed,
 		Pitch:              dbJob.Pitch,
 		BookTitle:          dbJob.BookTitle,
@@ -187,6 +189,11 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/ws", func(w http.ResponseWriter, r *http.Request) {
 		ServeWS(s.hub, w, r)
 	})
+
+	// Noun endpoints (for text normalization)
+	mux.HandleFunc("/api/nouns", s.handleNouns)
+	mux.HandleFunc("/api/nouns/", s.handleNoun)
+	mux.HandleFunc("/api/nouns/languages", s.handleNounLanguages)
 
 	// OPDS endpoints
 	mux.HandleFunc("/api/opds/sources", s.handleOPDSSources)
@@ -534,6 +541,11 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		voice = s.cfg.DefaultVoice
 	}
 
+	language := r.FormValue("language")
+	if language == "" {
+		language = "en" // Default to English
+	}
+
 	speed := parseFloat(r.FormValue("speed"), s.cfg.DefaultSpeed)
 	pitch := parseFloat(r.FormValue("pitch"), s.cfg.DefaultPitch)
 
@@ -558,7 +570,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create job
-	job := NewJob(header.Filename, tempPath, provider, voice, speed, pitch)
+	job := NewJob(header.Filename, tempPath, provider, voice, language, speed, pitch)
 
 	// Save to database
 	if s.db != nil {

@@ -9,6 +9,61 @@ import (
 	"unicode"
 )
 
+// HasSpeakableContent checks if text contains any speakable content (letters from any language).
+// Text with only punctuation, symbols, or whitespace will cause TTS engines to fail.
+func HasSpeakableContent(text string) bool {
+	for _, r := range text {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return true
+		}
+	}
+	return false
+}
+
+// HasSpeakableContentForLanguage checks if text contains speakable content for a specific language.
+// For Russian (ru), text must contain at least one Cyrillic letter.
+// For English (en), text must contain at least one Latin letter.
+// For other languages, falls back to HasSpeakableContent.
+func HasSpeakableContentForLanguage(text, lang string) bool {
+	if !HasSpeakableContent(text) {
+		return false
+	}
+
+	switch lang {
+	case "ru":
+		// Russian TTS requires Cyrillic characters
+		for _, r := range text {
+			if isCyrillic(r) {
+				return true
+			}
+		}
+		return false
+	case "en":
+		// English TTS requires Latin characters
+		for _, r := range text {
+			if isLatin(r) {
+				return true
+			}
+		}
+		return false
+	default:
+		return HasSpeakableContent(text)
+	}
+}
+
+// isCyrillic checks if a rune is a Cyrillic letter
+func isCyrillic(r rune) bool {
+	return (r >= 0x0400 && r <= 0x04FF) || // Cyrillic
+		(r >= 0x0500 && r <= 0x052F) // Cyrillic Supplement
+}
+
+// isLatin checks if a rune is a Latin letter
+func isLatin(r rune) bool {
+	return (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') ||
+		(r >= 0x00C0 && r <= 0x00FF) || // Latin-1 Supplement
+		(r >= 0x0100 && r <= 0x017F) // Latin Extended-A
+}
+
 // TextForTTS sanitizes text for TTS processing by normalizing problematic
 // Unicode characters while preserving all readable text from any language.
 // This should be applied during parsing stage so sanitized text is visible
@@ -189,9 +244,28 @@ func TextForTTS(text string) string {
 		}
 	}
 
-	// Normalize whitespace
-	whitespace := regexp.MustCompile(`\s+`)
-	result = whitespace.ReplaceAllString(cleaned.String(), " ")
+	// Normalize whitespace while preserving paragraph breaks
+	result = cleaned.String()
+
+	// First, normalize line endings to \n
+	result = strings.ReplaceAll(result, "\r\n", "\n")
+	result = strings.ReplaceAll(result, "\r", "\n")
+
+	// Preserve paragraph breaks (2+ newlines) by replacing with placeholder
+	paragraphBreak := regexp.MustCompile(`\n\s*\n`)
+	result = paragraphBreak.ReplaceAllString(result, "\n\n")
+
+	// Normalize spaces within lines (but not newlines)
+	spaceOnly := regexp.MustCompile(`[ \t]+`)
+	result = spaceOnly.ReplaceAllString(result, " ")
+
+	// Clean up: remove spaces at start/end of lines
+	lineSpaces := regexp.MustCompile(`(?m)^ +| +$`)
+	result = lineSpaces.ReplaceAllString(result, "")
+
+	// Collapse 3+ newlines to 2 (paragraph break)
+	multiNewline := regexp.MustCompile(`\n{3,}`)
+	result = multiNewline.ReplaceAllString(result, "\n\n")
 
 	return strings.TrimSpace(result)
 }
@@ -343,6 +417,11 @@ func GetDefaultRules() []struct {
 		{`\$(\d+)`, "$1 dollars", "Dollar amounts"},
 		{`(\d+)%`, "$1 percent", "Percentages"},
 		{`&`, " and ", "Ampersand"},
+
+		// Copyright symbols
+		{`(?i)\bCopyright\b`, "Copyright", "Copyright word"},
+		{`\(c\)`, "Copyright", "Copyright symbol (c)"},
+		{`©`, "Copyright", "Copyright symbol ©"},
 
 		// Common mispronunciations
 		{`(?i)\blinux\b`, "Linux", "Linux pronunciation"},

@@ -186,19 +186,107 @@ func (p *SileroProvider) GetModelsForLanguage(language string) []string {
 	return models
 }
 
+// normalizeVoiceID normalizes voice ID to lowercase speaker name
+func normalizeVoiceID(voice string) string {
+	parts := strings.Split(voice, "#")
+	if len(parts) != 2 {
+		return voice
+	}
+	return fmt.Sprintf("%s#%s", parts[0], strings.ToLower(parts[1]))
+}
+
+// mapSpeedToSSML maps numeric speed to SSML rate value
+func mapSpeedToSSML(speed float64) string {
+	if speed <= 0.6 {
+		return "x-slow"
+	} else if speed <= 0.85 {
+		return "slow"
+	} else if speed <= 1.1 {
+		return "medium"
+	} else if speed <= 1.35 {
+		return "fast"
+	}
+	return "x-fast"
+}
+
+// mapPitchToSSML maps numeric pitch to SSML pitch value
+func mapPitchToSSML(pitch float64) string {
+	if pitch <= 0.6 {
+		return "x-low"
+	} else if pitch <= 0.85 {
+		return "low"
+	} else if pitch <= 1.1 {
+		return "medium"
+	} else if pitch <= 1.35 {
+		return "high"
+	}
+	return "x-high"
+}
+
+// escapeXML escapes special XML characters in text
+func escapeXML(text string) string {
+	text = strings.ReplaceAll(text, "&", "&amp;")
+	text = strings.ReplaceAll(text, "<", "&lt;")
+	text = strings.ReplaceAll(text, ">", "&gt;")
+	text = strings.ReplaceAll(text, "'", "&apos;")
+	text = strings.ReplaceAll(text, "\"", "&quot;")
+	return text
+}
+
+// wrapTextWithSSML wraps text in SSML with optional prosody for speed/pitch
+func wrapTextWithSSML(text string, speed, pitch float64) string {
+	escapedText := escapeXML(text)
+	rate := mapSpeedToSSML(speed)
+	pitchVal := mapPitchToSSML(pitch)
+
+	// Build prosody attributes only for non-default values
+	var attrs []string
+	if rate != "medium" {
+		attrs = append(attrs, fmt.Sprintf(`rate="%s"`, rate))
+	}
+	if pitchVal != "medium" {
+		attrs = append(attrs, fmt.Sprintf(`pitch="%s"`, pitchVal))
+	}
+
+	// Always wrap in <speak>, add <prosody> only if needed
+	if len(attrs) > 0 {
+		prosodyAttrs := strings.Join(attrs, " ")
+		return fmt.Sprintf("<speak><prosody %s>%s</prosody></speak>", prosodyAttrs, escapedText)
+	}
+	return fmt.Sprintf("<speak>%s</speak>", escapedText)
+}
+
 // ConvertToSpeech converts text to speech using Silero TTS
 func (p *SileroProvider) ConvertToSpeech(text string, voice string, options *ConversionOptions) (io.Reader, error) {
+	// Normalize voice ID: Silero expects lowercase speaker names
+	// Voice format: silero:model_id#speaker
+	normalizedVoice := normalizeVoiceID(voice)
+
+	// Get speed and pitch from options
+	speed := 1.0
+	pitch := 1.0
+	if options != nil {
+		if options.Speed != 0 {
+			speed = options.Speed
+		}
+		if options.Pitch != 0 {
+			pitch = options.Pitch
+		}
+	}
+
+	// Wrap text in SSML with prosody for speed/pitch control
+	ssmlText := wrapTextWithSSML(text, speed, pitch)
+	logger.Debug("SileroProvider.ConvertToSpeech: voice='%s' -> '%s', speed=%.2f, pitch=%.2f, ssml_len=%d", voice, normalizedVoice, speed, pitch, len(ssmlText))
+
 	// Build the TTS URL
 	params := url.Values{}
-	params.Set("voice", voice)
-	params.Set("text", text)
+	params.Set("voice", normalizedVoice)
+	params.Set("text", ssmlText)
+	params.Set("ssml", "true")
 
 	// Silero supports sample_rate parameter
 	// Default to 48000 for best quality
 	params.Set("sample_rate", "48000")
-
-	// Note: Silero TTS doesn't support speed/pitch parameters directly
-	// Speed/pitch would need SSML or post-processing
 
 	reqURL := fmt.Sprintf("%s/api/tts?%s", p.serverURL, params.Encode())
 

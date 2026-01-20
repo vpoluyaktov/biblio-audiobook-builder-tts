@@ -28,6 +28,9 @@ type SettingsRequest struct {
 	UseDefaultPronunciation bool    `json:"use_default_pronunciation"`
 	PronunciationDictFile   string  `json:"pronunciation_dict_file"`
 
+	// Number Normalization (per provider)
+	ProviderNormalization map[string]bool `json:"provider_normalization"`
+
 	// Output
 	BitRateKbs        int `json:"bit_rate_kbs"`
 	SampleRateHz      int `json:"sample_rate_hz"`
@@ -80,6 +83,13 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 
 // getSettings returns all configuration settings
 func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
+	// Build provider normalization map with current values
+	providerNormalization := make(map[string]bool)
+	providers := []string{"espeak", "opentts", "rhvoice", "silero", "google", "openai", "azure"}
+	for _, p := range providers {
+		providerNormalization[p] = s.cfg.NeedsNormalization(p)
+	}
+
 	settings := SettingsRequest{
 		// General
 		ServerHost:  s.cfg.ServerHost,
@@ -96,6 +106,9 @@ func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
 		DefaultPitch:            s.cfg.DefaultPitch,
 		UseDefaultPronunciation: s.cfg.UseDefaultPronunciation,
 		PronunciationDictFile:   s.cfg.PronunciationDictFile,
+
+		// Number Normalization
+		ProviderNormalization: providerNormalization,
 
 		// Output
 		BitRateKbs:        s.cfg.BitRateKbs,
@@ -202,6 +215,16 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if wasProvided("pronunciation_dict_file") {
 		s.cfg.PronunciationDictFile = req.PronunciationDictFile
+	}
+
+	// Number Normalization (per provider)
+	if wasProvided("provider_normalization") {
+		if s.cfg.ProviderNormalization == nil {
+			s.cfg.ProviderNormalization = make(map[string]bool)
+		}
+		for provider, enabled := range req.ProviderNormalization {
+			s.cfg.ProviderNormalization[provider] = enabled
+		}
 	}
 
 	// Output
@@ -327,6 +350,16 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 			for provider, workers := range req.ProviderTTSWorkers {
 				key := "tts_workers_" + provider
 				if err := s.db.SetConfig(key, fmt.Sprintf("%d", workers)); err != nil {
+					logger.Warn("Failed to save config %s: %v", key, err)
+				}
+			}
+		}
+
+		// Save per-provider normalization settings
+		if wasProvided("provider_normalization") && req.ProviderNormalization != nil {
+			for provider, enabled := range req.ProviderNormalization {
+				key := "normalize_" + provider
+				if err := s.db.SetConfig(key, fmt.Sprintf("%t", enabled)); err != nil {
 					logger.Warn("Failed to save config %s: %v", key, err)
 				}
 			}

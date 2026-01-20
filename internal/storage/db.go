@@ -97,6 +97,7 @@ type Job struct {
 	FilePath           string           `json:"file_path"`
 	Provider           string           `json:"provider"`
 	Voice              string           `json:"voice"`
+	Language           string           `json:"language"`
 	Speed              float64          `json:"speed"`
 	Pitch              float64          `json:"pitch"`
 	BookTitle          string           `json:"book_title"`
@@ -161,6 +162,7 @@ func (db *DB) migrate() error {
 		file_path TEXT,
 		provider TEXT,
 		voice TEXT,
+		language TEXT DEFAULT 'en',
 		speed REAL DEFAULT 1.0,
 		pitch REAL DEFAULT 1.0,
 		book_title TEXT,
@@ -198,6 +200,22 @@ func (db *DB) migrate() error {
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_opds_sources_enabled ON opds_sources(enabled);
+
+	CREATE TABLE IF NOT EXISTS nouns (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		lang TEXT NOT NULL,
+		noun TEXT NOT NULL,
+		gender TEXT NOT NULL,
+		form TEXT NOT NULL,
+		singular TEXT NOT NULL,
+		plurals TEXT NOT NULL,
+		is_custom BOOLEAN DEFAULT 1,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(lang, noun)
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_nouns_lang ON nouns(lang);
 	`
 
 	_, err := db.conn.Exec(schema)
@@ -208,6 +226,9 @@ func (db *DB) migrate() error {
 	// Add worker_progress and num_workers columns if they don't exist (migration for existing DBs)
 	db.conn.Exec("ALTER TABLE jobs ADD COLUMN worker_progress TEXT")
 	db.conn.Exec("ALTER TABLE jobs ADD COLUMN num_workers INTEGER DEFAULT 0")
+
+	// Add language column if it doesn't exist (migration for existing DBs)
+	db.conn.Exec("ALTER TABLE jobs ADD COLUMN language TEXT DEFAULT 'en'")
 
 	return nil
 }
@@ -475,11 +496,11 @@ func (db *DB) CreateJob(job *Job) error {
 	workerProgressJSON, _ := json.Marshal(job.WorkerProgress)
 
 	_, err := db.conn.Exec(`
-		INSERT INTO jobs (id, status, file_name, file_path, provider, voice, speed, pitch,
+		INSERT INTO jobs (id, status, file_name, file_path, provider, voice, language, speed, pitch,
 			book_title, book_author, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
 			current_chapter, total_chapters, current_chapter_num, worker_progress, num_workers, error, created_at, started_at, completed_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, job.ID, job.Status, job.FileName, job.FilePath, job.Provider, job.Voice,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, job.ID, job.Status, job.FileName, job.FilePath, job.Provider, job.Voice, job.Language,
 		job.Speed, job.Pitch, job.BookTitle, job.BookAuthor, job.OutputPath,
 		job.M4BFile, string(m4bFilesJSON), job.ConversionProgress, job.BuildProgress, job.CurrentChapter,
 		job.TotalChapters, job.CurrentChapterNum, string(workerProgressJSON), job.NumWorkers, job.Error, job.CreatedAt,
@@ -497,12 +518,12 @@ func (db *DB) UpdateJob(job *Job) error {
 	workerProgressJSON, _ := json.Marshal(job.WorkerProgress)
 
 	_, err := db.conn.Exec(`
-		UPDATE jobs SET status = ?, file_name = ?, file_path = ?, provider = ?, voice = ?,
+		UPDATE jobs SET status = ?, file_name = ?, file_path = ?, provider = ?, voice = ?, language = ?,
 			speed = ?, pitch = ?, book_title = ?, book_author = ?, output_path = ?,
 			m4b_file = ?, m4b_files = ?, conversion_progress = ?, build_progress = ?, current_chapter = ?,
 			total_chapters = ?, current_chapter_num = ?, worker_progress = ?, num_workers = ?, error = ?, started_at = ?, completed_at = ?
 		WHERE id = ?
-	`, job.Status, job.FileName, job.FilePath, job.Provider, job.Voice,
+	`, job.Status, job.FileName, job.FilePath, job.Provider, job.Voice, job.Language,
 		job.Speed, job.Pitch, job.BookTitle, job.BookAuthor, job.OutputPath,
 		job.M4BFile, string(m4bFilesJSON), job.ConversionProgress, job.BuildProgress, job.CurrentChapter,
 		job.TotalChapters, job.CurrentChapterNum, string(workerProgressJSON), job.NumWorkers, job.Error, job.StartedAt,
@@ -521,16 +542,20 @@ func (db *DB) GetJob(id string) (*Job, error) {
 	var workerProgressJSON sql.NullString
 	var startedAt, completedAt sql.NullTime
 
+	var language sql.NullString
 	err := db.conn.QueryRow(`
-		SELECT id, status, file_name, file_path, provider, voice, speed, pitch,
+		SELECT id, status, file_name, file_path, provider, voice, language, speed, pitch,
 			book_title, book_author, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
 			current_chapter, total_chapters, current_chapter_num, worker_progress, num_workers, error, created_at, started_at, completed_at
 		FROM jobs WHERE id = ?
 	`, id).Scan(&job.ID, &job.Status, &job.FileName, &job.FilePath, &job.Provider,
-		&job.Voice, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor,
+		&job.Voice, &language, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor,
 		&job.OutputPath, &job.M4BFile, &m4bFilesJSON, &job.ConversionProgress, &job.BuildProgress,
 		&job.CurrentChapter, &job.TotalChapters, &job.CurrentChapterNum,
 		&workerProgressJSON, &job.NumWorkers, &job.Error, &job.CreatedAt, &startedAt, &completedAt)
+	if language.Valid {
+		job.Language = language.String
+	}
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -560,7 +585,7 @@ func (db *DB) ListJobs(status string, limit int) ([]*Job, error) {
 	defer db.mu.RUnlock()
 
 	query := `
-		SELECT id, status, file_name, file_path, provider, voice, speed, pitch,
+		SELECT id, status, file_name, file_path, provider, voice, language, speed, pitch,
 			book_title, book_author, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
 			current_chapter, total_chapters, current_chapter_num, worker_progress, num_workers, error, created_at, started_at, completed_at
 		FROM jobs
@@ -591,9 +616,10 @@ func (db *DB) ListJobs(status string, limit int) ([]*Job, error) {
 		var m4bFilesJSON string
 		var workerProgressJSON sql.NullString
 		var startedAt, completedAt sql.NullTime
+		var language sql.NullString
 
 		err := rows.Scan(&job.ID, &job.Status, &job.FileName, &job.FilePath, &job.Provider,
-			&job.Voice, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor,
+			&job.Voice, &language, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor,
 			&job.OutputPath, &job.M4BFile, &m4bFilesJSON, &job.ConversionProgress, &job.BuildProgress,
 			&job.CurrentChapter, &job.TotalChapters, &job.CurrentChapterNum,
 			&workerProgressJSON, &job.NumWorkers, &job.Error, &job.CreatedAt, &startedAt, &completedAt)
@@ -601,6 +627,9 @@ func (db *DB) ListJobs(status string, limit int) ([]*Job, error) {
 			return nil, err
 		}
 
+		if language.Valid {
+			job.Language = language.String
+		}
 		if startedAt.Valid {
 			job.StartedAt = &startedAt.Time
 		}
@@ -635,19 +664,23 @@ func (db *DB) GetPendingJob() (*Job, error) {
 	job := &Job{}
 	var m4bFilesJSON string
 	var startedAt, completedAt sql.NullTime
+	var language sql.NullString
 
 	err := db.conn.QueryRow(`
-		SELECT id, status, file_name, file_path, provider, voice, speed, pitch,
+		SELECT id, status, file_name, file_path, provider, voice, language, speed, pitch,
 			book_title, book_author, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
 			current_chapter, total_chapters, current_chapter_num, error, created_at, started_at, completed_at
 		FROM jobs WHERE status = 'pending'
 		ORDER BY created_at ASC
 		LIMIT 1
 	`).Scan(&job.ID, &job.Status, &job.FileName, &job.FilePath, &job.Provider,
-		&job.Voice, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor,
+		&job.Voice, &language, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor,
 		&job.OutputPath, &job.M4BFile, &m4bFilesJSON, &job.ConversionProgress, &job.BuildProgress,
 		&job.CurrentChapter, &job.TotalChapters, &job.CurrentChapterNum,
 		&job.Error, &job.CreatedAt, &startedAt, &completedAt)
+	if language.Valid {
+		job.Language = language.String
+	}
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -679,6 +712,198 @@ func (db *DB) CleanupOldJobs(olderThan time.Duration) (int64, error) {
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+// Noun represents a noun entry for number normalization
+type Noun struct {
+	ID        int64     `json:"id"`
+	Lang      string    `json:"lang"`
+	Noun      string    `json:"noun"`
+	Gender    string    `json:"gender"` // m, f, n
+	Form      string    `json:"form"`   // o (ordinal), c (cardinal)
+	Singular  string    `json:"singular"`
+	Plurals   string    `json:"plurals"`   // pipe-separated
+	IsCustom  bool      `json:"is_custom"` // true if user-added, false if from defaults
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// CreateNoun creates a new noun in the database
+func (db *DB) CreateNoun(noun *Noun) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	result, err := db.conn.Exec(`
+		INSERT INTO nouns (lang, noun, gender, form, singular, plurals, is_custom, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(lang, noun) DO UPDATE SET 
+			gender = excluded.gender,
+			form = excluded.form,
+			singular = excluded.singular,
+			plurals = excluded.plurals,
+			is_custom = excluded.is_custom,
+			updated_at = excluded.updated_at
+	`, noun.Lang, noun.Noun, noun.Gender, noun.Form, noun.Singular, noun.Plurals,
+		noun.IsCustom, noun.CreatedAt, noun.UpdatedAt)
+
+	if err != nil {
+		return err
+	}
+
+	id, _ := result.LastInsertId()
+	noun.ID = id
+	return nil
+}
+
+// UpdateNoun updates an existing noun
+func (db *DB) UpdateNoun(noun *Noun) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	_, err := db.conn.Exec(`
+		UPDATE nouns SET gender = ?, form = ?, singular = ?, plurals = ?, is_custom = ?, updated_at = ?
+		WHERE id = ?
+	`, noun.Gender, noun.Form, noun.Singular, noun.Plurals, noun.IsCustom, time.Now(), noun.ID)
+
+	return err
+}
+
+// GetNoun retrieves a noun by ID
+func (db *DB) GetNoun(id int64) (*Noun, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	noun := &Noun{}
+	err := db.conn.QueryRow(`
+		SELECT id, lang, noun, gender, form, singular, plurals, is_custom, created_at, updated_at
+		FROM nouns WHERE id = ?
+	`, id).Scan(&noun.ID, &noun.Lang, &noun.Noun, &noun.Gender, &noun.Form,
+		&noun.Singular, &noun.Plurals, &noun.IsCustom, &noun.CreatedAt, &noun.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return noun, nil
+}
+
+// GetNounByLangAndWord retrieves a noun by language and word
+func (db *DB) GetNounByLangAndWord(lang, word string) (*Noun, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	noun := &Noun{}
+	err := db.conn.QueryRow(`
+		SELECT id, lang, noun, gender, form, singular, plurals, is_custom, created_at, updated_at
+		FROM nouns WHERE lang = ? AND noun = ?
+	`, lang, word).Scan(&noun.ID, &noun.Lang, &noun.Noun, &noun.Gender, &noun.Form,
+		&noun.Singular, &noun.Plurals, &noun.IsCustom, &noun.CreatedAt, &noun.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return noun, nil
+}
+
+// ListNouns retrieves all nouns, optionally filtered by language
+func (db *DB) ListNouns(lang string) ([]*Noun, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	query := `SELECT id, lang, noun, gender, form, singular, plurals, is_custom, created_at, updated_at FROM nouns`
+	args := []interface{}{}
+
+	if lang != "" {
+		query += " WHERE lang = ?"
+		args = append(args, lang)
+	}
+
+	query += " ORDER BY lang, noun"
+
+	rows, err := db.conn.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var nouns []*Noun
+	for rows.Next() {
+		noun := &Noun{}
+		err := rows.Scan(&noun.ID, &noun.Lang, &noun.Noun, &noun.Gender, &noun.Form,
+			&noun.Singular, &noun.Plurals, &noun.IsCustom, &noun.CreatedAt, &noun.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		nouns = append(nouns, noun)
+	}
+
+	return nouns, nil
+}
+
+// DeleteNoun deletes a noun by ID
+func (db *DB) DeleteNoun(id int64) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	_, err := db.conn.Exec("DELETE FROM nouns WHERE id = ?", id)
+	return err
+}
+
+// DeleteNounByLangAndWord deletes a noun by language and word
+func (db *DB) DeleteNounByLangAndWord(lang, word string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	_, err := db.conn.Exec("DELETE FROM nouns WHERE lang = ? AND noun = ?", lang, word)
+	return err
+}
+
+// GetNounLanguages returns all unique languages in the nouns table
+func (db *DB) GetNounLanguages() ([]string, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	rows, err := db.conn.Query("SELECT DISTINCT lang FROM nouns ORDER BY lang")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var langs []string
+	for rows.Next() {
+		var lang string
+		if err := rows.Scan(&lang); err != nil {
+			return nil, err
+		}
+		langs = append(langs, lang)
+	}
+
+	return langs, nil
+}
+
+// CountNouns returns the number of nouns for a language
+func (db *DB) CountNouns(lang string) (int, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	var count int
+	query := "SELECT COUNT(*) FROM nouns"
+	args := []interface{}{}
+
+	if lang != "" {
+		query += " WHERE lang = ?"
+		args = append(args, lang)
+	}
+
+	err := db.conn.QueryRow(query, args...).Scan(&count)
+	return count, err
 }
 
 // OPDSSource represents an OPDS catalog source
