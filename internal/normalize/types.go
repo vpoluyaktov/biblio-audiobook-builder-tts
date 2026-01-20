@@ -107,3 +107,36 @@ func IsSupported(langCode string) bool {
 	_, ok := registry[langCode]
 	return ok
 }
+
+// LanguageProcessor is an optional interface for language-specific text processing.
+// Languages that need special handling (like Russian ordinal suffixes) can implement this.
+type LanguageProcessor interface {
+	// PreProcess handles language-specific preprocessing before number replacement.
+	// It receives the text and converter, and returns the processed text.
+	PreProcess(text string, converter NumberConverter) string
+
+	// DetectContext determines grammatical context from surrounding words.
+	// Returns the context and true if language-specific detection was applied.
+	DetectContext(wordBefore, wordAfter string, nounDB *NounDatabase) (Context, bool)
+
+	// PostProcessContext applies language-specific post-processing to the context.
+	// Called after number conversion to apply case transformations, etc.
+	PostProcessContext(words string, ctx Context) string
+
+	// GetChapterGender returns the grammatical gender for "chapter" in this language.
+	GetChapterGender() Gender
+}
+
+// langProcessorRegistry holds language-specific processors.
+var langProcessorRegistry = make(map[string]LanguageProcessor)
+
+// RegisterLanguageProcessor adds a language processor to the registry.
+func RegisterLanguageProcessor(langCode string, processor LanguageProcessor) {
+	langProcessorRegistry[langCode] = processor
+}
+
+// GetLanguageProcessor returns the language processor for the given language code.
+// Returns nil if no processor is registered.
+func GetLanguageProcessor(langCode string) LanguageProcessor {
+	return langProcessorRegistry[langCode]
+}

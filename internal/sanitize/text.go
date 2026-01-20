@@ -418,6 +418,11 @@ func GetDefaultRules() []struct {
 		{`(\d+)%`, "$1 percent", "Percentages"},
 		{`&`, " and ", "Ampersand"},
 
+		// Copyright symbols
+		{`(?i)\bCopyright\b`, "Copyright", "Copyright word"},
+		{`\(c\)`, "Copyright", "Copyright symbol (c)"},
+		{`©`, "Copyright", "Copyright symbol ©"},
+
 		// Common mispronunciations
 		{`(?i)\blinux\b`, "Linux", "Linux pronunciation"},
 		{`(?i)\bgithub\b`, "GitHub", "GitHub pronunciation"},

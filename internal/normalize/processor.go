@@ -44,9 +44,9 @@ func (p *Processor) Process(text, lang string) string {
 
 	result := text
 
-	// For Russian, first handle numbers with ordinal suffixes (e.g., "1996-м году")
-	if lang == "ru" {
-		result = p.processRussianOrdinalSuffixes(result, converter)
+	// Apply language-specific preprocessing if available
+	if langProc := GetLanguageProcessor(lang); langProc != nil {
+		result = langProc.PreProcess(result, converter)
 	}
 
 	// Find all remaining numbers and their positions
@@ -82,58 +82,13 @@ func (p *Processor) Process(text, lang string) string {
 		// Convert number to words
 		words := converter.ToWords(n, ctx)
 
-		// Apply case transformation for Russian ordinals
-		if lang == "ru" && ctx.Form == Ordinal && ctx.Case != Nominative {
-			words = TransformOrdinalCase(words, ctx.Case, ctx.Gender)
+		// Apply language-specific post-processing
+		if langProc := GetLanguageProcessor(lang); langProc != nil {
+			words = langProc.PostProcessContext(words, ctx)
 		}
 
 		// Replace in result
 		result = result[:start] + words + result[end:]
-	}
-
-	return result
-}
-
-// processRussianOrdinalSuffixes handles Russian numbers with ordinal suffixes like "1996-м"
-func (p *Processor) processRussianOrdinalSuffixes(text string, converter NumberConverter) string {
-	// Find all matches from end to start
-	matches := RussianOrdinalSuffixPattern.FindAllStringSubmatchIndex(text, -1)
-	if len(matches) == 0 {
-		return text
-	}
-
-	result := text
-	for i := len(matches) - 1; i >= 0; i-- {
-		match := matches[i]
-		fullStart, fullEnd := match[0], match[1]
-		numStart, numEnd := match[2], match[3]
-		suffixStart, suffixEnd := match[4], match[5]
-
-		numStr := text[numStart:numEnd]
-		suffix := text[suffixStart:suffixEnd]
-
-		n, err := strconv.ParseInt(numStr, 10, 64)
-		if err != nil {
-			continue
-		}
-
-		// Determine gender from suffix
-		gender := GenderFromSuffix(suffix)
-
-		ctx := Context{
-			Form:   Ordinal,
-			Gender: gender,
-			Case:   Nominative,
-		}
-
-		// Convert number to ordinal words (nominative case)
-		words := converter.ToWords(n, ctx)
-
-		// Apply case ending transformation based on suffix
-		words = TransformBySuffix(words, suffix, gender)
-
-		// Replace the entire match (number + hyphen + suffix) with the ordinal word
-		result = result[:fullStart] + words + result[fullEnd:]
 	}
 
 	return result
@@ -149,47 +104,27 @@ func (p *Processor) detectContext(text string, numStart, numEnd int, lang string
 	// Extract word after the number
 	wordAfter := p.extractWordAfter(text, numEnd)
 
-	// Check word before - handles patterns like "Chapter 5", "Глава 5"
-	// where the noun before determines the number's form (usually ordinal)
-	// Skip if word before is a Russian month (doesn't affect following number)
+	// Try language-specific context detection first
+	if langProc := GetLanguageProcessor(lang); langProc != nil {
+		if langCtx, ok := langProc.DetectContext(wordBefore, wordAfter, p.nounDB); ok {
+			return langCtx
+		}
+	}
+
+	// Generic context detection using noun database
+	// Check word before - handles patterns like "Chapter 5"
 	if wordBefore != "" {
-		if lang == "ru" && IsRussianMonth(strings.ToLower(wordBefore)) {
-			// Month before number doesn't affect it (e.g., "марта 1996")
-			// Fall through to check word after
-		} else if info, ok := p.nounDB.Lookup(lang, wordBefore); ok {
+		if info, ok := p.nounDB.Lookup(lang, wordBefore); ok {
 			ctx.Form = info.TriggerForm
 			ctx.Gender = info.Gender
 			return ctx
 		}
 	}
 
-	// Check word after - handles patterns like "5 dollars", "5 рублей", "25 марта"
+	// Check word after - handles patterns like "5 dollars"
 	if wordAfter != "" {
 		if info, ok := p.nounDB.Lookup(lang, wordAfter); ok {
 			ctx.Gender = info.Gender
-
-			if lang == "ru" {
-				// Russian-specific logic for dates and years
-				lowerWord := strings.ToLower(wordAfter)
-				if IsRussianMonth(lowerWord) {
-					// Dates: "25 марта" → ordinal neuter
-					ctx.Form = Ordinal
-					return ctx
-				} else if lowerWord == "год" {
-					// Year nominative: "1996 год" → ordinal masculine
-					ctx.Form = Ordinal
-					ctx.Gender = Masculine
-					return ctx
-				} else if lowerWord == "года" {
-					// Year genitive: "1996 года" → ordinal masculine genitive
-					ctx.Form = Ordinal
-					ctx.Gender = Masculine
-					ctx.Case = Genitive
-					return ctx
-				}
-			}
-
-			// Default for quantities: cardinal
 			ctx.Form = Cardinal
 			return ctx
 		}
@@ -327,9 +262,8 @@ func (p *Processor) ProcessWithContext(text, lang string, ctx Context) string {
 func (p *Processor) NormalizeChapter(title, lang string) string {
 	// Determine gender based on the word "chapter" in the target language
 	gender := Masculine
-	if lang == "ru" {
-		// "глава" is feminine in Russian
-		gender = Feminine
+	if langProc := GetLanguageProcessor(lang); langProc != nil {
+		gender = langProc.GetChapterGender()
 	}
 
 	ctx := Context{

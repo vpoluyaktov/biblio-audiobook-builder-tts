@@ -2,6 +2,7 @@ package normalize
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -86,13 +87,23 @@ var scaleOrdinalRU = map[Gender][]string{
 	Neuter:    {"", "тысячное", "миллионное", "миллиардное", "триллионное"},
 }
 
+// RussianProcessor implements LanguageProcessor for Russian-specific text processing.
+type RussianProcessor struct{}
+
+// Ensure RussianProcessor implements LanguageProcessor.
+var _ LanguageProcessor = (*RussianProcessor)(nil)
+
 func init() {
 	Register(&RussianConverter{})
+	RegisterLanguageProcessor("ru", &RussianProcessor{})
 }
 
 // RussianOrdinalSuffixPattern matches Russian ordinal suffixes after numbers
-// e.g., "1996-м", "1996-го", "1996-й", "1996-я", "1996-е", "1996-ом", "1996-ым"
-var RussianOrdinalSuffixPattern = regexp.MustCompile(`(\d+)-([мгйяеыо][оаяу|мй]?|ого|ему|ым|ом|ой|ую|ая|ое|ые|ых|ым|ыми)`)
+// e.g., "1996-м", "1996-го", "1996-й", "1996-я", "1996-е", "1996-ом", "1996-ым", "90-х"
+var RussianOrdinalSuffixPattern = regexp.MustCompile(`(\d+)-([мгйяеыо][оаяу|мй]?|ого|ему|ым|ом|ой|ую|ая|ое|ые|ых|ым|ыми|х)`)
+
+// RussianYearAbbrevPattern matches "гг." abbreviation for "годов" (years)
+var RussianYearAbbrevPattern = regexp.MustCompile(`гг\.`)
 
 // GenderFromSuffix determines grammatical gender from Russian ordinal suffix
 func GenderFromSuffix(suffix string) Gender {
@@ -128,6 +139,152 @@ func IsRussianMonth(word string) bool {
 		"сентября": true, "октября": true, "ноября": true, "декабря": true,
 	}
 	return months[word]
+}
+
+// IsGenitiveTrigger checks if a word triggers genitive case for following dates.
+// These are typically verbs or prepositions that require genitive case.
+func IsGenitiveTrigger(word string) bool {
+	word = strings.ToLower(word)
+	triggers := map[string]bool{
+		// Past tense verbs that trigger genitive for dates
+		"случилось": true, "произошло": true, "было": true, "состоялось": true,
+		"началось": true, "закончилось": true, "завершилось": true,
+		"родился": true, "родилась": true, "родились": true,
+		"умер": true, "умерла": true, "умерли": true,
+		"женился": true, "вышла": true,
+		// Prepositions that trigger genitive
+		"до": true, "после": true, "с": true, "от": true, "около": true,
+		"начиная": true, "кроме": true,
+	}
+	return triggers[word]
+}
+
+// GenderFromNounEnding determines grammatical gender from Russian noun ending.
+// This is a fallback heuristic for nouns not in the database.
+// It first attempts to normalize plural forms to singular, then applies
+// standard Russian grammar rules for nominative case:
+// - Consonant or -й → Masculine
+// - -а or -я → Feminine
+// - -о or -е → Neuter
+// - -ь (soft sign) → Ambiguous, defaults to Masculine
+func GenderFromNounEnding(word string) Gender {
+	word = strings.ToLower(word)
+	runes := []rune(word)
+	if len(runes) == 0 {
+		return Masculine
+	}
+
+	// Try to detect gender from plural endings first
+	if gender, ok := genderFromPluralEnding(word, runes); ok {
+		return gender
+	}
+
+	// Fall back to singular ending detection
+	lastRune := runes[len(runes)-1]
+
+	switch lastRune {
+	case 'а', 'я':
+		return Feminine
+	case 'о', 'е', 'ё':
+		return Neuter
+	case 'ь':
+		// Soft sign is ambiguous - could be masculine or feminine
+		// Default to masculine as it's slightly more common
+		return Masculine
+	default:
+		// Consonants and -й are masculine
+		return Masculine
+	}
+}
+
+// genderFromPluralEnding attempts to detect gender from Russian plural noun endings.
+// Returns the detected gender and true if a plural pattern was recognized.
+// Russian nouns after numbers typically appear in genitive case:
+// - After 2-4: genitive singular (собаки, окна, стола)
+// - After 5+: genitive plural (собак, окон, столов)
+func genderFromPluralEnding(word string, runes []rune) (Gender, bool) {
+	if len(runes) < 2 {
+		return Masculine, false
+	}
+
+	lastRune := runes[len(runes)-1]
+	lastTwo := string(runes[len(runes)-2:])
+
+	// Genitive plural endings (after 5, 6, 7, 8, 9, 10, 11-19, 20, etc.)
+	switch {
+	// -ов, -ев, -ёв → Masculine (столов, музеев)
+	case strings.HasSuffix(word, "ов") || strings.HasSuffix(word, "ев") || strings.HasSuffix(word, "ёв"):
+		return Masculine, true
+
+	// -ей → Could be Masculine (врачей) or Neuter (морей) or Feminine (ночей)
+	// Most commonly masculine, but ambiguous
+	case strings.HasSuffix(word, "ей"):
+		return Masculine, true
+
+	// Genitive singular endings (after 2, 3, 4, 22, 23, 24, etc.)
+	// -и → Feminine genitive singular (собаки, книги, земли)
+	case lastRune == 'и':
+		return Feminine, true
+
+	// -ы → Feminine genitive singular for hard stems (воды, горы)
+	// But also nominative plural for masculine (столы) - context dependent
+	// After numbers 2-4, it's more likely feminine genitive singular
+	case lastRune == 'ы':
+		return Feminine, true
+
+	// -а after consonant → Could be:
+	// - Neuter genitive singular (окна from окно)
+	// - Feminine nominative singular (кошка, Москва)
+	// - Masculine genitive singular (стола from стол)
+	//
+	// Neuter gen.sg pattern: short words (3-4 chars) like окна, яйца
+	// Feminine nom.sg: longer words ending in -ка, -ва, -на, etc.
+	// Only match neuter for very short words that look like gen.sg of neuter nouns
+	case lastRune == 'а' && len(runes) >= 3:
+		// Only match as neuter plural if word is very short (3-4 chars)
+		// and has consonant cluster before -а (like "окна" from "окно")
+		if len(runes) <= 4 {
+			prevRune := runes[len(runes)-2]
+			if !isRussianVowel(prevRune) && len(runes) >= 4 {
+				thirdLast := runes[len(runes)-3]
+				// Pattern like "окна" - consonant + consonant + а
+				if !isRussianVowel(thirdLast) {
+					return Neuter, true
+				}
+			}
+		}
+		// For longer words or other patterns, don't match - let singular detection handle
+		return Feminine, false
+
+	// -я after consonant → Could be Neuter genitive singular (моря, поля)
+	// But also Feminine nominative singular (земля, семья)
+	// Only treat as neuter if it looks like a plural form (short word after number 2-4)
+	// For safety, don't match here - let singular detection handle -я as feminine
+	case lastRune == 'я' && len(runes) >= 3:
+		prevRune := runes[len(runes)-2]
+		// Only match neuter if previous is 'р' (моря, поля pattern) and word is short
+		if !isRussianVowel(prevRune) && (prevRune == 'р' || prevRune == 'л') && len(runes) <= 4 {
+			return Neuter, true
+		}
+		return Feminine, false // Let singular detection handle it
+
+	// Zero ending (consonant) after removing vowel → check common patterns
+	// Words like "собак", "книг", "окон" - genitive plural
+	case lastTwo == "ок" || lastTwo == "он" || lastTwo == "ен":
+		// Could be neuter (окон) - but hard to tell without more context
+		return Neuter, false
+	}
+
+	return Masculine, false
+}
+
+// isRussianVowel checks if a rune is a Russian vowel
+func isRussianVowel(r rune) bool {
+	vowels := map[rune]bool{
+		'а': true, 'е': true, 'ё': true, 'и': true, 'о': true,
+		'у': true, 'ы': true, 'э': true, 'ю': true, 'я': true,
+	}
+	return vowels[r]
 }
 
 // TransformOrdinalCase transforms nominative ordinal to target case
@@ -188,6 +345,8 @@ func TransformBySuffix(words, suffix string, gender Gender) string {
 		newWord = transformToPrepositional(lastWord, gender)
 	case "ую":
 		newWord = transformToAccusativeFem(lastWord)
+	case "х", "ых":
+		newWord = transformToGenitivePlural(lastWord)
 	default:
 		return words
 	}
@@ -313,6 +472,44 @@ func transformToAccusativeFem(word string) string {
 		return strings.TrimSuffix(word, "яя") + "юю"
 	}
 	return word
+}
+
+// transformToGenitivePlural transforms ordinal to genitive plural form
+// Used for decades like "90-х" → "девяностых"
+func transformToGenitivePlural(word string) string {
+	// Handle ordinal endings
+	if strings.HasSuffix(word, "ый") {
+		return strings.TrimSuffix(word, "ый") + "ых"
+	}
+	if strings.HasSuffix(word, "ий") {
+		return strings.TrimSuffix(word, "ий") + "их"
+	}
+	if strings.HasSuffix(word, "ой") {
+		return strings.TrimSuffix(word, "ой") + "ых"
+	}
+	// Handle cardinal tens (девяносто → девяностых)
+	if strings.HasSuffix(word, "о") {
+		return word + "х"
+	}
+	if strings.HasSuffix(word, "ь") {
+		return strings.TrimSuffix(word, "ь") + "ых"
+	}
+	return word + "х"
+}
+
+// decadeSpecialCases maps round numbers to their decade forms in genitive plural
+// These are compound forms that don't follow regular ordinal rules
+var decadeSpecialCases = map[int64]string{
+	1000:  "тысячных",
+	2000:  "двухтысячных",
+	3000:  "трёхтысячных",
+	4000:  "четырёхтысячных",
+	5000:  "пятитысячных",
+	6000:  "шеститысячных",
+	7000:  "семитысячных",
+	8000:  "восьмитысячных",
+	9000:  "девятитысячных",
+	10000: "десятитысячных",
 }
 
 // LanguageCode returns the ISO 639-1 language code.
@@ -576,4 +773,137 @@ func (r *RussianConverter) ordinalWithScale(n int64, gender Gender) string {
 	parts = append(parts, r.ordinalRecursive(remainder, gender, true))
 
 	return strings.Join(parts, " ")
+}
+
+// PreProcess handles Russian-specific preprocessing before number replacement.
+// It processes ordinal suffixes like "1996-м году" and abbreviations like "гг." before general number processing.
+func (p *RussianProcessor) PreProcess(text string, converter NumberConverter) string {
+	result := text
+
+	// First, expand "гг." abbreviation to "годов"
+	result = RussianYearAbbrevPattern.ReplaceAllString(result, "годов")
+
+	// Find all ordinal suffix matches from end to start
+	matches := RussianOrdinalSuffixPattern.FindAllStringSubmatchIndex(result, -1)
+	if len(matches) == 0 {
+		return result
+	}
+
+	for i := len(matches) - 1; i >= 0; i-- {
+		match := matches[i]
+		fullStart, fullEnd := match[0], match[1]
+		numStart, numEnd := match[2], match[3]
+		suffixStart, suffixEnd := match[4], match[5]
+
+		numStr := result[numStart:numEnd]
+		suffix := result[suffixStart:suffixEnd]
+
+		n, err := strconv.ParseInt(numStr, 10, 64)
+		if err != nil {
+			continue
+		}
+
+		// Determine gender from suffix
+		gender := GenderFromSuffix(suffix)
+
+		var words string
+
+		// Check for special decade cases (e.g., "2000-х" → "двухтысячных")
+		if (suffix == "х" || suffix == "ых") && decadeSpecialCases[n] != "" {
+			words = decadeSpecialCases[n]
+		} else {
+			ctx := Context{
+				Form:   Ordinal,
+				Gender: gender,
+				Case:   Nominative,
+			}
+
+			// Convert number to ordinal words (nominative case)
+			words = converter.ToWords(n, ctx)
+
+			// Apply case ending transformation based on suffix
+			words = TransformBySuffix(words, suffix, gender)
+		}
+
+		// Replace the entire match (number + hyphen + suffix) with the ordinal word
+		result = result[:fullStart] + words + result[fullEnd:]
+	}
+
+	return result
+}
+
+// DetectContext determines grammatical context from surrounding words for Russian.
+// Returns the context and true if Russian-specific detection was applied.
+func (p *RussianProcessor) DetectContext(wordBefore, wordAfter string, nounDB *NounDatabase) (Context, bool) {
+	ctx := DefaultContext()
+
+	// Check if word before triggers genitive case (for dates)
+	genitiveTriggered := wordBefore != "" && IsGenitiveTrigger(wordBefore)
+
+	// Check word before - skip if it's a Russian month (doesn't affect following number)
+	if wordBefore != "" && !genitiveTriggered {
+		if IsRussianMonth(strings.ToLower(wordBefore)) {
+			// Month before number doesn't affect it (e.g., "марта 1996")
+			// Fall through to check word after
+		} else if info, ok := nounDB.Lookup("ru", wordBefore); ok {
+			ctx.Form = info.TriggerForm
+			ctx.Gender = info.Gender
+			return ctx, true
+		}
+	}
+
+	// Check word after - handles patterns like "5 рублей", "25 марта"
+	if wordAfter != "" {
+		if info, ok := nounDB.Lookup("ru", wordAfter); ok {
+			ctx.Gender = info.Gender
+
+			lowerWord := strings.ToLower(wordAfter)
+			if IsRussianMonth(lowerWord) {
+				// Dates: "25 марта" → ordinal neuter
+				// Use genitive case if triggered by preceding word
+				ctx.Form = Ordinal
+				if genitiveTriggered {
+					ctx.Case = Genitive
+				}
+				return ctx, true
+			} else if lowerWord == "год" {
+				// Year nominative: "1996 год" → ordinal masculine
+				ctx.Form = Ordinal
+				ctx.Gender = Masculine
+				return ctx, true
+			} else if lowerWord == "года" {
+				// Year genitive: "1996 года" → ordinal masculine genitive
+				ctx.Form = Ordinal
+				ctx.Gender = Masculine
+				ctx.Case = Genitive
+				return ctx, true
+			}
+
+			// Default for quantities: cardinal
+			ctx.Form = Cardinal
+			return ctx, true
+		}
+
+		// Fallback: noun not in database - use ending-based gender detection
+		// Default to cardinal form since we can't determine ordinal triggers
+		ctx.Gender = GenderFromNounEnding(wordAfter)
+		ctx.Form = Cardinal
+		return ctx, true
+	}
+
+	return ctx, false
+}
+
+// PostProcessContext applies Russian-specific post-processing to ordinal words.
+// It handles case transformations for ordinals.
+func (p *RussianProcessor) PostProcessContext(words string, ctx Context) string {
+	if ctx.Form == Ordinal && ctx.Case != Nominative {
+		return TransformOrdinalCase(words, ctx.Case, ctx.Gender)
+	}
+	return words
+}
+
+// GetChapterGender returns Feminine because "глава" (chapter) is feminine in Russian.
+func (p *RussianProcessor) GetChapterGender() Gender {
+	return Feminine
 }
