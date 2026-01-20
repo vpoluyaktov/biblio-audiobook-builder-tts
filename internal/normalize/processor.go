@@ -26,6 +26,11 @@ func NewProcessorWithDB(db *NounDatabase) *Processor {
 	}
 }
 
+// GetNounDatabase returns the noun database used by this processor.
+func (p *Processor) GetNounDatabase() *NounDatabase {
+	return p.nounDB
+}
+
 // numberPattern matches integers (with optional leading minus sign)
 var numberPattern = regexp.MustCompile(`-?\d+`)
 

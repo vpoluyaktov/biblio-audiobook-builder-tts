@@ -188,6 +188,11 @@ func (s *Server) Start() error {
 		ServeWS(s.hub, w, r)
 	})
 
+	// Noun endpoints (for text normalization)
+	mux.HandleFunc("/api/nouns", s.handleNouns)
+	mux.HandleFunc("/api/nouns/", s.handleNoun)
+	mux.HandleFunc("/api/nouns/languages", s.handleNounLanguages)
+
 	// OPDS endpoints
 	mux.HandleFunc("/api/opds/sources", s.handleOPDSSources)
 	mux.HandleFunc("/api/opds/sources/", s.handleOPDSSource)

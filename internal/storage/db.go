@@ -198,6 +198,22 @@ func (db *DB) migrate() error {
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_opds_sources_enabled ON opds_sources(enabled);
+
+	CREATE TABLE IF NOT EXISTS nouns (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		lang TEXT NOT NULL,
+		noun TEXT NOT NULL,
+		gender TEXT NOT NULL,
+		form TEXT NOT NULL,
+		singular TEXT NOT NULL,
+		plurals TEXT NOT NULL,
+		is_custom BOOLEAN DEFAULT 1,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(lang, noun)
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_nouns_lang ON nouns(lang);
 	`
 
 	_, err := db.conn.Exec(schema)
@@ -679,6 +695,198 @@ func (db *DB) CleanupOldJobs(olderThan time.Duration) (int64, error) {
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+// Noun represents a noun entry for number normalization
+type Noun struct {
+	ID        int64     `json:"id"`
+	Lang      string    `json:"lang"`
+	Noun      string    `json:"noun"`
+	Gender    string    `json:"gender"` // m, f, n
+	Form      string    `json:"form"`   // o (ordinal), c (cardinal)
+	Singular  string    `json:"singular"`
+	Plurals   string    `json:"plurals"`   // pipe-separated
+	IsCustom  bool      `json:"is_custom"` // true if user-added, false if from defaults
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// CreateNoun creates a new noun in the database
+func (db *DB) CreateNoun(noun *Noun) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	result, err := db.conn.Exec(`
+		INSERT INTO nouns (lang, noun, gender, form, singular, plurals, is_custom, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(lang, noun) DO UPDATE SET 
+			gender = excluded.gender,
+			form = excluded.form,
+			singular = excluded.singular,
+			plurals = excluded.plurals,
+			is_custom = excluded.is_custom,
+			updated_at = excluded.updated_at
+	`, noun.Lang, noun.Noun, noun.Gender, noun.Form, noun.Singular, noun.Plurals,
+		noun.IsCustom, noun.CreatedAt, noun.UpdatedAt)
+
+	if err != nil {
+		return err
+	}
+
+	id, _ := result.LastInsertId()
+	noun.ID = id
+	return nil
+}
+
+// UpdateNoun updates an existing noun
+func (db *DB) UpdateNoun(noun *Noun) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	_, err := db.conn.Exec(`
+		UPDATE nouns SET gender = ?, form = ?, singular = ?, plurals = ?, is_custom = ?, updated_at = ?
+		WHERE id = ?
+	`, noun.Gender, noun.Form, noun.Singular, noun.Plurals, noun.IsCustom, time.Now(), noun.ID)
+
+	return err
+}
+
+// GetNoun retrieves a noun by ID
+func (db *DB) GetNoun(id int64) (*Noun, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	noun := &Noun{}
+	err := db.conn.QueryRow(`
+		SELECT id, lang, noun, gender, form, singular, plurals, is_custom, created_at, updated_at
+		FROM nouns WHERE id = ?
+	`, id).Scan(&noun.ID, &noun.Lang, &noun.Noun, &noun.Gender, &noun.Form,
+		&noun.Singular, &noun.Plurals, &noun.IsCustom, &noun.CreatedAt, &noun.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return noun, nil
+}
+
+// GetNounByLangAndWord retrieves a noun by language and word
+func (db *DB) GetNounByLangAndWord(lang, word string) (*Noun, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	noun := &Noun{}
+	err := db.conn.QueryRow(`
+		SELECT id, lang, noun, gender, form, singular, plurals, is_custom, created_at, updated_at
+		FROM nouns WHERE lang = ? AND noun = ?
+	`, lang, word).Scan(&noun.ID, &noun.Lang, &noun.Noun, &noun.Gender, &noun.Form,
+		&noun.Singular, &noun.Plurals, &noun.IsCustom, &noun.CreatedAt, &noun.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return noun, nil
+}
+
+// ListNouns retrieves all nouns, optionally filtered by language
+func (db *DB) ListNouns(lang string) ([]*Noun, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	query := `SELECT id, lang, noun, gender, form, singular, plurals, is_custom, created_at, updated_at FROM nouns`
+	args := []interface{}{}
+
+	if lang != "" {
+		query += " WHERE lang = ?"
+		args = append(args, lang)
+	}
+
+	query += " ORDER BY lang, noun"
+
+	rows, err := db.conn.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var nouns []*Noun
+	for rows.Next() {
+		noun := &Noun{}
+		err := rows.Scan(&noun.ID, &noun.Lang, &noun.Noun, &noun.Gender, &noun.Form,
+			&noun.Singular, &noun.Plurals, &noun.IsCustom, &noun.CreatedAt, &noun.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		nouns = append(nouns, noun)
+	}
+
+	return nouns, nil
+}
+
+// DeleteNoun deletes a noun by ID
+func (db *DB) DeleteNoun(id int64) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	_, err := db.conn.Exec("DELETE FROM nouns WHERE id = ?", id)
+	return err
+}
+
+// DeleteNounByLangAndWord deletes a noun by language and word
+func (db *DB) DeleteNounByLangAndWord(lang, word string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	_, err := db.conn.Exec("DELETE FROM nouns WHERE lang = ? AND noun = ?", lang, word)
+	return err
+}
+
+// GetNounLanguages returns all unique languages in the nouns table
+func (db *DB) GetNounLanguages() ([]string, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	rows, err := db.conn.Query("SELECT DISTINCT lang FROM nouns ORDER BY lang")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var langs []string
+	for rows.Next() {
+		var lang string
+		if err := rows.Scan(&lang); err != nil {
+			return nil, err
+		}
+		langs = append(langs, lang)
+	}
+
+	return langs, nil
+}
+
+// CountNouns returns the number of nouns for a language
+func (db *DB) CountNouns(lang string) (int, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	var count int
+	query := "SELECT COUNT(*) FROM nouns"
+	args := []interface{}{}
+
+	if lang != "" {
+		query += " WHERE lang = ?"
+		args = append(args, lang)
+	}
+
+	err := db.conn.QueryRow(query, args...).Scan(&count)
+	return count, err
 }
 
 // OPDSSource represents an OPDS catalog source
