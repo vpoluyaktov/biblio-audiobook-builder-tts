@@ -54,6 +54,7 @@ class App {
                 voice: this.voiceSelect.value,
                 speed: this.speedInput.value,
                 pitch: this.pitchInput.value,
+                useSentencePauses: this.useSentencePausesCheckbox?.checked ?? true,
                 testVoiceText: testVoiceText
             };
             localStorage.setItem(TTS_SETTINGS_KEY, JSON.stringify(settings));
@@ -89,6 +90,8 @@ class App {
         this.speedValue = document.getElementById('speed-value');
         this.pitchInput = document.getElementById('pitch');
         this.pitchValue = document.getElementById('pitch-value');
+        this.ssmlOptionsContainer = document.getElementById('ssml-options');
+        this.useSentencePausesCheckbox = document.getElementById('use-sentence-pauses');
         this.previewBtn = document.getElementById('preview-btn');
         this.uploadBtn = document.getElementById('upload-btn');
 
@@ -197,6 +200,7 @@ class App {
         this.providerSelect.addEventListener('change', () => {
             this.loadLanguages();
             this.updateCostEstimate();
+            this.updateSSMLOptionsVisibility();
         });
         this.languageSelect.addEventListener('change', () => this.loadModels());
         this.modelSelect.addEventListener('change', () => this.loadVoices());
@@ -212,6 +216,11 @@ class App {
             this.pitchValue.textContent = this.pitchInput.value + 'x';
             this.saveTTSSettings();
         });
+
+        // SSML options checkbox
+        if (this.useSentencePausesCheckbox) {
+            this.useSentencePausesCheckbox.addEventListener('change', () => this.saveTTSSettings());
+        }
 
         // Preview and Upload buttons
         this.previewBtn.addEventListener('click', () => this.previewFile());
@@ -436,8 +445,25 @@ class App {
             }).join('');
 
             await this.loadLanguages();
+            this.updateSSMLOptionsVisibility();
         } catch (e) {
             console.error('Failed to load providers:', e);
+        }
+    }
+
+    // Show/hide SSML options based on current provider's SSML support
+    updateSSMLOptionsVisibility() {
+        const currentProvider = this.providerSelect.value;
+        const providerInfo = this.providers.find(p => p.id === currentProvider);
+        const hasSSMLSupport = providerInfo?.ssml_support || false;
+        
+        if (this.ssmlOptionsContainer) {
+            this.ssmlOptionsContainer.style.display = hasSSMLSupport ? 'flex' : 'none';
+        }
+        
+        // Restore saved preference if available
+        if (hasSSMLSupport && this.useSentencePausesCheckbox && this.savedTTSSettings?.useSentencePauses !== undefined) {
+            this.useSentencePausesCheckbox.checked = this.savedTTSSettings.useSentencePauses;
         }
     }
 
@@ -825,7 +851,8 @@ class App {
                     voice: this.voiceSelect.value,
                     language: this.languageSelect.value,
                     speed: parseFloat(this.speedInput.value),
-                    pitch: parseFloat(this.pitchInput.value)
+                    pitch: parseFloat(this.pitchInput.value),
+                    use_sentence_pauses: this.useSentencePausesCheckbox?.checked ?? true
                 })
             });
 
@@ -867,6 +894,7 @@ class App {
         formData.append('language', this.languageSelect.value);
         formData.append('speed', this.speedInput.value);
         formData.append('pitch', this.pitchInput.value);
+        formData.append('use_sentence_pauses', this.useSentencePausesCheckbox?.checked ?? true);
 
         this.uploadBtn.disabled = true;
         this.previewBtn.disabled = true;

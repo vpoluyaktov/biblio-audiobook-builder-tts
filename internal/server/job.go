@@ -86,11 +86,12 @@ type Job struct {
 	NumWorkers     int              `json:"num_workers,omitempty"`
 
 	// TTS settings
-	Provider string  `json:"provider"`
-	Voice    string  `json:"voice"`
-	Language string  `json:"language"` // ISO 639-1 language code (e.g., "en", "ru")
-	Speed    float64 `json:"speed"`
-	Pitch    float64 `json:"pitch"`
+	Provider          string  `json:"provider"`
+	Voice             string  `json:"voice"`
+	Language          string  `json:"language"` // ISO 639-1 language code (e.g., "en", "ru")
+	Speed             float64 `json:"speed"`
+	Pitch             float64 `json:"pitch"`
+	UseSentencePauses bool    `json:"use_sentence_pauses"` // Add SSML paragraph/sentence pauses
 
 	// Book metadata (populated after parsing)
 	BookTitle  string `json:"book_title"`
@@ -117,7 +118,7 @@ type Job struct {
 }
 
 // NewJob creates a new conversion job
-func NewJob(fileName, filePath, provider, voice, language string, speed, pitch float64) *Job {
+func NewJob(fileName, filePath, provider, voice, language string, speed, pitch float64, useSentencePauses bool) *Job {
 	return &Job{
 		ID:                 uuid.New().String(),
 		FileName:           fileName,
@@ -130,6 +131,7 @@ func NewJob(fileName, filePath, provider, voice, language string, speed, pitch f
 		Language:           language,
 		Speed:              speed,
 		Pitch:              pitch,
+		UseSentencePauses:  useSentencePauses,
 		CreatedAt:          time.Now(),
 	}
 }

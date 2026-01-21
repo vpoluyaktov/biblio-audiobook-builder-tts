@@ -534,12 +534,13 @@ func (s *Server) handleOPDSConvert(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		PreviewID string  `json:"preview_id"`
-		Provider  string  `json:"provider"`
-		Voice     string  `json:"voice"`
-		Language  string  `json:"language"`
-		Speed     float64 `json:"speed"`
-		Pitch     float64 `json:"pitch"`
+		PreviewID         string  `json:"preview_id"`
+		Provider          string  `json:"provider"`
+		Voice             string  `json:"voice"`
+		Language          string  `json:"language"`
+		Speed             float64 `json:"speed"`
+		Pitch             float64 `json:"pitch"`
+		UseSentencePauses *bool   `json:"use_sentence_pauses"` // Pointer to detect if explicitly set
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -588,8 +589,14 @@ func (s *Server) handleOPDSConvert(w http.ResponseWriter, r *http.Request) {
 		pitch = s.cfg.DefaultPitch
 	}
 
+	// Default to true for backward compatibility
+	useSentencePauses := true
+	if req.UseSentencePauses != nil {
+		useSentencePauses = *req.UseSentencePauses
+	}
+
 	// Create job
-	job := NewJob(preview.FileName, preview.FilePath, provider, voice, language, speed, pitch)
+	job := NewJob(preview.FileName, preview.FilePath, provider, voice, language, speed, pitch, useSentencePauses)
 
 	// Save to database
 	if s.db != nil {
