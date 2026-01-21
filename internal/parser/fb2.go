@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
@@ -10,6 +11,8 @@ import (
 	"os"
 	"regexp"
 	"strings"
+
+	"golang.org/x/text/encoding/ianaindex"
 )
 
 // Pre-compiled regex patterns for FB2 parsing (performance optimization)
@@ -116,8 +119,21 @@ func (p *fb2Parser) ParseFB2(r io.Reader) (*Book, error) {
 		return "</"
 	})
 
+	// Use xml.Decoder with CharsetReader to handle non-UTF-8 encodings (e.g., windows-1251)
 	var fb2 fb2Document
-	if err := xml.Unmarshal([]byte(contentStr), &fb2); err != nil {
+	decoder := xml.NewDecoder(bytes.NewReader([]byte(contentStr)))
+	decoder.CharsetReader = func(charset string, input io.Reader) (io.Reader, error) {
+		enc, err := ianaindex.IANA.Encoding(charset)
+		if err != nil {
+			return nil, fmt.Errorf("unsupported charset %q: %v", charset, err)
+		}
+		if enc == nil {
+			// nil encoding means UTF-8
+			return input, nil
+		}
+		return enc.NewDecoder().Reader(input), nil
+	}
+	if err := decoder.Decode(&fb2); err != nil {
 		return nil, fmt.Errorf("failed to parse FB2: %v", err)
 	}
 
