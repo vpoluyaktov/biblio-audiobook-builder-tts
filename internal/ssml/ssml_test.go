@@ -6,20 +6,20 @@ import (
 )
 
 func TestWrapTextInSSML_EmptyText(t *testing.T) {
-	result := WrapTextInSSML("")
+	result := WrapTextInSSML("", true)
 	expected := "<speak></speak>"
 	if result != expected {
 		t.Errorf("Expected %q, got %q", expected, result)
 	}
 
-	result = WrapTextInSSML("   ")
+	result = WrapTextInSSML("   ", true)
 	if result != expected {
 		t.Errorf("Expected %q for whitespace, got %q", expected, result)
 	}
 }
 
 func TestWrapTextInSSML_SingleSentence(t *testing.T) {
-	result := WrapTextInSSML("Hello world.")
+	result := WrapTextInSSML("Hello world.", true)
 	if !strings.Contains(result, "<speak>") {
 		t.Error("Missing <speak> tag")
 	}
@@ -35,7 +35,7 @@ func TestWrapTextInSSML_SingleSentence(t *testing.T) {
 }
 
 func TestWrapTextInSSML_MultipleSentences(t *testing.T) {
-	result := WrapTextInSSML("First sentence. Second sentence! Third sentence?")
+	result := WrapTextInSSML("First sentence. Second sentence! Third sentence?", true)
 
 	if strings.Count(result, "<s>") != 3 {
 		t.Errorf("Expected 3 sentence tags, got %d in: %s", strings.Count(result, "<s>"), result)
@@ -53,7 +53,7 @@ func TestWrapTextInSSML_MultipleSentences(t *testing.T) {
 
 func TestWrapTextInSSML_MultipleParagraphs(t *testing.T) {
 	input := "First paragraph.\n\nSecond paragraph."
-	result := WrapTextInSSML(input)
+	result := WrapTextInSSML(input, true)
 
 	if strings.Count(result, "<p>") != 2 {
 		t.Errorf("Expected 2 paragraph tags, got %d in: %s", strings.Count(result, "<p>"), result)
@@ -62,7 +62,7 @@ func TestWrapTextInSSML_MultipleParagraphs(t *testing.T) {
 
 func TestWrapTextInSSML_SingleNewlineParagraphs(t *testing.T) {
 	input := "First paragraph.\nSecond paragraph."
-	result := WrapTextInSSML(input)
+	result := WrapTextInSSML(input, true)
 
 	if strings.Count(result, "<p>") != 2 {
 		t.Errorf("Expected 2 paragraph tags for single newline, got %d in: %s", strings.Count(result, "<p>"), result)
@@ -71,7 +71,7 @@ func TestWrapTextInSSML_SingleNewlineParagraphs(t *testing.T) {
 
 func TestWrapTextInSSML_XMLEscaping(t *testing.T) {
 	input := "Tom & Jerry said \"Hello\" and <waved>."
-	result := WrapTextInSSML(input)
+	result := WrapTextInSSML(input, true)
 
 	if !strings.Contains(result, "&amp;") {
 		t.Error("& not escaped")
@@ -90,7 +90,7 @@ func TestWrapTextInSSML_XMLEscaping(t *testing.T) {
 func TestWrapTextInSSML_Ellipsis(t *testing.T) {
 	// Ellipsis within a sentence should not cause splits
 	input := "Wait... what happened next?"
-	result := WrapTextInSSML(input)
+	result := WrapTextInSSML(input, true)
 
 	// Ellipsis followed by lowercase should be one sentence
 	if strings.Count(result, "<s>") != 1 {
@@ -99,7 +99,7 @@ func TestWrapTextInSSML_Ellipsis(t *testing.T) {
 
 	// Multiple sentences with ellipsis
 	input2 := "First sentence. Wait... Second sentence."
-	result2 := WrapTextInSSML(input2)
+	result2 := WrapTextInSSML(input2, true)
 	if strings.Count(result2, "<s>") != 2 {
 		t.Errorf("Expected 2 sentences, got %d in: %s", strings.Count(result2, "<s>"), result2)
 	}
@@ -107,7 +107,7 @@ func TestWrapTextInSSML_Ellipsis(t *testing.T) {
 
 func TestWrapTextInSSML_RussianText(t *testing.T) {
 	input := "Привет мир. Как дела? Отлично!"
-	result := WrapTextInSSML(input)
+	result := WrapTextInSSML(input, true)
 
 	if strings.Count(result, "<s>") != 3 {
 		t.Errorf("Expected 3 Russian sentences, got %d in: %s", strings.Count(result, "<s>"), result)
@@ -121,7 +121,7 @@ Second paragraph here. It also has two sentences.
 
 Third paragraph is short.`
 
-	result := WrapTextInSSML(input)
+	result := WrapTextInSSML(input, true)
 
 	if strings.Count(result, "<p>") != 3 {
 		t.Errorf("Expected 3 paragraphs, got %d", strings.Count(result, "<p>"))
@@ -129,6 +129,35 @@ Third paragraph is short.`
 	if strings.Count(result, "<s>") != 5 {
 		t.Errorf("Expected 5 sentences, got %d in: %s", strings.Count(result, "<s>"), result)
 	}
+}
+
+func TestWrapTextInSSML_WithoutSentencePauses(t *testing.T) {
+	// When useSentencePauses is false, should only wrap in <speak> tags
+	input := "First sentence. Second sentence!\n\nNew paragraph."
+	result := WrapTextInSSML(input, false)
+
+	expected := "<speak>First sentence. Second sentence!\n\nNew paragraph.</speak>"
+	// The text should be XML-escaped but not have <p> or <s> tags
+	if strings.Contains(result, "<p>") {
+		t.Errorf("Should not contain <p> tags when useSentencePauses=false, got: %s", result)
+	}
+	if strings.Contains(result, "<s>") {
+		t.Errorf("Should not contain <s> tags when useSentencePauses=false, got: %s", result)
+	}
+	if !strings.HasPrefix(result, "<speak>") {
+		t.Errorf("Should start with <speak>, got: %s", result)
+	}
+	if !strings.HasSuffix(result, "</speak>") {
+		t.Errorf("Should end with </speak>, got: %s", result)
+	}
+
+	// Test XML escaping still works
+	inputWithSpecialChars := "Tom & Jerry"
+	resultWithSpecialChars := WrapTextInSSML(inputWithSpecialChars, false)
+	if !strings.Contains(resultWithSpecialChars, "&amp;") {
+		t.Errorf("Should still escape XML characters, got: %s", resultWithSpecialChars)
+	}
+	_ = expected // silence unused variable warning
 }
 
 func TestSplitIntoParagraphs(t *testing.T) {

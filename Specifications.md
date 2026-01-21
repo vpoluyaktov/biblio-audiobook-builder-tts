@@ -272,6 +272,7 @@ Flags:
 |---------|--------|-------|
 | Test Voice UI | 🔄 In Progress | Allow users to test TTS voice before conversion |
 | Parallel Processing | 🔄 In Progress | Concurrent TTS encoding and M4B building |
+| Configurable SSML Tags | 🔄 In Progress | Toggle paragraph/sentence SSML tags per conversion |
 
 ### Not Started ❌
 
@@ -1177,10 +1178,118 @@ func (w *Worker) processChapter(text string, provider *storage.TTSProvider) ([]b
 - [x] Add `SSMLSupport` field to `TTSProvider` struct
 - [x] Update provider CRUD operations to include `ssml_support`
 - [x] Add SSML checkbox to provider settings UI
-- [ ] Create `internal/ssml/ssml.go` with `WrapTextInSSML` function
-- [ ] Create `internal/ssml/ssml_test.go` with tests
-- [ ] Integrate SSML processing into TTS worker pipeline
+- [x] Create `internal/ssml/ssml.go` with `WrapTextInSSML` function
+- [x] Create `internal/ssml/ssml_test.go` with tests
+- [x] Integrate SSML processing into TTS worker pipeline
 - [ ] Test with Google Cloud TTS and Azure TTS
+
+---
+
+### Phase -0.23: Configurable SSML Paragraph/Sentence Tags (High Priority)
+
+**Goal**: Allow users to toggle SSML paragraph (`<p>`) and sentence (`<s>`) tags on/off per conversion. These tags add natural pauses between paragraphs and sentences, but may not be suitable for all voices or use cases.
+
+#### -0.23.1 Feature Overview
+
+The SSML `<p>` and `<s>` tags are currently applied automatically when a provider has `ssml_support` enabled. However, some voices may produce unnatural pauses or the user may prefer continuous speech without extra pauses.
+
+This feature adds a toggle on the main conversion form (next to speed/pitch controls) that allows users to:
+- **Enable**: Apply `<p>` and `<s>` tags for natural paragraph/sentence pauses
+- **Disable**: Send plain text without paragraph/sentence markup (only `<speak>` wrapper if SSML is supported)
+
+**Default behavior**: Enabled (current behavior preserved)
+
+#### -0.23.2 UI Changes
+
+Add a checkbox toggle in the upload form, in the same row as speed/pitch controls:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Speed: [━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━] 1.0x                  │
+│  Pitch: [━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━] 1.0x                  │
+│  ☑ Add pauses between paragraphs and sentences                  │
+│    (Uses SSML tags for more natural speech rhythm)              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+The toggle should:
+- Be visible only when the selected provider supports SSML
+- Be checked by default
+- Save preference to localStorage with other TTS settings
+- Be included in the conversion request
+
+#### -0.23.3 API Changes
+
+**Upload/Convert Request:**
+
+Add `use_sentence_pauses` field to the conversion request:
+
+```json
+{
+  "provider": "google",
+  "voice": "en-US-Wavenet-D",
+  "speed": 1.0,
+  "pitch": 1.0,
+  "use_sentence_pauses": true
+}
+```
+
+**Job Object:**
+
+Add `use_sentence_pauses` field to job storage:
+
+```json
+{
+  "id": "uuid",
+  "use_sentence_pauses": true,
+  ...
+}
+```
+
+#### -0.23.4 Backend Changes
+
+**SSML Wrapping Logic:**
+
+Modify `WrapTextInSSML` or add a new function that respects the toggle:
+
+```go
+// WrapTextInSSML wraps text in SSML with optional paragraph/sentence tags
+func WrapTextInSSML(text string, useSentencePauses bool) string {
+    if !useSentencePauses {
+        // Simple wrapper without <p> and <s> tags
+        return "<speak>" + escapeXML(text) + "</speak>"
+    }
+    // Current implementation with <p> and <s> tags
+    ...
+}
+```
+
+**Adapter Changes:**
+
+Pass the `useSentencePauses` option through the TTS pipeline:
+
+```go
+type ConvertOptions struct {
+    Speed             float64
+    Pitch             float64
+    SSMLSupport       bool
+    UseSentencePauses bool  // New field
+}
+```
+
+#### -0.23.5 Implementation Tasks
+
+- [x] Add `use_sentence_pauses` field to Job struct in `internal/server/job.go`
+- [x] Add `use_sentence_pauses` to job creation in upload handler
+- [x] Add `UseSentencePauses` field to `ConvertOptions` in `internal/tts/service.go`
+- [x] Modify `WrapTextInSSML` to accept `useSentencePauses` parameter
+- [x] Update adapter to pass `useSentencePauses` to SSML wrapping
+- [x] Add checkbox to upload form in `index.html` (after pitch control)
+- [x] Add JavaScript to show/hide checkbox based on provider SSML support
+- [x] Save `useSentencePauses` preference to localStorage
+- [x] Add CSS styles for the new checkbox
+- [ ] Update test voice modal to respect the setting
+- [ ] Test with SSML-supporting providers (Google, RHVoice, Silero)
 
 ---
 

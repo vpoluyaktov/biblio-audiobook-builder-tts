@@ -557,6 +557,12 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	speed := parseFloat(r.FormValue("speed"), s.cfg.DefaultSpeed)
 	pitch := parseFloat(r.FormValue("pitch"), s.cfg.DefaultPitch)
 
+	// Parse use_sentence_pauses (default to true for backward compatibility)
+	useSentencePauses := true
+	if useSentencePausesStr := r.FormValue("use_sentence_pauses"); useSentencePausesStr != "" {
+		useSentencePauses = useSentencePausesStr == "true" || useSentencePausesStr == "1"
+	}
+
 	// Save file to temp directory
 	tempDir := s.cfg.TempDir
 	if err := os.MkdirAll(tempDir, 0755); err != nil {
@@ -578,7 +584,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create job
-	job := NewJob(header.Filename, tempPath, provider, voice, language, speed, pitch)
+	job := NewJob(header.Filename, tempPath, provider, voice, language, speed, pitch, useSentencePauses)
 
 	// Save to database
 	if s.db != nil {

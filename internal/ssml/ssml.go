@@ -14,13 +14,20 @@ var sentenceEndPattern = regexp.MustCompile(`([.!?։؟])(\s+|$)`)
 // ellipsisPattern matches ellipsis to avoid splitting on each dot
 var ellipsisPattern = regexp.MustCompile(`\.{2,}`)
 
-// WrapTextInSSML converts plain text to SSML format with paragraph and sentence tags.
-// This improves speech quality by adding natural pauses between paragraphs and sentences.
-func WrapTextInSSML(text string) string {
+// WrapTextInSSML converts plain text to SSML format.
+// If useSentencePauses is true, adds paragraph and sentence tags for natural pauses.
+// If useSentencePauses is false, only wraps in <speak> tags without paragraph/sentence markup.
+func WrapTextInSSML(text string, useSentencePauses bool) string {
 	if strings.TrimSpace(text) == "" {
 		return "<speak></speak>"
 	}
 
+	// Simple wrapper without paragraph/sentence pauses
+	if !useSentencePauses {
+		return "<speak>" + escapeXML(text) + "</speak>"
+	}
+
+	// Full SSML with paragraph and sentence tags
 	paragraphs := splitIntoParagraphs(text)
 
 	var result strings.Builder
