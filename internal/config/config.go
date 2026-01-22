@@ -5,7 +5,7 @@ import (
 )
 
 // Default database path
-const DefaultDBPath = "biblio-audiobook-builder-tts.db"
+const DefaultDBPath = "./db/abb_tts.db"
 
 // Config holds all configuration for the application
 type Config struct {
@@ -45,7 +45,7 @@ func Load(configFile string) (*Config, error) {
 
 	// Basic settings
 	viper.SetDefault("log_file", "biblio-audiobook-builder-tts.log")
-	viper.SetDefault("output_dir", "./output")
+	viper.SetDefault("output_dir", "./temp")
 	viper.SetDefault("temp_dir", "./temp")
 	viper.SetDefault("default_voice", "en-US")
 	viper.SetDefault("default_provider", "espeak")

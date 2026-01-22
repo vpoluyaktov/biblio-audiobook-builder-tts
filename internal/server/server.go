@@ -212,6 +212,9 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/opds/convert", s.handleOPDSConvert)
 	mux.HandleFunc("/api/opds/proxy", s.handleOPDSProxy)
 
+	// Health check endpoint
+	mux.HandleFunc("/health", s.handleHealth)
+
 	// Serve main page
 	mux.HandleFunc("/", s.handleIndex)
 
@@ -222,6 +225,13 @@ func (s *Server) Start() error {
 
 	logger.Info("Server starting on %s", s.addr)
 	return s.httpServer.ListenAndServe()
+}
+
+// handleHealth returns a simple health check response
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"ok"}`))
 }
 
 // Stop gracefully stops the server

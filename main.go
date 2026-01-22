@@ -44,7 +44,7 @@ func main() {
 	}
 
 	// Parse command line flags
-	dbPath := flag.String("db", config.DefaultDBPath, "Path to SQLite database file")
+	dbPath := flag.String("db", getEnvOrDefault("ABB_TTS_DATABASE_PATH", config.DefaultDBPath), "Path to SQLite database file")
 	port := flag.String("port", "", "Port to run the server on (overrides config)")
 	host := flag.String("host", "", "Host to bind the server to (overrides config)")
 	noBrowser := flag.Bool("no-browser", false, "Don't automatically open browser")
@@ -79,7 +79,15 @@ func main() {
 	cfg := config.LoadFromDB(appConfigMap)
 	config.SetInstance(cfg)
 
-	// Override config with command line flags
+	// Override config with environment variables
+	if envPort := os.Getenv("ABB_TTS_PORT"); envPort != "" {
+		cfg.ServerPort = envPort
+	}
+	if envHost := os.Getenv("ABB_TTS_HOST"); envHost != "" {
+		cfg.ServerHost = envHost
+	}
+
+	// Override config with command line flags (highest priority)
 	if *port != "" {
 		cfg.ServerPort = *port
 	}
@@ -196,6 +204,14 @@ func main() {
 	}
 
 	logger.Info("Server stopped")
+}
+
+// getEnvOrDefault returns the value of an environment variable or a default value
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }
 
 // openBrowser opens the default browser to the given URL
