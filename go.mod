@@ -1,4 +1,4 @@
-module abb_tts
+module biblio-audiobook-builder-tts
 
 go 1.24.0
 

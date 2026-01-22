@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"abb_tts/internal/logger"
+	"biblio-audiobook-builder-tts/internal/logger"
 )
 
 // JobDispatcher manages a pool of workers to process jobs concurrently

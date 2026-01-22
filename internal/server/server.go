@@ -14,11 +14,11 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"abb_tts/internal/config"
-	"abb_tts/internal/logger"
-	"abb_tts/internal/parser"
-	"abb_tts/internal/storage"
-	"abb_tts/internal/tts"
+	"biblio-audiobook-builder-tts/internal/config"
+	"biblio-audiobook-builder-tts/internal/logger"
+	"biblio-audiobook-builder-tts/internal/parser"
+	"biblio-audiobook-builder-tts/internal/storage"
+	"biblio-audiobook-builder-tts/internal/tts"
 )
 
 //go:embed assets/*

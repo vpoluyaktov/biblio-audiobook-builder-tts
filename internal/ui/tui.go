@@ -2,10 +2,10 @@ package ui
 
 import (
 	"github.com/vpoluyaktov/tview"
-	"abb_tts/internal/dto"
-	"abb_tts/internal/mq"
-	"abb_tts/internal/parser"
-	"abb_tts/internal/tts"
+	"biblio-audiobook-builder-tts/internal/dto"
+	"biblio-audiobook-builder-tts/internal/mq"
+	"biblio-audiobook-builder-tts/internal/parser"
+	"biblio-audiobook-builder-tts/internal/tts"
 )
 
 type TUI struct {

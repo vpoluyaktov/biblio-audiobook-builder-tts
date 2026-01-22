@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"abb_tts/internal/normalize"
+	"biblio-audiobook-builder-tts/internal/normalize"
 	"time"
 )
 

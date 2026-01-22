@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"abb_tts/internal/normalize"
-	"abb_tts/internal/storage"
+	"biblio-audiobook-builder-tts/internal/normalize"
+	"biblio-audiobook-builder-tts/internal/storage"
 )
 
 // NounDB defines the database operations needed for noun management

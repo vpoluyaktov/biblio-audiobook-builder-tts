@@ -3,7 +3,7 @@ package controller
 import (
 	"time"
 
-	"abb_tts/internal/mq"
+	"biblio-audiobook-builder-tts/internal/mq"
 )
 
 type controller interface {

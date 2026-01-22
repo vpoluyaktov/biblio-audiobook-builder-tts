@@ -1,9 +1,9 @@
 package app
 
 import (
-	"abb_tts/internal/config"
-	"abb_tts/internal/parser"
-	"abb_tts/internal/tts"
+	"biblio-audiobook-builder-tts/internal/config"
+	"biblio-audiobook-builder-tts/internal/parser"
+	"biblio-audiobook-builder-tts/internal/tts"
 )
 
 // App represents the main application

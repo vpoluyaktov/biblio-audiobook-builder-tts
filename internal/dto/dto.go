@@ -1,7 +1,7 @@
 package dto
 
 import (
-	"abb_tts/internal/parser"
+	"biblio-audiobook-builder-tts/internal/parser"
 )
 
 // Base interface for all DTOs

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"github.com/gdamore/tcell/v2"
 	"github.com/vpoluyaktov/tview"
-	"abb_tts/internal/dto"
-	"abb_tts/internal/mq"
-	parser "abb_tts/internal/parser"
-	"abb_tts/internal/tts"
+	"biblio-audiobook-builder-tts/internal/dto"
+	"biblio-audiobook-builder-tts/internal/mq"
+	parser "biblio-audiobook-builder-tts/internal/parser"
+	"biblio-audiobook-builder-tts/internal/tts"
 )
 
 type BookPage struct {

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"abb_tts/internal/parser"
+	"biblio-audiobook-builder-tts/internal/parser"
 )
 
 func TestPreviewStore_CreatePreview(t *testing.T) {

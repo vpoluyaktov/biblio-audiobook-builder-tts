@@ -21,6 +21,7 @@ class App {
         this.opdsSources = [];
         this.opdsHistory = []; // Navigation history for breadcrumbs
         this.currentOPDSBook = null;
+        this.currentOPDSEntries = []; // Store entries for safe click handling
 
         this.init();
     }
@@ -1867,16 +1868,20 @@ class App {
             return;
         }
 
+        // Store entries for safe click handling
+        this.currentOPDSEntries = catalog.entries;
+
         // Render entries as a grid
         let html = '<div class="opds-grid">';
         
-        for (const entry of catalog.entries) {
+        for (let i = 0; i < catalog.entries.length; i++) {
+            const entry = catalog.entries[i];
             if (entry.is_navigation) {
                 // Navigation entry (folder)
                 html += this.renderNavigationEntry(entry);
             } else {
                 // Book entry
-                html += this.renderBookEntry(entry);
+                html += this.renderBookEntry(entry, i);
             }
         }
 
@@ -1922,24 +1927,25 @@ class App {
         `;
     }
 
-    renderBookEntry(entry) {
+    renderBookEntry(entry, index) {
         const coverUrl = entry.cover_url || entry.thumbnail_url;
+        const sourceIdParam = this.currentOPDSSourceId ? `&source_id=${encodeURIComponent(this.currentOPDSSourceId)}` : '';
         const coverHtml = coverUrl 
-            ? `<img src="/api/opds/proxy?url=${encodeURIComponent(coverUrl)}" alt="Cover" onerror="this.parentElement.innerHTML='<span class=\\'no-cover\\'>📖</span>'">`
+            ? `<img src="/api/opds/proxy?url=${encodeURIComponent(coverUrl)}${sourceIdParam}" alt="Cover" onerror="this.parentElement.innerHTML='<span class=\\'no-cover\\'>📖</span>'">`
             : '<span class="no-cover">📖</span>';
 
         const authors = entry.authors && entry.authors.length > 0 
             ? entry.authors.join(', ') 
             : '';
 
-        const formats = entry.download_links
+        const formats = (entry.download_links || [])
             .filter(dl => dl.format === 'epub' || dl.format === 'fb2')
             .map(dl => dl.format.toUpperCase())
             .filter((v, i, a) => a.indexOf(v) === i)
             .join(', ');
 
         return `
-            <div class="opds-entry" onclick='app.showBookDetails(${JSON.stringify(entry).replace(/'/g, "\\'")})'>
+            <div class="opds-entry" onclick="app.showBookDetailsByIndex(${index})">
                 <div class="opds-entry-cover">${coverHtml}</div>
                 <div class="opds-entry-info">
                     <div class="opds-entry-title">${this.escapeHtml(entry.title)}</div>
@@ -1948,6 +1954,13 @@ class App {
                 </div>
             </div>
         `;
+    }
+
+    showBookDetailsByIndex(index) {
+        const entry = this.currentOPDSEntries[index];
+        if (entry) {
+            this.showBookDetails(entry);
+        }
     }
 
     navigateOPDS(url, title) {
@@ -2110,8 +2123,9 @@ class App {
 
         // Set cover
         const coverUrl = entry.cover_url || entry.thumbnail_url;
+        const sourceIdParam = this.currentOPDSSourceId ? `&source_id=${encodeURIComponent(this.currentOPDSSourceId)}` : '';
         if (coverUrl) {
-            this.opdsBookCover.innerHTML = `<img src="/api/opds/proxy?url=${encodeURIComponent(coverUrl)}" alt="Cover" onerror="this.parentElement.innerHTML='<span class=\\'no-cover\\'>No Cover</span>'">`;
+            this.opdsBookCover.innerHTML = `<img src="/api/opds/proxy?url=${encodeURIComponent(coverUrl)}${sourceIdParam}" alt="Cover" onerror="this.parentElement.innerHTML='<span class=\\'no-cover\\'>No Cover</span>'">`;
         } else {
             this.opdsBookCover.innerHTML = '<span class="no-cover">No Cover</span>';
         }

@@ -12,13 +12,13 @@ import (
 	"syscall"
 	"time"
 
-	"abb_tts/internal/config"
-	"abb_tts/internal/logger"
-	"abb_tts/internal/server"
-	"abb_tts/internal/storage"
-	"abb_tts/internal/tts"
-	"abb_tts/internal/tui"
-	"abb_tts/internal/utils"
+	"biblio-audiobook-builder-tts/internal/config"
+	"biblio-audiobook-builder-tts/internal/logger"
+	"biblio-audiobook-builder-tts/internal/server"
+	"biblio-audiobook-builder-tts/internal/storage"
+	"biblio-audiobook-builder-tts/internal/tts"
+	"biblio-audiobook-builder-tts/internal/tui"
+	"biblio-audiobook-builder-tts/internal/utils"
 
 	"golang.org/x/term"
 )

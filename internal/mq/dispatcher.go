@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"abb_tts/internal/dto"
-	"abb_tts/internal/monitoring"
+	"biblio-audiobook-builder-tts/internal/dto"
+	"biblio-audiobook-builder-tts/internal/monitoring"
 )
 
 type Dispatcher struct {

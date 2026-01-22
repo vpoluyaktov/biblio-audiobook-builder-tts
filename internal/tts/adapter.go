@@ -1,9 +1,9 @@
 package tts
 
 import (
-	"abb_tts/internal/logger"
-	"abb_tts/internal/sanitize"
-	"abb_tts/internal/ssml"
+	"biblio-audiobook-builder-tts/internal/logger"
+	"biblio-audiobook-builder-tts/internal/sanitize"
+	"biblio-audiobook-builder-tts/internal/ssml"
 	"bytes"
 	"fmt"
 	"io"

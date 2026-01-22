@@ -6,8 +6,8 @@ import (
 	"io"
 	"net/http"
 
-	"abb_tts/internal/audiobookshelf"
-	"abb_tts/internal/logger"
+	"biblio-audiobook-builder-tts/internal/audiobookshelf"
+	"biblio-audiobook-builder-tts/internal/logger"
 )
 
 // SettingsRequest represents the settings form data

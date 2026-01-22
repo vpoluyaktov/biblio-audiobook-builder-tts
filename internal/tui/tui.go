@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"abb_tts/internal/server"
-	"abb_tts/internal/storage"
-	"abb_tts/internal/tts"
+	"biblio-audiobook-builder-tts/internal/server"
+	"biblio-audiobook-builder-tts/internal/storage"
+	"biblio-audiobook-builder-tts/internal/tts"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"

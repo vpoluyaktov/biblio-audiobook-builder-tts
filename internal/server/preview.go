@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"abb_tts/internal/parser"
+	"biblio-audiobook-builder-tts/internal/parser"
 
 	"github.com/google/uuid"
 )

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"abb_tts/internal/storage"
+	"biblio-audiobook-builder-tts/internal/storage"
 )
 
 // mockJobDB is a mock implementation of JobDB for testing

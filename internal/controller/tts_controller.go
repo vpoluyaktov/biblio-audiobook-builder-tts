@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"abb_tts/internal/dto"
-	"abb_tts/internal/monitoring"
-	"abb_tts/internal/mq"
-	"abb_tts/internal/tts"
+	"biblio-audiobook-builder-tts/internal/dto"
+	"biblio-audiobook-builder-tts/internal/monitoring"
+	"biblio-audiobook-builder-tts/internal/mq"
+	"biblio-audiobook-builder-tts/internal/tts"
 )
 
 type TTSController struct {

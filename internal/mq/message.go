@@ -3,7 +3,7 @@ package mq
 import (
 	"time"
 
-	"abb_tts/internal/dto"
+	"biblio-audiobook-builder-tts/internal/dto"
 )
 
 const (

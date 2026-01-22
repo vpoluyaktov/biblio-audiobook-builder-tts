@@ -1,6 +1,6 @@
 package dto
 
-import parser "abb_tts/internal/parser"
+import parser "biblio-audiobook-builder-tts/internal/parser"
 
 // ParseBookCommand is sent from BookPage to BookController to request parsing an ebook file
 // Result is sent as BookParsedResult

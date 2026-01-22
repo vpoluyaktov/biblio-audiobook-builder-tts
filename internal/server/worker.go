@@ -11,16 +11,16 @@ import (
 	"sync"
 	"time"
 
-	"abb_tts/internal/audio"
-	"abb_tts/internal/audiobookshelf"
-	"abb_tts/internal/config"
-	"abb_tts/internal/logger"
-	"abb_tts/internal/normalize"
-	"abb_tts/internal/parser"
-	"abb_tts/internal/sanitize"
-	"abb_tts/internal/storage"
-	"abb_tts/internal/tts"
-	"abb_tts/internal/utils"
+	"biblio-audiobook-builder-tts/internal/audio"
+	"biblio-audiobook-builder-tts/internal/audiobookshelf"
+	"biblio-audiobook-builder-tts/internal/config"
+	"biblio-audiobook-builder-tts/internal/logger"
+	"biblio-audiobook-builder-tts/internal/normalize"
+	"biblio-audiobook-builder-tts/internal/parser"
+	"biblio-audiobook-builder-tts/internal/sanitize"
+	"biblio-audiobook-builder-tts/internal/storage"
+	"biblio-audiobook-builder-tts/internal/tts"
+	"biblio-audiobook-builder-tts/internal/utils"
 )
 
 // JobDB defines the database operations needed for job management

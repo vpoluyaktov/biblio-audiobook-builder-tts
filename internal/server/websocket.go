@@ -1,7 +1,7 @@
 package server
 
 import (
-	"abb_tts/internal/logger"
+	"biblio-audiobook-builder-tts/internal/logger"
 	"encoding/json"
 	"net/http"
 	"sync"

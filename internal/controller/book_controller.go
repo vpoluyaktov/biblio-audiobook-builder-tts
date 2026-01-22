@@ -3,10 +3,10 @@ package controller
 import (
 	"fmt"
 	"strings"
-	"abb_tts/internal/dto"
-	"abb_tts/internal/mq"
-	"abb_tts/internal/monitoring"
-	parser "abb_tts/internal/parser"
+	"biblio-audiobook-builder-tts/internal/dto"
+	"biblio-audiobook-builder-tts/internal/mq"
+	"biblio-audiobook-builder-tts/internal/monitoring"
+	parser "biblio-audiobook-builder-tts/internal/parser"
 )
 
 type BookController struct {

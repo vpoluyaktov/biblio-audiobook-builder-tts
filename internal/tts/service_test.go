@@ -3,7 +3,7 @@ package tts
 import (
 	"testing"
 
-	"abb_tts/internal/config"
+	"biblio-audiobook-builder-tts/internal/config"
 )
 
 func TestNewService_DefaultProvider(t *testing.T) {

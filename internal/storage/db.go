@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"abb_tts/internal/logger"
+	"biblio-audiobook-builder-tts/internal/logger"
 	"database/sql"
 	"encoding/json"
 	"fmt"

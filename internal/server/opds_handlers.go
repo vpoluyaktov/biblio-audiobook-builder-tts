@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"abb_tts/internal/logger"
-	"abb_tts/internal/opds"
-	"abb_tts/internal/parser"
-	"abb_tts/internal/storage"
+	"biblio-audiobook-builder-tts/internal/logger"
+	"biblio-audiobook-builder-tts/internal/opds"
+	"biblio-audiobook-builder-tts/internal/parser"
+	"biblio-audiobook-builder-tts/internal/storage"
 
 	"github.com/google/uuid"
 )
@@ -636,6 +636,9 @@ func (s *Server) handleOPDSProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get optional source ID for authentication
+	sourceID := r.URL.Query().Get("source_id")
+
 	// Create request
 	req, err := http.NewRequest("GET", targetURL, nil)
 	if err != nil {
@@ -645,6 +648,17 @@ func (s *Server) handleOPDSProxy(w http.ResponseWriter, r *http.Request) {
 
 	req.Header.Set("Accept", "application/atom+xml, application/xml, text/xml, image/*")
 	req.Header.Set("User-Agent", "abb_tts OPDS Client/1.0")
+
+	// Add Basic Auth if source has credentials
+	if sourceID != "" {
+		if db, ok := s.db.(OPDSDB); ok {
+			if source, err := db.GetOPDSSource(sourceID); err == nil && source != nil {
+				if source.Username != "" && source.Password != "" {
+					req.SetBasicAuth(source.Username, source.Password)
+				}
+			}
+		}
+	}
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)

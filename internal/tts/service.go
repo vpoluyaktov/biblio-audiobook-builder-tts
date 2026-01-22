@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"io"
 
-	"abb_tts/internal/config"
-	"abb_tts/internal/logger"
-	"abb_tts/internal/storage"
+	"biblio-audiobook-builder-tts/internal/config"
+	"biblio-audiobook-builder-tts/internal/logger"
+	"biblio-audiobook-builder-tts/internal/storage"
 )
 
 // Service interface defines methods for text-to-speech conversion
