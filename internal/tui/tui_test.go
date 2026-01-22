@@ -117,7 +117,7 @@ func TestModelView(t *testing.T) {
 	}
 
 	// Should contain the title
-	if !containsString(view, "AUDIOBOOK BUILDER TTS SERVER") {
+	if !containsString(view, "BIBLIO AUDIOBOOK BUILDER TTS") {
 		t.Error("View should contain title")
 	}
 

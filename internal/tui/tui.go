@@ -187,7 +187,7 @@ func (m Model) View() string {
 	}
 
 	// Title
-	title := titleStyle.Render("🎧  AUDIOBOOK BUILDER TTS SERVER  🎧")
+	title := titleStyle.Render("🎧  BIBLIO AUDIOBOOK BUILDER TTS  🎧")
 
 	// Server status line
 	uptime := time.Since(m.startTime).Round(time.Second)
