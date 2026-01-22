@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# End-to-End Test Script for ABB_TTS Server
+# End-to-End Test Script for Biblio Audiobook Builder TTS Server
 # Tests the complete workflow: upload -> conversion -> build -> completion
 # Uses espeak provider for fast testing
 
@@ -75,7 +75,7 @@ log_info "Test 1: Checking server health..."
 HEALTH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$SERVER_URL/api/jobs" 2>/dev/null || echo "000")
 if [ "$HEALTH_RESPONSE" != "200" ]; then
     log_error "Server is not responding at $SERVER_URL (HTTP $HEALTH_RESPONSE)"
-    log_info "Please start the server first: ./abb_tts server --headless"
+    log_info "Please start the server first: ./biblio-audiobook-builder-tts server --headless"
     exit 1
 fi
 log_success "Server is healthy"

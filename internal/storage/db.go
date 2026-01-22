@@ -403,7 +403,7 @@ func (db *DB) SaveAllConfig(cfg *Config) error {
 // DefaultConfig returns the default configuration
 func DefaultConfig() *Config {
 	return &Config{
-		LogFile:                 "abb_tts.log",
+		LogFile:                 "biblio-audiobook-builder-tts.log",
 		OutputDir:               "./output",
 		TempDir:                 "./temp",
 		DefaultVoice:            "en-US",

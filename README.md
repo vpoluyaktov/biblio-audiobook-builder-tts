@@ -1,8 +1,10 @@
-# Audiobook Builder (TTS version)
+# Biblio Audiobook Builder TTS
+
+> Part of the [BiblioHub](https://github.com/vpoluyaktov/BiblioHub) application suite
 
 ## Description
 
-Audiobook Builder TTS is a powerful tool that converts electronic books in .epub and .fb2 formats into audiobooks using text-to-speech technology. It supports both local and cloud-based TTS services, allowing you to create high-quality audiobooks from your digital library.
+Biblio Audiobook Builder TTS is a powerful tool that converts electronic books in .epub and .fb2 formats into audiobooks using text-to-speech technology. It supports both local and cloud-based TTS services, allowing you to create high-quality audiobooks from your digital library.
 
 ## Features
 - TUI interface for easy interaction
@@ -39,20 +41,20 @@ For Windows, visit [ffmpeg website](https://ffmpeg.org/download.html) for instal
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/vpoluyaktov/abb_tts.git
+   git clone https://github.com/vpoluyaktov/biblio-audiobook-builder-tts.git
    ```
 
 2. Ensure Go is installed on your system
 
 3. Build the application:
    ```bash
-   cd abb_tts
+   cd biblio-audiobook-builder-tts
    go build
    ```
 
 ## Configuration
 
-The application can be configured using the `abb_tts.config.yaml` file. Key configuration options include:
+The application can be configured using the `biblio-audiobook-builder-tts.config.yaml` file. Key configuration options include:
 
 - Log file location
 - Output directory for audiobooks
@@ -64,7 +66,7 @@ The application can be configured using the `abb_tts.config.yaml` file. Key conf
 
 1. Run the application:
    ```bash
-   ./abb_tts
+   ./biblio-audiobook-builder-tts
    ```
 
 2. Follow the TUI interface to:
@@ -80,4 +82,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-# abb_tts

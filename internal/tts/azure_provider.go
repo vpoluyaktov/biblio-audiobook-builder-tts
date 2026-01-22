@@ -355,7 +355,7 @@ func (p *AzureProvider) ConvertToSpeech(text string, voice string, options *Conv
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/ssml+xml")
 	req.Header.Set("X-Microsoft-OutputFormat", "riff-24khz-16bit-mono-pcm") // WAV format
-	req.Header.Set("User-Agent", "abb_tts")
+	req.Header.Set("User-Agent", "BiblioHub-Audiobook-Builder")
 
 	// Send request with retries
 	var lastErr error

@@ -1,8 +1,10 @@
-# Audiobook Builder TTS - Specifications
+# Biblio Audiobook Builder TTS - Specifications
+
+> Part of the [BiblioHub](https://github.com/vpoluyaktov/BiblioHub) application suite
 
 ## Overview
 
-**Audiobook Builder TTS (abb_tts)** is a server-based application that converts eBooks (EPUB, FB2) into audiobooks using various Text-to-Speech engines. It provides a web interface for uploading books, monitoring conversion progress, and downloading completed audiobooks.
+**Biblio Audiobook Builder TTS** is a server-based application that converts eBooks (EPUB, FB2) into audiobooks using various Text-to-Speech engines. It provides a web interface for uploading books, monitoring conversion progress, and downloading completed audiobooks.
 
 ### Key Features
 
@@ -66,9 +68,9 @@
 ### Package Structure
 
 ```
-abb_tts/
+biblio-audiobook-builder-tts/
 ├── main.go                     # Application entry point
-├── abb_tts.config.yaml         # Configuration file
+├── biblio-audiobook-builder-tts.config.yaml  # Configuration file
 ├── go.mod                      # Go module definition
 ├── Specifications.md           # This file
 │
@@ -218,10 +220,10 @@ audiobookshelf_library: ""
 ### Command Line Flags
 
 ```bash
-./abb_tts [flags]
+./biblio-audiobook-builder-tts [flags]
 
 Flags:
-  --config string      Path to configuration file (default "abb_tts.config.yaml")
+  --config string      Path to configuration file (default "biblio-audiobook-builder-tts.config.yaml")
   --port string        Port to run the server on (overrides config)
   --host string        Host to bind the server to (overrides config)
   --no-browser         Don't automatically open browser

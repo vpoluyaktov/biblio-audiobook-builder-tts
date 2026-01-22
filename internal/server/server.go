@@ -27,7 +27,7 @@ var assetsFS embed.FS
 //go:embed templates/*
 var templatesFS embed.FS
 
-// Server represents the HTTP server for abb_tts
+// Server represents the HTTP server for Biblio Audiobook Builder TTS
 type Server struct {
 	addr         string
 	cfg          *config.Config

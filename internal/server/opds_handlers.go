@@ -647,7 +647,7 @@ func (s *Server) handleOPDSProxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req.Header.Set("Accept", "application/atom+xml, application/xml, text/xml, image/*")
-	req.Header.Set("User-Agent", "abb_tts OPDS Client/1.0")
+	req.Header.Set("User-Agent", "BiblioHub Audiobook Builder OPDS Client/1.0")
 
 	// Add Basic Auth if source has credentials
 	if sourceID != "" {

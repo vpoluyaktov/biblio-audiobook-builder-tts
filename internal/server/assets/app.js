@@ -1,7 +1,7 @@
 // Audiobook Builder TTS - Web Client
 
 // localStorage key for TTS settings
-const TTS_SETTINGS_KEY = 'abb_tts_settings';
+const TTS_SETTINGS_KEY = 'biblio_audiobook_builder_tts_settings';
 
 class App {
     constructor() {
@@ -1238,7 +1238,7 @@ class App {
         document.getElementById('cfg-open-browser').checked = s.open_browser !== false;
         document.getElementById('cfg-output-dir').value = s.output_dir || './output';
         document.getElementById('cfg-temp-dir').value = s.temp_dir || './temp';
-        document.getElementById('cfg-log-file').value = s.log_file || 'abb_tts.log';
+        document.getElementById('cfg-log-file').value = s.log_file || 'biblio-audiobook-builder-tts.log';
         
         // TTS tab
         document.getElementById('cfg-default-provider').value = s.default_provider || 'espeak';

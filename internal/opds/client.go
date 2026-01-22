@@ -183,7 +183,7 @@ func (c *Client) FetchCatalog(catalogURL string) (*CatalogResponse, error) {
 	}
 
 	req.Header.Set("Accept", "application/atom+xml, application/xml, text/xml")
-	req.Header.Set("User-Agent", "abb_tts OPDS Client/1.0")
+	req.Header.Set("User-Agent", "BiblioHub Audiobook Builder OPDS Client/1.0")
 
 	// Add Basic Auth if credentials are set
 	if c.username != "" && c.password != "" {
@@ -469,7 +469,7 @@ func (c *Client) FetchOpenSearchDescription(openSearchURL string) (*OpenSearchDe
 	}
 
 	req.Header.Set("Accept", "application/opensearchdescription+xml, application/xml, text/xml")
-	req.Header.Set("User-Agent", "abb_tts OPDS Client/1.0")
+	req.Header.Set("User-Agent", "BiblioHub Audiobook Builder OPDS Client/1.0")
 
 	if c.username != "" && c.password != "" {
 		req.SetBasicAuth(c.username, c.password)
@@ -574,7 +574,7 @@ func (c *Client) DownloadBook(downloadURL string) ([]byte, string, error) {
 		return nil, "", fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("User-Agent", "abb_tts OPDS Client/1.0")
+	req.Header.Set("User-Agent", "BiblioHub Audiobook Builder OPDS Client/1.0")
 
 	// Add Basic Auth if credentials are set
 	if c.username != "" && c.password != "" {

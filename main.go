@@ -26,9 +26,9 @@ import (
 func main() {
 	// Customize usage
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage of abb_tts:\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage of biblio-audiobook-builder-tts:\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "  --db string\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "        Path to SQLite database file (default \"abb_tts.db\")\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "        Path to SQLite database file (default \"biblio-audiobook-builder-tts.db\")\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "  --port string\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "        Port to run the server on (overrides config)\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "  --host string\n")
