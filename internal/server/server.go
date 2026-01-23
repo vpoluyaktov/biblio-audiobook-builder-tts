@@ -819,6 +819,7 @@ type ProviderUpdateRequest struct {
 	APIKey           *string `json:"api_key,omitempty"`
 	Region           *string `json:"region,omitempty"`
 	TTSWorkers       *int    `json:"tts_workers,omitempty"`
+	MaxChunkSize     *int    `json:"max_chunk_size,omitempty"`
 	NormalizeNumbers *bool   `json:"normalize_numbers,omitempty"`
 	SSMLSupport      *bool   `json:"ssml_support,omitempty"`
 	IsDefault        *bool   `json:"is_default,omitempty"`
@@ -862,6 +863,9 @@ func (s *Server) updateProvider(w http.ResponseWriter, r *http.Request, id strin
 	}
 	if req.TTSWorkers != nil {
 		dbProv.TTSWorkers = *req.TTSWorkers
+	}
+	if req.MaxChunkSize != nil {
+		dbProv.MaxChunkSize = *req.MaxChunkSize
 	}
 	if req.NormalizeNumbers != nil {
 		dbProv.NormalizeNumbers = *req.NormalizeNumbers

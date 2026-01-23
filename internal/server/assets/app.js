@@ -1327,6 +1327,7 @@ class App {
         // Set form values
         document.getElementById('provider-edit-enabled').checked = provider.enabled;
         document.getElementById('provider-edit-workers').value = provider.tts_workers || 3;
+        document.getElementById('provider-edit-chunk-size').value = provider.max_chunk_size || 900;
         document.getElementById('provider-edit-normalize').checked = provider.normalize_numbers;
         document.getElementById('provider-edit-ssml').checked = provider.ssml_support;
         
@@ -1382,6 +1383,7 @@ class App {
         const updateData = {
             enabled: document.getElementById('provider-edit-enabled').checked,
             tts_workers: parseInt(document.getElementById('provider-edit-workers').value),
+            max_chunk_size: parseInt(document.getElementById('provider-edit-chunk-size').value),
             normalize_numbers: document.getElementById('provider-edit-normalize').checked,
             ssml_support: document.getElementById('provider-edit-ssml').checked
         };

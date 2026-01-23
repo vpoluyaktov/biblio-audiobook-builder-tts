@@ -463,7 +463,7 @@ On first run, initialize with default providers:
 - [x] Modify GetAdapter() in service.go to pass provider's MaxChunkSize to chunker
 - [x] Update NewAdapter() to accept custom ChunkerConfig (already supported)
 - [x] Add migration to set max_chunk_size for existing providers
-- [ ] Update Settings UI to show/edit max_chunk_size per provider
+- [x] Update Settings UI to show/edit max_chunk_size per provider
 - [ ] Test with Silero (900), Google (4000), and other providers
 
 ---
