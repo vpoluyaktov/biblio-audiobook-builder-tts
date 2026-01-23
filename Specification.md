@@ -323,6 +323,7 @@ CREATE TABLE IF NOT EXISTS providers (
     
     -- Performance settings
     tts_workers INTEGER DEFAULT 3, -- Number of concurrent TTS workers
+    max_chunk_size INTEGER DEFAULT 900, -- Maximum characters per TTS request
     
     -- Processing settings
     normalize_numbers BOOLEAN DEFAULT 1,  -- Enable number normalization
@@ -352,6 +353,7 @@ type TTSProvider struct {
     APIKey           string    `json:"api_key"`  // API key for cloud providers
     Region           string    `json:"region"`   // Region for Azure TTS
     TTSWorkers       int       `json:"tts_workers"`
+    MaxChunkSize     int       `json:"max_chunk_size"` // Maximum characters per TTS request
     NormalizeNumbers bool      `json:"normalize_numbers"`
     SSMLSupport      bool      `json:"ssml_support"`  // Provider supports SSML markup
     IsDefault        bool      `json:"is_default"`
@@ -365,15 +367,15 @@ type TTSProvider struct {
 
 On first run, initialize with default providers:
 
-| ID | Name | Type | Enabled | SSML | URL | API Key |
-|----|------|------|---------|------|-----|---------|
-| espeak | eSpeak | local | true | false | - | - |
-| google | Google Cloud TTS | cloud | false | true | - | (required) |
-| openai | OpenAI TTS | cloud | false | false | - | (required) |
-| azure | Azure TTS | cloud | false | true | - | (required + region) |
-| opentts | OpenTTS | self-hosted | false | false | (required) | - |
-| rhvoice | RHVoice | self-hosted | false | true | (required) | - |
-| silero | Silero TTS | self-hosted | false | true | (required) | - |
+| ID | Name | Type | Enabled | SSML | Max Chunk | URL | API Key |
+|----|------|------|---------|------|-----------|-----|---------|
+| espeak | eSpeak | local | true | false | 5000 | - | - |
+| google | Google Cloud TTS | cloud | false | true | 4000 | - | (required) |
+| openai | OpenAI TTS | cloud | false | false | 4000 | - | (required) |
+| azure | Azure TTS | cloud | false | true | 4000 | - | (required + region) |
+| opentts | OpenTTS | self-hosted | false | false | 2000 | (required) | - |
+| rhvoice | RHVoice | self-hosted | false | true | 2000 | (required) | - |
+| silero | Silero TTS | self-hosted | false | true | 900 | (required) | - |
 
 #### -3.5 API Endpoints
 
@@ -442,6 +444,27 @@ On first run, initialize with default providers:
 - [x] Add provider status indicators to UI
 - [x] Test migration from existing config
 - [ ] Update TUI to show provider status from database (future enhancement)
+
+#### -3.9 Per-Provider Chunk Size (Branch: `feature/per-provider-chunk-size`)
+
+**Goal**: Allow each TTS provider to have its own maximum chunk size limit, optimizing quality for providers with higher limits while ensuring compatibility with providers like Silero that have strict 1000-char limits.
+
+**Background**: Different TTS providers have different text length limits:
+- Silero: 1000 characters (hard limit from model)
+- Google Cloud TTS: 5000 bytes (~4000 chars for ASCII, less for multi-byte)
+- OpenAI TTS: 4096 characters
+- Azure TTS: No hard limit (billed per character)
+- eSpeak/RHVoice/OpenTTS: No strict limits
+
+**Implementation Tasks**:
+- [x] Add `max_chunk_size` column to providers table in db.go migrate()
+- [x] Update TTSProvider struct with MaxChunkSize field
+- [x] Update InitializeDefaultProviders() with per-provider chunk sizes
+- [x] Modify GetAdapter() in service.go to pass provider's MaxChunkSize to chunker
+- [x] Update NewAdapter() to accept custom ChunkerConfig (already supported)
+- [x] Add migration to set max_chunk_size for existing providers
+- [x] Update Settings UI to show/edit max_chunk_size per provider
+- [ ] Test with Silero (900), Google (4000), and other providers
 
 ---
 

@@ -179,7 +179,14 @@ func (s *service) GetAdapter(providerName string) (*Adapter, error) {
 		return nil, fmt.Errorf("provider not found: %s", providerName)
 	}
 
-	return NewAdapter(provider, DefaultChunkerConfig()), nil
+	// Get provider-specific chunk size from database config
+	chunkerConfig := DefaultChunkerConfig()
+	if dbProvider, exists := s.providerInfos[providerName]; exists && dbProvider.MaxChunkSize > 0 {
+		chunkerConfig.MaxChunkSize = dbProvider.MaxChunkSize
+		logger.Debug("Using provider-specific MaxChunkSize=%d for %s", dbProvider.MaxChunkSize, providerName)
+	}
+
+	return NewAdapter(provider, chunkerConfig), nil
 }
 
 // GetAvailableVoices returns a list of available TTS voices

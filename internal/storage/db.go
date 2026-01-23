@@ -202,6 +202,7 @@ func (db *DB) migrate() error {
 		api_key TEXT DEFAULT '',
 		region TEXT DEFAULT '',
 		tts_workers INTEGER DEFAULT 3,
+		max_chunk_size INTEGER DEFAULT 900,
 		normalize_numbers BOOLEAN DEFAULT 1,
 		ssml_support BOOLEAN DEFAULT 0,
 		is_default BOOLEAN DEFAULT 0,
@@ -228,6 +229,14 @@ func (db *DB) migrate() error {
 
 	// Add ssml_support column if it doesn't exist (migration for existing DBs)
 	db.conn.Exec("ALTER TABLE providers ADD COLUMN ssml_support BOOLEAN DEFAULT 0")
+
+	// Add max_chunk_size column if it doesn't exist (migration for existing DBs)
+	db.conn.Exec("ALTER TABLE providers ADD COLUMN max_chunk_size INTEGER DEFAULT 900")
+
+	// Update existing providers with appropriate max_chunk_size values
+	db.conn.Exec("UPDATE providers SET max_chunk_size = 5000 WHERE id = 'espeak' AND max_chunk_size = 900")
+	db.conn.Exec("UPDATE providers SET max_chunk_size = 4000 WHERE id IN ('google', 'openai', 'azure') AND max_chunk_size = 900")
+	db.conn.Exec("UPDATE providers SET max_chunk_size = 2000 WHERE id IN ('opentts', 'rhvoice') AND max_chunk_size = 900")
 
 	return nil
 }
@@ -962,6 +971,7 @@ type TTSProvider struct {
 	APIKey           string    `json:"api_key"`
 	Region           string    `json:"region"`
 	TTSWorkers       int       `json:"tts_workers"`
+	MaxChunkSize     int       `json:"max_chunk_size"` // Maximum characters per TTS request
 	NormalizeNumbers bool      `json:"normalize_numbers"`
 	SSMLSupport      bool      `json:"ssml_support"`
 	IsDefault        bool      `json:"is_default"`
@@ -976,8 +986,8 @@ func (db *DB) CreateProvider(provider *TTSProvider) error {
 	defer db.mu.Unlock()
 
 	_, err := db.conn.Exec(`
-		INSERT INTO providers (id, name, type, enabled, url, api_key, region, tts_workers, normalize_numbers, ssml_support, is_default, display_order, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO providers (id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, ssml_support, is_default, display_order, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			name = excluded.name,
 			type = excluded.type,
@@ -986,13 +996,14 @@ func (db *DB) CreateProvider(provider *TTSProvider) error {
 			api_key = excluded.api_key,
 			region = excluded.region,
 			tts_workers = excluded.tts_workers,
+			max_chunk_size = excluded.max_chunk_size,
 			normalize_numbers = excluded.normalize_numbers,
 			ssml_support = excluded.ssml_support,
 			is_default = excluded.is_default,
 			display_order = excluded.display_order,
 			updated_at = excluded.updated_at
 	`, provider.ID, provider.Name, provider.Type, provider.Enabled, provider.URL, provider.APIKey, provider.Region,
-		provider.TTSWorkers, provider.NormalizeNumbers, provider.SSMLSupport, provider.IsDefault, provider.DisplayOrder,
+		provider.TTSWorkers, provider.MaxChunkSize, provider.NormalizeNumbers, provider.SSMLSupport, provider.IsDefault, provider.DisplayOrder,
 		provider.CreatedAt, provider.UpdatedAt)
 
 	return err
@@ -1005,10 +1016,10 @@ func (db *DB) UpdateProvider(provider *TTSProvider) error {
 
 	_, err := db.conn.Exec(`
 		UPDATE providers SET name = ?, type = ?, enabled = ?, url = ?, api_key = ?, region = ?, tts_workers = ?,
-			normalize_numbers = ?, ssml_support = ?, is_default = ?, display_order = ?, updated_at = ?
+			max_chunk_size = ?, normalize_numbers = ?, ssml_support = ?, is_default = ?, display_order = ?, updated_at = ?
 		WHERE id = ?
 	`, provider.Name, provider.Type, provider.Enabled, provider.URL, provider.APIKey, provider.Region, provider.TTSWorkers,
-		provider.NormalizeNumbers, provider.SSMLSupport, provider.IsDefault, provider.DisplayOrder, time.Now(), provider.ID)
+		provider.MaxChunkSize, provider.NormalizeNumbers, provider.SSMLSupport, provider.IsDefault, provider.DisplayOrder, time.Now(), provider.ID)
 
 	return err
 }
@@ -1020,10 +1031,10 @@ func (db *DB) GetProvider(id string) (*TTSProvider, error) {
 
 	provider := &TTSProvider{}
 	err := db.conn.QueryRow(`
-		SELECT id, name, type, enabled, url, api_key, region, tts_workers, normalize_numbers, ssml_support, is_default, display_order, created_at, updated_at
+		SELECT id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, ssml_support, is_default, display_order, created_at, updated_at
 		FROM providers WHERE id = ?
 	`, id).Scan(&provider.ID, &provider.Name, &provider.Type, &provider.Enabled, &provider.URL, &provider.APIKey, &provider.Region,
-		&provider.TTSWorkers, &provider.NormalizeNumbers, &provider.SSMLSupport, &provider.IsDefault, &provider.DisplayOrder,
+		&provider.TTSWorkers, &provider.MaxChunkSize, &provider.NormalizeNumbers, &provider.SSMLSupport, &provider.IsDefault, &provider.DisplayOrder,
 		&provider.CreatedAt, &provider.UpdatedAt)
 
 	if err == sql.ErrNoRows {
@@ -1041,7 +1052,7 @@ func (db *DB) ListProviders(enabledOnly bool) ([]*TTSProvider, error) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 
-	query := `SELECT id, name, type, enabled, url, api_key, region, tts_workers, normalize_numbers, ssml_support, is_default, display_order, created_at, updated_at FROM providers`
+	query := `SELECT id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, ssml_support, is_default, display_order, created_at, updated_at FROM providers`
 	if enabledOnly {
 		query += " WHERE enabled = 1"
 	}
@@ -1057,7 +1068,7 @@ func (db *DB) ListProviders(enabledOnly bool) ([]*TTSProvider, error) {
 	for rows.Next() {
 		provider := &TTSProvider{}
 		err := rows.Scan(&provider.ID, &provider.Name, &provider.Type, &provider.Enabled, &provider.URL, &provider.APIKey, &provider.Region,
-			&provider.TTSWorkers, &provider.NormalizeNumbers, &provider.SSMLSupport, &provider.IsDefault, &provider.DisplayOrder,
+			&provider.TTSWorkers, &provider.MaxChunkSize, &provider.NormalizeNumbers, &provider.SSMLSupport, &provider.IsDefault, &provider.DisplayOrder,
 			&provider.CreatedAt, &provider.UpdatedAt)
 		if err != nil {
 			return nil, err
@@ -1148,6 +1159,7 @@ func (db *DB) InitializeDefaultProviders() error {
 			APIKey:           "",
 			Region:           "",
 			TTSWorkers:       3,
+			MaxChunkSize:     5000,
 			NormalizeNumbers: true,
 			SSMLSupport:      false,
 			IsDefault:        true,
@@ -1164,6 +1176,7 @@ func (db *DB) InitializeDefaultProviders() error {
 			APIKey:           "",
 			Region:           "",
 			TTSWorkers:       3,
+			MaxChunkSize:     4000,
 			NormalizeNumbers: false,
 			SSMLSupport:      true,
 			IsDefault:        false,
@@ -1180,6 +1193,7 @@ func (db *DB) InitializeDefaultProviders() error {
 			APIKey:           "",
 			Region:           "",
 			TTSWorkers:       3,
+			MaxChunkSize:     4000,
 			NormalizeNumbers: false,
 			SSMLSupport:      false,
 			IsDefault:        false,
@@ -1196,6 +1210,7 @@ func (db *DB) InitializeDefaultProviders() error {
 			APIKey:           "",
 			Region:           "",
 			TTSWorkers:       3,
+			MaxChunkSize:     4000,
 			NormalizeNumbers: false,
 			SSMLSupport:      true,
 			IsDefault:        false,
@@ -1212,6 +1227,7 @@ func (db *DB) InitializeDefaultProviders() error {
 			APIKey:           "",
 			Region:           "",
 			TTSWorkers:       3,
+			MaxChunkSize:     2000,
 			NormalizeNumbers: true,
 			SSMLSupport:      false,
 			IsDefault:        false,
@@ -1228,6 +1244,7 @@ func (db *DB) InitializeDefaultProviders() error {
 			APIKey:           "",
 			Region:           "",
 			TTSWorkers:       3,
+			MaxChunkSize:     2000,
 			NormalizeNumbers: true,
 			SSMLSupport:      true,
 			IsDefault:        false,
@@ -1244,6 +1261,7 @@ func (db *DB) InitializeDefaultProviders() error {
 			APIKey:           "",
 			Region:           "",
 			TTSWorkers:       3,
+			MaxChunkSize:     900,
 			NormalizeNumbers: true,
 			SSMLSupport:      true,
 			IsDefault:        false,
