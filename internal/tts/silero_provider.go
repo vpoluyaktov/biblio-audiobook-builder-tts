@@ -47,14 +47,31 @@ func NewSileroProvider(serverURL string) *SileroProvider {
 		voicesMap: make(map[string]sileroVoice),
 	}
 
-	// Load voices on initialization
-	if err := p.loadVoices(); err != nil {
-		logger.Warn("Failed to load Silero voices: %v", err)
-	} else {
-		logger.Debug("Loaded %d voices from Silero TTS server at %s", len(p.voices), serverURL)
-	}
+	// Load voices with retry logic (Silero server may not be ready yet)
+	go p.loadVoicesWithRetry()
 
 	return p
+}
+
+// loadVoicesWithRetry attempts to load voices with exponential backoff
+func (p *SileroProvider) loadVoicesWithRetry() {
+	maxRetries := 10
+	baseDelay := 2 * time.Second
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if err := p.loadVoices(); err != nil {
+			delay := baseDelay * time.Duration(1<<attempt) // Exponential backoff: 2s, 4s, 8s, 16s...
+			if delay > 60*time.Second {
+				delay = 60 * time.Second // Cap at 60 seconds
+			}
+			logger.Warn("Failed to load Silero voices (attempt %d/%d): %v. Retrying in %v...", attempt+1, maxRetries, err, delay)
+			time.Sleep(delay)
+		} else {
+			logger.Info("Loaded %d voices from Silero TTS server at %s", len(p.voices), p.serverURL)
+			return
+		}
+	}
+	logger.Error("Failed to load Silero voices after %d attempts. Provider will have no voices.", maxRetries)
 }
 
 // loadVoices fetches available voices from the Silero TTS server
