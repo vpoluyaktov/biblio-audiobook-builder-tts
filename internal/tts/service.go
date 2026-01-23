@@ -148,6 +148,12 @@ func (s *service) initializeProviderFromDB(dbProv *storage.TTSProvider) {
 			s.providers["silero"] = NewSileroProvider(dbProv.URL)
 			logger.Debug("Initialized Silero TTS provider with URL: %s", dbProv.URL)
 		}
+
+	case "openvoice":
+		if dbProv.URL != "" {
+			s.providers["openvoice"] = NewOpenVoiceProvider(dbProv.URL)
+			logger.Debug("Initialized OpenVoice TTS provider with URL: %s", dbProv.URL)
+		}
 	}
 }
 

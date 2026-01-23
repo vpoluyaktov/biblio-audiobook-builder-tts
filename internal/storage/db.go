@@ -1269,6 +1269,23 @@ func (db *DB) InitializeDefaultProviders() error {
 			CreatedAt:        now,
 			UpdatedAt:        now,
 		},
+		{
+			ID:               "openvoice",
+			Name:             "OpenVoice TTS",
+			Type:             "self-hosted",
+			Enabled:          false,
+			URL:              "",
+			APIKey:           "",
+			Region:           "",
+			TTSWorkers:       3,
+			MaxChunkSize:     2000,
+			NormalizeNumbers: true,
+			SSMLSupport:      false,
+			IsDefault:        false,
+			DisplayOrder:     7,
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		},
 	}
 
 	for _, provider := range defaults {
