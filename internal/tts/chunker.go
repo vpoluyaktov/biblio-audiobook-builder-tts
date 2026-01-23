@@ -26,7 +26,7 @@ type ChunkerConfig struct {
 func DefaultChunkerConfig() *ChunkerConfig {
 	return &ChunkerConfig{
 		Mode:          ChunkBySentence,
-		MaxChunkSize:  4000, // Most TTS APIs have ~5000 char limit, leave margin
+		MaxChunkSize:  900, // Silero TTS has 1000 char limit, leave margin for SSML overhead
 		PreserveWords: true,
 	}
 }
