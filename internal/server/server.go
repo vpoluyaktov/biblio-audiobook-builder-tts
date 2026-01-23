@@ -1004,6 +1004,17 @@ func (s *Server) testProvider(w http.ResponseWriter, r *http.Request, id string)
 			testResult = s.testSileroConnection(url)
 		}
 
+	case "openvoice":
+		url := testReq.URL
+		if url == "" {
+			testResult = map[string]interface{}{
+				"success": false,
+				"error":   "URL not configured",
+			}
+		} else {
+			testResult = s.testOpenVoiceConnection(url)
+		}
+
 	case "openai":
 		apiKey := testReq.APIKey
 		if apiKey == "" {
@@ -1131,6 +1142,48 @@ func (s *Server) testRHVoiceConnection(url string) map[string]interface{} {
 }
 
 func (s *Server) testSileroConnection(url string) map[string]interface{} {
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(url + "/health")
+	if err != nil {
+		return map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Connection failed: %v", err),
+		}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Server returned status %d", resp.StatusCode),
+		}
+	}
+
+	// Fetch voices to get count
+	voicesResp, err := client.Get(url + "/api/voices")
+	if err != nil {
+		return map[string]interface{}{
+			"success":     true,
+			"voice_count": 0,
+		}
+	}
+	defer voicesResp.Body.Close()
+
+	var voicesMap map[string]interface{}
+	if err := json.NewDecoder(voicesResp.Body).Decode(&voicesMap); err != nil {
+		return map[string]interface{}{
+			"success":     true,
+			"voice_count": 0,
+		}
+	}
+
+	return map[string]interface{}{
+		"success":     true,
+		"voice_count": len(voicesMap),
+	}
+}
+
+func (s *Server) testOpenVoiceConnection(url string) map[string]interface{} {
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(url + "/health")
 	if err != nil {
