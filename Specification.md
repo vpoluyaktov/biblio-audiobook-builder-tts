@@ -210,11 +210,24 @@ abb-tts:
   environment:
     - ABB_TTS_SERVER_URL=http://tts-silero:9902
     - ABB_TTS_OPDS_SERVER_URL=http://opds-server:9903
+    - ABB_TTS_OUTPUT_DIR=/data/output
+    - ABB_TTS_TEMP_DIR=/data/temp
   volumes:
     - ./data/abb_tts/db:/db
-    - ./data/abb_tts/temp:/temp
+    - ./data/abb_tts/data:/data
 ```
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ABB_TTS_HOST` | Server host | `0.0.0.0` |
+| `ABB_TTS_PORT` | Server port | `9901` |
+| `ABB_TTS_OUTPUT_DIR` | Output directory for audiobooks | `./output` |
+| `ABB_TTS_TEMP_DIR` | Temp directory for processing | `./temp` |
+| `ABB_TTS_SERVER_URL` | Silero TTS server URL | `http://tts-silero:9902` |
+| `ABB_TTS_OPDS_SERVER_URL` | OPDS server URL | `http://opds-server:9903` |
 
 ---
 
-*Last updated: 2026-01-23*
+*Last updated: 2026-01-24*

@@ -181,6 +181,11 @@ func (a *Adapter) ConvertToSpeech(text string, voice string, options *Conversion
 		audioBuffers = append(audioBuffers, audioData)
 	}
 
+	// Check if we have any audio to return
+	if len(audioBuffers) == 0 {
+		return nil, fmt.Errorf("no speakable content for the target language - all chunks were skipped")
+	}
+
 	// Concatenate all audio buffers
 	return concatenateAudio(audioBuffers), nil
 }
@@ -259,6 +264,11 @@ func (a *Adapter) ConvertToSpeechWithChunks(text string, voice string, options *
 		}
 
 		readers = append(readers, reader)
+	}
+
+	// Check if we have any audio to return
+	if len(readers) == 0 {
+		return nil, fmt.Errorf("no speakable content for the target language - all chunks were skipped")
 	}
 
 	return readers, nil

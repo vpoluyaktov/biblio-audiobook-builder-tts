@@ -43,9 +43,13 @@ type Config struct {
 func Load(configFile string) (*Config, error) {
 	var config Config
 
+	// Enable automatic environment variable binding with ABB_TTS_ prefix
+	viper.SetEnvPrefix("ABB_TTS")
+	viper.AutomaticEnv()
+
 	// Basic settings
 	viper.SetDefault("log_file", "biblio-audiobook-builder-tts.log")
-	viper.SetDefault("output_dir", "./temp")
+	viper.SetDefault("output_dir", "./output")
 	viper.SetDefault("temp_dir", "./temp")
 	viper.SetDefault("default_voice", "en-US")
 	viper.SetDefault("default_provider", "espeak")
