@@ -86,9 +86,6 @@ func main() {
 	if envHost := os.Getenv("ABB_TTS_HOST"); envHost != "" {
 		cfg.ServerHost = envHost
 	}
-	if envOutputDir := os.Getenv("ABB_TTS_OUTPUT_DIR"); envOutputDir != "" {
-		cfg.OutputDir = envOutputDir
-	}
 	if envTempDir := os.Getenv("ABB_TTS_TEMP_DIR"); envTempDir != "" {
 		cfg.TempDir = envTempDir
 	}

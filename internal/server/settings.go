@@ -16,7 +16,6 @@ type SettingsRequest struct {
 	ServerHost  string `json:"server_host"`
 	ServerPort  string `json:"server_port"`
 	OpenBrowser bool   `json:"open_browser"`
-	OutputDir   string `json:"output_dir"`
 	TempDir     string `json:"temp_dir"`
 	LogFile     string `json:"log_file"`
 
@@ -68,7 +67,6 @@ func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
 		ServerHost:  s.cfg.ServerHost,
 		ServerPort:  s.cfg.ServerPort,
 		OpenBrowser: s.cfg.OpenBrowser,
-		OutputDir:   s.cfg.OutputDir,
 		TempDir:     s.cfg.TempDir,
 		LogFile:     s.cfg.LogFile,
 
@@ -140,9 +138,6 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 	if wasProvided("open_browser") {
 		s.cfg.OpenBrowser = req.OpenBrowser
 	}
-	if wasProvided("output_dir") {
-		s.cfg.OutputDir = req.OutputDir
-	}
 	if wasProvided("temp_dir") {
 		s.cfg.TempDir = req.TempDir
 	}
@@ -210,7 +205,6 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 			provided bool
 		}{
 			"log_file":                  {req.LogFile, wasProvided("log_file")},
-			"output_dir":                {req.OutputDir, wasProvided("output_dir")},
 			"temp_dir":                  {req.TempDir, wasProvided("temp_dir")},
 			"default_voice":             {req.DefaultVoice, wasProvided("default_voice")},
 			"default_provider":          {req.DefaultProvider, wasProvided("default_provider")},

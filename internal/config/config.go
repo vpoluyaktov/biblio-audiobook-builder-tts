@@ -11,7 +11,6 @@ const DefaultDBPath = "./db/abb_tts.db"
 type Config struct {
 	// Basic settings
 	LogFile         string `mapstructure:"log_file"`
-	OutputDir       string `mapstructure:"output_dir"`
 	TempDir         string `mapstructure:"temp_dir"`
 	DefaultVoice    string `mapstructure:"default_voice"`
 	DefaultProvider string `mapstructure:"default_provider"`
@@ -49,7 +48,6 @@ func Load(configFile string) (*Config, error) {
 
 	// Basic settings
 	viper.SetDefault("log_file", "biblio-audiobook-builder-tts.log")
-	viper.SetDefault("output_dir", "./output")
 	viper.SetDefault("temp_dir", "./temp")
 	viper.SetDefault("default_voice", "en-US")
 	viper.SetDefault("default_provider", "espeak")
@@ -104,9 +102,6 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 
 	if v, ok := dbConfig["log_file"].(string); ok {
 		cfg.LogFile = v
-	}
-	if v, ok := dbConfig["output_dir"].(string); ok {
-		cfg.OutputDir = v
 	}
 	if v, ok := dbConfig["temp_dir"].(string); ok {
 		cfg.TempDir = v

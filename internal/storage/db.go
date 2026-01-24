@@ -24,7 +24,6 @@ type DB struct {
 type Config struct {
 	// Basic settings
 	LogFile         string `json:"log_file"`
-	OutputDir       string `json:"output_dir"`
 	TempDir         string `json:"temp_dir"`
 	DefaultVoice    string `json:"default_voice"`
 	DefaultProvider string `json:"default_provider"`
@@ -292,9 +291,6 @@ func (db *DB) GetAllConfig() (*Config, error) {
 	if v, ok := configMap["log_file"]; ok {
 		cfg.LogFile = v
 	}
-	if v, ok := configMap["output_dir"]; ok {
-		cfg.OutputDir = v
-	}
 	if v, ok := configMap["temp_dir"]; ok {
 		cfg.TempDir = v
 	}
@@ -378,7 +374,6 @@ func (db *DB) SaveAllConfig(cfg *Config) error {
 
 	configs := map[string]string{
 		"log_file":                  cfg.LogFile,
-		"output_dir":                cfg.OutputDir,
 		"temp_dir":                  cfg.TempDir,
 		"default_voice":             cfg.DefaultVoice,
 		"default_provider":          cfg.DefaultProvider,
@@ -413,7 +408,6 @@ func (db *DB) SaveAllConfig(cfg *Config) error {
 func DefaultConfig() *Config {
 	return &Config{
 		LogFile:                 "biblio-audiobook-builder-tts.log",
-		OutputDir:               "./output",
 		TempDir:                 "./temp",
 		DefaultVoice:            "en-US",
 		DefaultProvider:         "espeak",
@@ -1391,7 +1385,6 @@ func (db *DB) InitializeDefaults() error {
 func (c *Config) ToAppConfig() map[string]interface{} {
 	return map[string]interface{}{
 		"log_file":                  c.LogFile,
-		"output_dir":                c.OutputDir,
 		"temp_dir":                  c.TempDir,
 		"default_voice":             c.DefaultVoice,
 		"default_provider":          c.DefaultProvider,

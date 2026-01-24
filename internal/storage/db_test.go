@@ -94,7 +94,6 @@ func TestSaveAllConfig(t *testing.T) {
 	// Create custom config
 	cfg := &Config{
 		LogFile:           "custom.log",
-		OutputDir:         "/custom/output",
 		TempDir:           "/custom/temp",
 		DefaultVoice:      "en-GB",
 		DefaultProvider:   "piper",

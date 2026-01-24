@@ -229,8 +229,8 @@ type ChapterResult struct {
 
 // convertBook converts the book to audio files using parallel processing
 func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, error) {
-	// Create output directory (use absolute path)
-	outputDir := filepath.Join(w.cfg.OutputDir, sanitizeFileName(book.Title))
+	// Create output directory inside temp dir (use absolute path)
+	outputDir := filepath.Join(w.cfg.TempDir, sanitizeFileName(book.Title))
 	absOutputDir, err := filepath.Abs(outputDir)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to get absolute path: %v", err)
