@@ -89,6 +89,9 @@ func main() {
 	if envTempDir := os.Getenv("ABB_TTS_TEMP_DIR"); envTempDir != "" {
 		cfg.TempDir = envTempDir
 	}
+	if envLogFile := os.Getenv("ABB_TTS_LOG_FILE"); envLogFile != "" {
+		cfg.LogFile = envLogFile
+	}
 
 	// Override config with command line flags (highest priority)
 	if *port != "" {
