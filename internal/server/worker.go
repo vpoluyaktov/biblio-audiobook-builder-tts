@@ -224,6 +224,7 @@ type ChapterResult struct {
 	Index      int
 	OutputPath string
 	Error      error
+	Skipped    bool // True if chapter was skipped (no speakable content for target language)
 }
 
 // convertBook converts the book to audio files using parallel processing
@@ -331,7 +332,11 @@ func (w *Worker) convertBook(job *Job, book *parser.Book) (string, []string, err
 				w.saveJob(job)
 			}
 
-			logger.Debug("Converted chapter %d/%d: %s (worker %d)", currentCompleted, totalChapters, ch.Title, workerID)
+			if result.Skipped {
+				logger.Debug("Skipped chapter %d/%d: %s (no speakable content, worker %d)", currentCompleted, totalChapters, ch.Title, workerID)
+			} else {
+				logger.Debug("Converted chapter %d/%d: %s (worker %d)", currentCompleted, totalChapters, ch.Title, workerID)
+			}
 		}, chapterIndex, chapter)
 	}
 
@@ -404,6 +409,18 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 	textFilePath := filepath.Join(outputDir, textFileName)
 	if err := os.WriteFile(textFilePath, []byte(content), 0644); err != nil {
 		logger.Warn("Failed to save chapter text file '%s': %v", textFileName, err)
+	}
+
+	// Check if chapter has speakable content for the target language
+	// Skip chapters that have no content the TTS engine can process (e.g., "Illustration." for Russian TTS)
+	lang := job.Language
+	if lang == "" {
+		lang = "en"
+	}
+	if !sanitize.HasSpeakableContentForLanguage(content, lang) {
+		logger.Info("Skipping chapter %d (%s) - no speakable content for language '%s'", index+1, chapter.Title, lang)
+		result.Skipped = true
+		return result
 	}
 
 	// Progress callback for per-chunk updates
