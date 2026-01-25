@@ -412,14 +412,26 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 	}
 
 	// Check if chapter has speakable content for the target language
-	// Skip chapters that have no content the TTS engine can process (e.g., "Illustration." for Russian TTS)
+	// Generate silent audio for chapters that have no content the TTS engine can process
+	// (e.g., "Illustration." for Russian TTS) to maintain chapter alignment in the audiobook
 	lang := job.Language
 	if lang == "" {
 		lang = "en"
 	}
 	if !sanitize.HasSpeakableContentForLanguage(content, lang) {
-		logger.Info("Skipping chapter %d (%s) - no speakable content for language '%s'", index+1, chapter.Title, lang)
-		result.Skipped = true
+		logger.Info("Chapter %d (%s) has no speakable content for language '%s' - generating 1 second of silence", index+1, chapter.Title, lang)
+
+		// Generate a 1-second silent WAV file to maintain chapter alignment
+		chapterFileName := fmt.Sprintf("%02d_%s.wav", index+1, sanitizeFileName(chapter.Title))
+		outputPath := filepath.Join(outputDir, chapterFileName)
+
+		if err := audio.GenerateSilentWAV(1*time.Second, outputPath, 44100); err != nil {
+			result.Error = fmt.Errorf("failed to generate silent audio: %v", err)
+			return result
+		}
+
+		result.OutputPath = outputPath
+		result.Skipped = true // Still mark as skipped for logging purposes
 		return result
 	}
 

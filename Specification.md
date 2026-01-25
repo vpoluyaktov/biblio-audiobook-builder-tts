@@ -171,6 +171,7 @@ Flags:
 - Audiobookshelf integration
 - Settings UI with provider management
 - SQLite persistence
+- Silent audio generation for chapters with no speakable content (maintains chapter alignment)
 
 ### In Progress 🔄
 
