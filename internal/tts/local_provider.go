@@ -70,6 +70,38 @@ func (p *LocalProvider) ConvertToSpeech(text string, voice string, options *Conv
 	return bytes.NewReader(output), nil
 }
 
+// GetAvailableLanguages returns available language codes
+func (p *LocalProvider) GetAvailableLanguages() []string {
+	langMap := make(map[string]bool)
+	for _, v := range p.GetAvailableVoices() {
+		langMap[v.Language] = true
+	}
+	languages := make([]string, 0, len(langMap))
+	for lang := range langMap {
+		languages = append(languages, lang)
+	}
+	return languages
+}
+
+// GetModelsForLanguage returns available models (local providers have no models)
+func (p *LocalProvider) GetModelsForLanguage(language string) []string {
+	return []string{}
+}
+
+// GetVoicesFiltered returns voices filtered by language and model
+func (p *LocalProvider) GetVoicesFiltered(language, model string) []Voice {
+	if language == "" {
+		return p.GetAvailableVoices()
+	}
+	var filtered []Voice
+	for _, v := range p.GetAvailableVoices() {
+		if v.Language == language {
+			filtered = append(filtered, v)
+		}
+	}
+	return filtered
+}
+
 // RefreshVoices reloads the voice list (no-op for local provider)
 func (p *LocalProvider) RefreshVoices() error {
 	return nil

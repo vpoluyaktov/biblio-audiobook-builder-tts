@@ -114,6 +114,38 @@ func (p *CloudProvider) ConvertToSpeech(text string, voice string, options *Conv
 	return bytes.NewReader(audioContent), nil
 }
 
+// GetAvailableLanguages returns available language codes
+func (p *CloudProvider) GetAvailableLanguages() []string {
+	langMap := make(map[string]bool)
+	for _, v := range p.GetAvailableVoices() {
+		langMap[v.Language] = true
+	}
+	languages := make([]string, 0, len(langMap))
+	for lang := range langMap {
+		languages = append(languages, lang)
+	}
+	return languages
+}
+
+// GetModelsForLanguage returns available models (cloud provider has no models)
+func (p *CloudProvider) GetModelsForLanguage(language string) []string {
+	return []string{}
+}
+
+// GetVoicesFiltered returns voices filtered by language and model
+func (p *CloudProvider) GetVoicesFiltered(language, model string) []Voice {
+	if language == "" {
+		return p.GetAvailableVoices()
+	}
+	var filtered []Voice
+	for _, v := range p.GetAvailableVoices() {
+		if v.Language == language {
+			filtered = append(filtered, v)
+		}
+	}
+	return filtered
+}
+
 // RefreshVoices reloads the voice list (no-op for cloud provider)
 func (p *CloudProvider) RefreshVoices() error {
 	return nil

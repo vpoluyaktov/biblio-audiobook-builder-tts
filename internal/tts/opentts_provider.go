@@ -164,9 +164,16 @@ func (p *OpenTTSProvider) GetAvailableLanguages() []string {
 
 // GetAvailableEngines returns available TTS engines
 func (p *OpenTTSProvider) GetAvailableEngines() []string {
+	return p.GetModelsForLanguage("")
+}
+
+// GetModelsForLanguage returns models (engines) filtered by language
+func (p *OpenTTSProvider) GetModelsForLanguage(language string) []string {
 	engineMap := make(map[string]bool)
 	for _, v := range p.voicesMap {
-		engineMap[v.TTSName] = true
+		if language == "" || v.Language == language || strings.HasPrefix(v.Language, language) {
+			engineMap[v.TTSName] = true
+		}
 	}
 
 	engines := make([]string, 0, len(engineMap))

@@ -161,6 +161,11 @@ func (p *OpenAIProvider) GetAvailableModels() []string {
 	return openAIModels
 }
 
+// GetModelsForLanguage returns models filtered by language (OpenAI has same models for all languages)
+func (p *OpenAIProvider) GetModelsForLanguage(language string) []string {
+	return openAIModels
+}
+
 // parseOpenAIVoiceID parses a voice ID in format "model:voice" and returns model and voice
 func parseOpenAIVoiceID(voiceID string) (model, voice string) {
 	// Default to tts-1 model if no model specified

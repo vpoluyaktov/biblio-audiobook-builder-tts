@@ -224,117 +224,31 @@ func (s *service) GetVoicesFiltered(providerName, language, model string) []Voic
 		if !exists {
 			return voices
 		}
-
-		// Check if provider supports filtering (GoogleProvider does)
-		if gp, ok := provider.(*GoogleProvider); ok {
-			return gp.GetVoicesFiltered(language, model)
-		}
-
-		// Check if provider supports filtering (OpenTTSProvider does)
-		if op, ok := provider.(*OpenTTSProvider); ok {
-			return op.GetVoicesFiltered(language, model)
-		}
-
-		// Check if provider supports filtering (OpenAIProvider does)
-		if oap, ok := provider.(*OpenAIProvider); ok {
-			return oap.GetVoicesFiltered(language, model)
-		}
-
-		// Check if provider supports filtering (AzureProvider does)
-		if ap, ok := provider.(*AzureProvider); ok {
-			return ap.GetVoicesFiltered(language, model)
-		}
-
-		// Check if provider supports filtering (RHVoiceProvider does)
-		if rp, ok := provider.(*RHVoiceProvider); ok {
-			return rp.GetVoicesFiltered(language, model)
-		}
-
-		// Check if provider supports filtering (SileroProvider does)
-		if sp, ok := provider.(*SileroProvider); ok {
-			return sp.GetVoicesFiltered(language, model)
-		}
-
-		// For other providers, get all voices and filter manually
-		allVoices := provider.GetAvailableVoices()
-		for _, v := range allVoices {
-			matchLang := language == "" || v.Language == language
-			matchModel := model == "" || extractModelType(v.ID) == model
-			if matchLang && matchModel {
-				voices = append(voices, v)
-			}
-		}
-		return voices
+		return provider.GetVoicesFiltered(language, model)
 	}
 
 	// Get voices from all providers and filter
 	for _, provider := range s.providers {
-		if gp, ok := provider.(*GoogleProvider); ok {
-			voices = append(voices, gp.GetVoicesFiltered(language, model)...)
-		} else {
-			allVoices := provider.GetAvailableVoices()
-			for _, v := range allVoices {
-				matchLang := language == "" || v.Language == language
-				matchModel := model == "" || extractModelType(v.ID) == model
-				if matchLang && matchModel {
-					voices = append(voices, v)
-				}
-			}
-		}
+		voices = append(voices, provider.GetVoicesFiltered(language, model)...)
 	}
 	return voices
 }
 
 // GetAvailableLanguages returns available languages for a provider
 func (s *service) GetAvailableLanguages(providerName string) []string {
-	langMap := make(map[string]bool)
-
 	if providerName != "" {
 		provider, exists := s.providers[providerName]
 		if !exists {
 			return []string{}
 		}
+		return provider.GetAvailableLanguages()
+	}
 
-		// Check if provider has GetAvailableLanguages method
-		if gp, ok := provider.(*GoogleProvider); ok {
-			return gp.GetAvailableLanguages()
-		}
-
-		// Check if provider has GetAvailableLanguages method (OpenTTS)
-		if op, ok := provider.(*OpenTTSProvider); ok {
-			return op.GetAvailableLanguages()
-		}
-
-		// Check if provider has GetAvailableLanguages method (OpenAI)
-		if oap, ok := provider.(*OpenAIProvider); ok {
-			return oap.GetAvailableLanguages()
-		}
-
-		// Check if provider has GetAvailableLanguages method (Azure)
-		if ap, ok := provider.(*AzureProvider); ok {
-			return ap.GetAvailableLanguages()
-		}
-
-		// Check if provider has GetAvailableLanguages method (RHVoice)
-		if rp, ok := provider.(*RHVoiceProvider); ok {
-			return rp.GetAvailableLanguages()
-		}
-
-		// Check if provider has GetAvailableLanguages method (Silero)
-		if sp, ok := provider.(*SileroProvider); ok {
-			return sp.GetAvailableLanguages()
-		}
-
-		// For other providers, extract from voices
-		for _, v := range provider.GetAvailableVoices() {
-			langMap[v.Language] = true
-		}
-	} else {
-		// Get from all providers
-		for _, provider := range s.providers {
-			for _, v := range provider.GetAvailableVoices() {
-				langMap[v.Language] = true
-			}
+	// Get from all providers
+	langMap := make(map[string]bool)
+	for _, provider := range s.providers {
+		for _, lang := range provider.GetAvailableLanguages() {
+			langMap[lang] = true
 		}
 	}
 
@@ -347,65 +261,19 @@ func (s *service) GetAvailableLanguages(providerName string) []string {
 
 // GetAvailableModels returns available model types for a provider
 func (s *service) GetAvailableModels(providerName, language string) []string {
-	modelMap := make(map[string]bool)
-
 	if providerName != "" {
 		provider, exists := s.providers[providerName]
 		if !exists {
 			return []string{}
 		}
+		return provider.GetModelsForLanguage(language)
+	}
 
-		// Check if provider has GetAvailableModels method
-		if gp, ok := provider.(*GoogleProvider); ok {
-			return gp.GetAvailableModels()
-		}
-
-		// Check if provider is OpenTTS - use engines as models
-		if op, ok := provider.(*OpenTTSProvider); ok {
-			return op.GetAvailableEngines()
-		}
-
-		// Check if provider is OpenAI - use models
-		if oap, ok := provider.(*OpenAIProvider); ok {
-			return oap.GetAvailableModels()
-		}
-
-		// Check if provider is Azure - use models
-		if ap, ok := provider.(*AzureProvider); ok {
-			return ap.GetAvailableModels()
-		}
-
-		// Check if provider is RHVoice - use models
-		if rp, ok := provider.(*RHVoiceProvider); ok {
-			return rp.GetAvailableModels()
-		}
-
-		// Check if provider is Silero - use models filtered by language
-		if sp, ok := provider.(*SileroProvider); ok {
-			return sp.GetModelsForLanguage(language)
-		}
-
-		// Check if provider is OpenVoice - use models filtered by language
-		if op, ok := provider.(*OpenVoiceProvider); ok {
-			return op.GetModelsForLanguage(language)
-		}
-
-		// For other providers, extract from voices
-		for _, v := range provider.GetAvailableVoices() {
-			model := extractModelType(v.ID)
-			if model != "" {
-				modelMap[model] = true
-			}
-		}
-	} else {
-		// Get from all providers
-		for _, provider := range s.providers {
-			for _, v := range provider.GetAvailableVoices() {
-				model := extractModelType(v.ID)
-				if model != "" {
-					modelMap[model] = true
-				}
-			}
+	// Get from all providers
+	modelMap := make(map[string]bool)
+	for _, provider := range s.providers {
+		for _, model := range provider.GetModelsForLanguage(language) {
+			modelMap[model] = true
 		}
 	}
 

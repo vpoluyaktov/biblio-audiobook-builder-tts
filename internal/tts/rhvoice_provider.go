@@ -180,6 +180,11 @@ func (p *RHVoiceProvider) GetAvailableModels() []string {
 	return []string{"RHVoice"}
 }
 
+// GetModelsForLanguage returns models filtered by language (RHVoice has single model for all languages)
+func (p *RHVoiceProvider) GetModelsForLanguage(language string) []string {
+	return []string{"RHVoice"}
+}
+
 // ConvertToSpeech converts text to speech using RHVoice
 // Uses POST to /rhasspy endpoint for long text support
 func (p *RHVoiceProvider) ConvertToSpeech(text string, voice string, options *ConversionOptions) (io.Reader, error) {

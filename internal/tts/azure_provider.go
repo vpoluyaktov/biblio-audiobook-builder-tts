@@ -308,6 +308,11 @@ func (p *AzureProvider) GetAvailableModels() []string {
 	return []string{"Standard", "Neural"}
 }
 
+// GetModelsForLanguage returns models filtered by language (Azure has same models for all languages)
+func (p *AzureProvider) GetModelsForLanguage(language string) []string {
+	return []string{"Standard", "Neural"}
+}
+
 // ConvertToSpeech converts text to speech using Azure TTS API
 func (p *AzureProvider) ConvertToSpeech(text string, voice string, options *ConversionOptions) (io.Reader, error) {
 	if p.subscriptionKey == "" || p.region == "" {

@@ -185,12 +185,19 @@ func (p *GoogleProvider) GetAvailableLanguages() []string {
 
 // GetAvailableModels returns a list of unique model types from available voices
 func (p *GoogleProvider) GetAvailableModels() []string {
+	return p.GetModelsForLanguage("")
+}
+
+// GetModelsForLanguage returns models filtered by language
+func (p *GoogleProvider) GetModelsForLanguage(language string) []string {
 	allVoices := p.GetAvailableVoices()
 	modelMap := make(map[string]bool)
 	for _, v := range allVoices {
-		model := extractModelType(v.ID)
-		if model != "" {
-			modelMap[model] = true
+		if language == "" || v.Language == language {
+			model := extractModelType(v.ID)
+			if model != "" {
+				modelMap[model] = true
+			}
 		}
 	}
 
