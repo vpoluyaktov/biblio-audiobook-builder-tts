@@ -752,6 +752,8 @@ func (s *Server) handleProviderByID(w http.ResponseWriter, r *http.Request) {
 			s.enableProvider(w, r, providerID, false)
 		case "set-default":
 			s.setDefaultProvider(w, r, providerID)
+		case "refresh":
+			s.refreshProvider(w, r, providerID)
 		default:
 			http.Error(w, "Unknown action", http.StatusBadRequest)
 		}
@@ -925,6 +927,22 @@ func (s *Server) enableProvider(w http.ResponseWriter, _ *http.Request, id strin
 		status = "enabled"
 	}
 	s.jsonResponse(w, http.StatusOK, map[string]string{"status": status})
+}
+
+// refreshProvider refreshes the voice list for a provider
+func (s *Server) refreshProvider(w http.ResponseWriter, _ *http.Request, id string) {
+	if err := s.ttsService.RefreshProvider(id); err != nil {
+		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to refresh provider: %v", err))
+		return
+	}
+
+	// Return updated voice count
+	voices := s.ttsService.GetVoicesFiltered(id, "", "")
+	s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"status":      "refreshed",
+		"provider":    id,
+		"voice_count": len(voices),
+	})
 }
 
 // setDefaultProvider sets a provider as the default

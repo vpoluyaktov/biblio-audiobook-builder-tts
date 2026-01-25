@@ -425,3 +425,14 @@ func extractLanguageCode(voiceName string) string {
 	}
 	return "en-US" // Default fallback
 }
+
+// RefreshVoices reloads the voice list from the API
+func (p *GoogleProvider) RefreshVoices() error {
+	voices, err := p.fetchVoicesFromAPI("")
+	if err != nil {
+		return err
+	}
+	p.cachedVoices = voices
+	p.lastFetch = time.Now()
+	return nil
+}

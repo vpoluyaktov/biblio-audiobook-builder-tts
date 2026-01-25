@@ -69,3 +69,8 @@ func (p *LocalProvider) ConvertToSpeech(text string, voice string, options *Conv
 
 	return bytes.NewReader(output), nil
 }
+
+// RefreshVoices reloads the voice list (no-op for local provider)
+func (p *LocalProvider) RefreshVoices() error {
+	return nil
+}

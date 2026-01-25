@@ -198,7 +198,8 @@ class App {
         this.removeFileBtn.addEventListener('click', () => this.clearSelectedFile());
 
         // Cascading dropdown changes - settings are saved in loadVoices() at the end of cascade
-        this.providerSelect.addEventListener('change', () => {
+        this.providerSelect.addEventListener('change', async () => {
+            await this.refreshProvider(this.providerSelect.value);
             this.loadLanguages();
             this.updateCostEstimate();
             this.updateSSMLOptionsVisibility();
@@ -420,6 +421,26 @@ class App {
             this.pitchValue.textContent = this.pitchInput.value + 'x';
         } catch (e) {
             console.error('Failed to load config:', e);
+        }
+    }
+
+    // Refresh a provider's voice list from the server
+    async refreshProvider(providerId) {
+        try {
+            const response = await fetch(`/api/providers/${providerId}/refresh`, {
+                method: 'POST'
+            });
+            if (response.ok) {
+                const data = await response.json();
+                console.log(`Provider ${providerId} refreshed: ${data.voice_count} voices`);
+                // Update the provider's voice count in our local list
+                const provider = this.providers.find(p => p.id === providerId);
+                if (provider) {
+                    provider.voice_count = data.voice_count;
+                }
+            }
+        } catch (e) {
+            console.error(`Failed to refresh provider ${providerId}:`, e);
         }
     }
 

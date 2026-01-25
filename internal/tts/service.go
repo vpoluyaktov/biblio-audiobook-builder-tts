@@ -20,6 +20,7 @@ type Service interface {
 	GetAvailableProviders() []string
 	GetAdapter(providerName string) (*Adapter, error)
 	ReloadProviders()
+	RefreshProvider(providerID string) error
 	GetProviderInfo(providerID string) *ProviderInfo
 }
 
@@ -413,6 +414,15 @@ func (s *service) GetAvailableModels(providerName, language string) []string {
 // ReloadProviders reinitializes providers based on current config or database
 func (s *service) ReloadProviders() {
 	s.loadProviders()
+}
+
+// RefreshProvider refreshes the voice list for a specific provider
+func (s *service) RefreshProvider(providerID string) error {
+	provider, exists := s.providers[providerID]
+	if !exists {
+		return fmt.Errorf("provider not found: %s", providerID)
+	}
+	return provider.RefreshVoices()
 }
 
 // GetProviderInfo returns runtime information about a specific provider

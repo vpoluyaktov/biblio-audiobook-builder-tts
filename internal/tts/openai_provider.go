@@ -20,7 +20,7 @@ type OpenAIProvider struct {
 
 // OpenAI TTS API endpoint
 const (
-	openAITTSEndpoint    = "https://api.openai.com/v1/audio/speech"
+	openAITTSEndpoint     = "https://api.openai.com/v1/audio/speech"
 	defaultOpenAICacheTTL = 1 * time.Hour
 )
 
@@ -286,4 +286,12 @@ func EstimateOpenAICost(charCount int, model string) float64 {
 		pricePerMillion = 30.0
 	}
 	return float64(charCount) / 1000000.0 * pricePerMillion
+}
+
+// RefreshVoices reloads the voice list (regenerates static voice list)
+func (p *OpenAIProvider) RefreshVoices() error {
+	p.cachedVoices = nil
+	p.lastFetch = time.Time{}
+	_ = p.GetAvailableVoices()
+	return nil
 }

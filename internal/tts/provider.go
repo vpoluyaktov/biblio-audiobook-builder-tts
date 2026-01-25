@@ -14,6 +14,10 @@ type Provider interface {
 
 	// ConvertToSpeech converts text to speech
 	ConvertToSpeech(text string, voice string, options *ConversionOptions) (io.Reader, error)
+
+	// RefreshVoices reloads the voice list from the provider
+	// Returns error if refresh fails
+	RefreshVoices() error
 }
 
 // BaseProvider implements common functionality for TTS providers

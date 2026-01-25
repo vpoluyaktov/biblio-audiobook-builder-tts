@@ -424,3 +424,14 @@ func EstimateAzureCost(charCount int, voiceType string) float64 {
 func GetAzureSupportedFormats() []string {
 	return azureOutputFormats
 }
+
+// RefreshVoices reloads the voice list from the API
+func (p *AzureProvider) RefreshVoices() error {
+	voices, err := p.fetchVoicesFromAPI()
+	if err != nil {
+		return err
+	}
+	p.cachedVoices = voices
+	p.lastVoiceFetch = time.Now()
+	return nil
+}

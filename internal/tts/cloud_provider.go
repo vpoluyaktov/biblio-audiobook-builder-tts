@@ -11,8 +11,8 @@ import (
 // CloudProvider uses cloud-based TTS services
 type CloudProvider struct {
 	BaseProvider
-	service    string
-	apiKey     string
+	service     string
+	apiKey      string
 	apiEndpoint string
 }
 
@@ -20,9 +20,9 @@ type CloudProvider struct {
 func NewCloudProvider(service, apiKey, apiEndpoint string) Provider {
 	return &CloudProvider{
 		BaseProvider: BaseProvider{name: "cloud"},
-		service:     service,
-		apiKey:      apiKey,
-		apiEndpoint: apiEndpoint,
+		service:      service,
+		apiKey:       apiKey,
+		apiEndpoint:  apiEndpoint,
 	}
 }
 
@@ -61,20 +61,20 @@ func (p *CloudProvider) ConvertToSpeech(text string, voice string, options *Conv
 			},
 			"voice": map[string]string{
 				"languageCode": "en-US",
-				"name":        voice,
+				"name":         voice,
 			},
 			"audioConfig": map[string]interface{}{
 				"audioEncoding": "MP3",
-				"speakingRate": options.Speed,
-				"pitch":        options.Pitch,
+				"speakingRate":  options.Speed,
+				"pitch":         options.Pitch,
 			},
 		})
 	case "azure":
 		requestBody, err = json.Marshal(map[string]interface{}{
-			"text": text,
+			"text":  text,
 			"voice": voice,
 			"options": map[string]interface{}{
-				"rate": options.Speed,
+				"rate":  options.Speed,
 				"pitch": options.Pitch,
 			},
 		})
@@ -112,4 +112,9 @@ func (p *CloudProvider) ConvertToSpeech(text string, voice string, options *Conv
 	}
 
 	return bytes.NewReader(audioContent), nil
+}
+
+// RefreshVoices reloads the voice list (no-op for cloud provider)
+func (p *CloudProvider) RefreshVoices() error {
+	return nil
 }
