@@ -161,7 +161,7 @@ Flags:
 - HTTP server with REST API and WebSocket
 - Job management (create, list, delete, progress tracking)
 - Book parsing (EPUB, FB2)
-- TTS providers: eSpeak, Silero, OpenTTS, RHVoice, Google, OpenAI
+- TTS providers: eSpeak, Silero, OpenVoice, OpenTTS, RHVoice, Google, OpenAI
 - Text chunking with per-provider max chunk size
 - Number normalization (English, Russian)
 - SSML processing with sentence/paragraph pauses
@@ -172,6 +172,7 @@ Flags:
 - Settings UI with provider management
 - SQLite persistence
 - Silent audio generation for chapters with no speakable content (maintains chapter alignment)
+- OpenVoice provider returns hardcoded "MeloTTS" model name (server doesn't have /api/models endpoint)
 
 ### In Progress 🔄
 

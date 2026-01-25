@@ -384,6 +384,11 @@ func (s *service) GetAvailableModels(providerName, language string) []string {
 			return sp.GetModelsForLanguage(language)
 		}
 
+		// Check if provider is OpenVoice - return hardcoded model name
+		if _, ok := provider.(*OpenVoiceProvider); ok {
+			return []string{"MeloTTS"}
+		}
+
 		// For other providers, extract from voices
 		for _, v := range provider.GetAvailableVoices() {
 			model := extractModelType(v.ID)
