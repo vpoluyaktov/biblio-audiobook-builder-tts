@@ -45,14 +45,6 @@ func TestNewM4BBuilder(t *testing.T) {
 		t.Error("tempDir should not be empty")
 	}
 
-	if builder.options.BitRate != "128k" {
-		t.Errorf("Default BitRate should be '128k', got %q", builder.options.BitRate)
-	}
-
-	if builder.options.SampleRate != 44100 {
-		t.Errorf("Default SampleRate should be 44100, got %d", builder.options.SampleRate)
-	}
-
 	// Check temp dir exists
 	if _, err := os.Stat(builder.tempDir); os.IsNotExist(err) {
 		t.Error("tempDir should exist")

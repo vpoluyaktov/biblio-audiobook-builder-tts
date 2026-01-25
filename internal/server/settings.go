@@ -28,8 +28,6 @@ type SettingsRequest struct {
 	PronunciationDictFile   string  `json:"pronunciation_dict_file"`
 
 	// Output
-	BitRateKbs        int `json:"bit_rate_kbs"`
-	SampleRateHz      int `json:"sample_rate_hz"`
 	ChapterGapSeconds int `json:"chapter_gap_seconds"`
 	MaxFileSizeMB     int `json:"max_file_size_mb"`
 
@@ -79,8 +77,6 @@ func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
 		PronunciationDictFile:   s.cfg.PronunciationDictFile,
 
 		// Output
-		BitRateKbs:        s.cfg.BitRateKbs,
-		SampleRateHz:      s.cfg.SampleRateHz,
 		ChapterGapSeconds: s.cfg.ChapterGapSeconds,
 		MaxFileSizeMB:     s.cfg.MaxFileSizeMB,
 
@@ -166,12 +162,6 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Output
-	if wasProvided("bit_rate_kbs") {
-		s.cfg.BitRateKbs = req.BitRateKbs
-	}
-	if wasProvided("sample_rate_hz") {
-		s.cfg.SampleRateHz = req.SampleRateHz
-	}
 	if wasProvided("chapter_gap_seconds") {
 		s.cfg.ChapterGapSeconds = req.ChapterGapSeconds
 	}
@@ -211,8 +201,6 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 			"server_port":               {req.ServerPort, wasProvided("server_port")},
 			"server_host":               {req.ServerHost, wasProvided("server_host")},
 			"open_browser":              {fmt.Sprintf("%t", req.OpenBrowser), wasProvided("open_browser")},
-			"bit_rate_kbs":              {fmt.Sprintf("%d", req.BitRateKbs), wasProvided("bit_rate_kbs")},
-			"sample_rate_hz":            {fmt.Sprintf("%d", req.SampleRateHz), wasProvided("sample_rate_hz")},
 			"default_speed":             {fmt.Sprintf("%.2f", req.DefaultSpeed), wasProvided("default_speed")},
 			"default_pitch":             {fmt.Sprintf("%.2f", req.DefaultPitch), wasProvided("default_pitch")},
 			"chapter_gap_seconds":       {fmt.Sprintf("%d", req.ChapterGapSeconds), wasProvided("chapter_gap_seconds")},

@@ -505,7 +505,8 @@ func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (s
 	}
 
 	// Split into parts if needed based on estimated M4B output size
-	parts, err := audio.SplitIntoPartsByEstimatedSize(chapterFiles, chapterTitles, w.cfg.MaxFileSizeMB, w.cfg.BitRateKbs)
+	// Use default 128kbps for size estimation (actual bitrate is determined by ffmpeg)
+	parts, err := audio.SplitIntoPartsByEstimatedSize(chapterFiles, chapterTitles, w.cfg.MaxFileSizeMB, 128)
 	if err != nil {
 		return "", fmt.Errorf("failed to split into parts: %v", err)
 	}
@@ -514,7 +515,7 @@ func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (s
 		logger.Info("Book will be split into %d parts", len(parts))
 	}
 
-	// Prepare M4B options
+	// Prepare M4B options (sample rate is auto-detected from source files)
 	gapDuration := time.Duration(w.cfg.ChapterGapSeconds) * time.Second
 	options := audio.M4BOptions{
 		Title:           book.Title,
@@ -522,8 +523,6 @@ func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (s
 		Album:           book.Title,
 		Genre:           "Audiobook",
 		Description:     book.Description,
-		BitRate:         fmt.Sprintf("%dk", w.cfg.BitRateKbs),
-		SampleRate:      w.cfg.SampleRateHz,
 		GapBetweenChaps: gapDuration,
 	}
 
