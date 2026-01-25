@@ -35,8 +35,6 @@ type M4BOptions struct {
 	CoverImage      []byte
 	CoverImageType  string // "image/jpeg" or "image/png"
 	Chapters        []Chapter
-	BitRate         string // e.g., "128k"
-	SampleRate      int    // e.g., 44100
 	GapBetweenChaps time.Duration
 }
 
@@ -46,6 +44,7 @@ type M4BBuilder struct {
 	options       M4BOptions
 	progressCb    FFmpegProgressCallback
 	totalDuration time.Duration
+	sampleRate    int // Auto-detected from source files
 }
 
 // SetProgressCallback sets a callback for ffmpeg progress updates
@@ -58,13 +57,6 @@ func NewM4BBuilder(options M4BOptions) (*M4BBuilder, error) {
 	tempDir, err := ioutil.TempDir("", "m4b_build_")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp dir: %w", err)
-	}
-
-	if options.BitRate == "" {
-		options.BitRate = "128k"
-	}
-	if options.SampleRate == 0 {
-		options.SampleRate = 44100
 	}
 
 	return &M4BBuilder{
@@ -84,6 +76,14 @@ func (b *M4BBuilder) BuildFromFiles(audioFiles []string, outputPath string) erro
 	if len(audioFiles) == 0 {
 		return fmt.Errorf("no audio files provided")
 	}
+
+	// Step 0: Auto-detect sample rate from the first audio file
+	sampleRate, err := getAudioSampleRate(audioFiles[0])
+	if err != nil {
+		// Default to 48000 if detection fails
+		sampleRate = 48000
+	}
+	b.sampleRate = sampleRate
 
 	// Step 1: Get duration of each audio file and build chapter list
 	chapters, err := b.buildChapterList(audioFiles)
@@ -248,11 +248,10 @@ func (b *M4BBuilder) runFFmpeg(concatFile, metadataFile, coverPath, outputPath s
 		)
 	}
 
-	// Audio encoding settings
+	// Audio encoding settings - use auto-detected sample rate, let ffmpeg choose optimal bitrate
 	args = append(args,
 		"-c:a", "aac",
-		"-b:a", b.options.BitRate,
-		"-ar", fmt.Sprintf("%d", b.options.SampleRate),
+		"-ar", fmt.Sprintf("%d", b.sampleRate),
 		"-ac", "2", // Stereo
 	)
 
@@ -339,6 +338,30 @@ func getAudioDuration(filePath string) (time.Duration, error) {
 	}
 
 	return time.Duration(seconds * float64(time.Second)), nil
+}
+
+// getAudioSampleRate uses ffprobe to get the sample rate of an audio file
+func getAudioSampleRate(filePath string) (int, error) {
+	cmd := exec.Command("ffprobe",
+		"-v", "error",
+		"-select_streams", "a:0",
+		"-show_entries", "stream=sample_rate",
+		"-of", "default=noprint_wrappers=1:nokey=1",
+		filePath,
+	)
+
+	output, err := cmd.Output()
+	if err != nil {
+		return 0, fmt.Errorf("ffprobe error: %w", err)
+	}
+
+	var sampleRate int
+	_, err = fmt.Sscanf(strings.TrimSpace(string(output)), "%d", &sampleRate)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse sample rate: %w", err)
+	}
+
+	return sampleRate, nil
 }
 
 // escapeMetadata escapes special characters for FFMETADATA format

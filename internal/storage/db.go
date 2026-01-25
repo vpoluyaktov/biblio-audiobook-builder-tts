@@ -34,8 +34,6 @@ type Config struct {
 	OpenBrowser bool   `json:"open_browser"`
 
 	// TTS settings
-	BitRateKbs              int     `json:"bit_rate_kbs"`
-	SampleRateHz            int     `json:"sample_rate_hz"`
 	DefaultSpeed            float64 `json:"default_speed"`
 	DefaultPitch            float64 `json:"default_pitch"`
 	ChapterGapSeconds       int     `json:"chapter_gap_seconds"`
@@ -309,12 +307,6 @@ func (db *DB) GetAllConfig() (*Config, error) {
 	if v, ok := configMap["open_browser"]; ok {
 		cfg.OpenBrowser = v == "true"
 	}
-	if v, ok := configMap["bit_rate_kbs"]; ok {
-		fmt.Sscanf(v, "%d", &cfg.BitRateKbs)
-	}
-	if v, ok := configMap["sample_rate_hz"]; ok {
-		fmt.Sscanf(v, "%d", &cfg.SampleRateHz)
-	}
 	if v, ok := configMap["default_speed"]; ok {
 		fmt.Sscanf(v, "%f", &cfg.DefaultSpeed)
 	}
@@ -380,8 +372,6 @@ func (db *DB) SaveAllConfig(cfg *Config) error {
 		"server_port":               cfg.ServerPort,
 		"server_host":               cfg.ServerHost,
 		"open_browser":              fmt.Sprintf("%t", cfg.OpenBrowser),
-		"bit_rate_kbs":              fmt.Sprintf("%d", cfg.BitRateKbs),
-		"sample_rate_hz":            fmt.Sprintf("%d", cfg.SampleRateHz),
 		"default_speed":             fmt.Sprintf("%.2f", cfg.DefaultSpeed),
 		"default_pitch":             fmt.Sprintf("%.2f", cfg.DefaultPitch),
 		"chapter_gap_seconds":       fmt.Sprintf("%d", cfg.ChapterGapSeconds),
@@ -414,8 +404,6 @@ func DefaultConfig() *Config {
 		ServerPort:              "8080",
 		ServerHost:              "0.0.0.0",
 		OpenBrowser:             true,
-		BitRateKbs:              128,
-		SampleRateHz:            44100,
 		DefaultSpeed:            1.0,
 		DefaultPitch:            1.0,
 		ChapterGapSeconds:       2,
@@ -1391,8 +1379,6 @@ func (c *Config) ToAppConfig() map[string]interface{} {
 		"server_port":               c.ServerPort,
 		"server_host":               c.ServerHost,
 		"open_browser":              c.OpenBrowser,
-		"bit_rate_kbs":              c.BitRateKbs,
-		"sample_rate_hz":            c.SampleRateHz,
 		"default_speed":             c.DefaultSpeed,
 		"default_pitch":             c.DefaultPitch,
 		"chapter_gap_seconds":       c.ChapterGapSeconds,

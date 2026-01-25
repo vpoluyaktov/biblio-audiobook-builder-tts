@@ -1510,8 +1510,6 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		"default_voice":    s.cfg.DefaultVoice,
 		"default_speed":    s.cfg.DefaultSpeed,
 		"default_pitch":    s.cfg.DefaultPitch,
-		"bit_rate_kbs":     s.cfg.BitRateKbs,
-		"sample_rate_hz":   s.cfg.SampleRateHz,
 	})
 }
 

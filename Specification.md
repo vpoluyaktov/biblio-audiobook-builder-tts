@@ -230,4 +230,27 @@ abb-tts:
 
 ---
 
-*Last updated: 2026-01-24*
+## Recent Changes
+
+### fix/auto-detect-sample-rate (2026-01-25)
+
+**Problem**: M4B audiobooks were being encoded with incorrect pitch when the source WAV sample rate didn't match the configured output sample rate. For example, Silero TTS outputs at 48000 Hz, but the M4B builder was configured to use 44100 Hz, causing pitch to drop.
+
+**Solution**: 
+- Removed configurable `bit_rate_kbs` and `sample_rate_hz` settings from the application
+- M4B builder now auto-detects the sample rate from the first source WAV file
+- FFmpeg determines optimal bitrate automatically
+- Removed Audio Settings section from the Settings UI
+
+**Files Changed**:
+- `internal/audio/m4b.go` - Added `getAudioSampleRate()` function, auto-detect sample rate in `BuildFromFiles()`
+- `internal/storage/db.go` - Removed `BitRateKbs` and `SampleRateHz` from Config struct
+- `internal/config/config.go` - Removed bit rate and sample rate config fields
+- `internal/server/settings.go` - Removed bit rate and sample rate from settings API
+- `internal/server/worker.go` - Updated M4B options to not pass sample rate
+- `internal/server/templates/index.html` - Removed Audio Settings section from UI
+- `internal/server/assets/app.js` - Removed bit rate and sample rate from settings JS
+
+---
+
+*Last updated: 2026-01-25*

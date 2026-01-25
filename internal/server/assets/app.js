@@ -1270,8 +1270,6 @@ class App {
         document.getElementById('cfg-pronunciation-dict').value = s.pronunciation_dict_file || '';
         
         // Output tab
-        document.getElementById('cfg-bit-rate').value = s.bit_rate_kbs || 128;
-        document.getElementById('cfg-sample-rate').value = s.sample_rate_hz || 44100;
         document.getElementById('cfg-chapter-gap').value = s.chapter_gap_seconds || 2;
         document.getElementById('cfg-max-file-size').value = s.max_file_size_mb || 250;
         document.getElementById('cfg-concurrent-encoders').value = s.concurrent_encoders || 2;
@@ -1499,8 +1497,6 @@ class App {
             pronunciation_dict_file: document.getElementById('cfg-pronunciation-dict').value,
             
             // Output
-            bit_rate_kbs: parseInt(document.getElementById('cfg-bit-rate').value),
-            sample_rate_hz: parseInt(document.getElementById('cfg-sample-rate').value),
             chapter_gap_seconds: parseInt(document.getElementById('cfg-chapter-gap').value),
             max_file_size_mb: parseInt(document.getElementById('cfg-max-file-size').value),
             concurrent_encoders: parseInt(document.getElementById('cfg-concurrent-encoders').value),

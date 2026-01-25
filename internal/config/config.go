@@ -21,8 +21,6 @@ type Config struct {
 	OpenBrowser bool   `mapstructure:"open_browser"`
 
 	// TTS settings
-	BitRateKbs              int     `mapstructure:"bit_rate_kbs"`
-	SampleRateHz            int     `mapstructure:"sample_rate_hz"`
 	DefaultSpeed            float64 `mapstructure:"default_speed"`
 	DefaultPitch            float64 `mapstructure:"default_pitch"`
 	ChapterGapSeconds       int     `mapstructure:"chapter_gap_seconds"`       // Silence between chapters
@@ -58,8 +56,6 @@ func Load(configFile string) (*Config, error) {
 	viper.SetDefault("open_browser", true)
 
 	// TTS settings
-	viper.SetDefault("bit_rate_kbs", 128)
-	viper.SetDefault("sample_rate_hz", 44100)
 	viper.SetDefault("default_speed", 1.0)
 	viper.SetDefault("default_pitch", 1.0)
 	viper.SetDefault("chapter_gap_seconds", 2)          // 2 seconds silence between chapters
@@ -120,12 +116,6 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 	}
 	if v, ok := dbConfig["open_browser"].(bool); ok {
 		cfg.OpenBrowser = v
-	}
-	if v, ok := dbConfig["bit_rate_kbs"].(float64); ok {
-		cfg.BitRateKbs = int(v)
-	}
-	if v, ok := dbConfig["sample_rate_hz"].(float64); ok {
-		cfg.SampleRateHz = int(v)
 	}
 	if v, ok := dbConfig["default_speed"].(float64); ok {
 		cfg.DefaultSpeed = v

@@ -78,9 +78,6 @@ func TestGetAllConfig(t *testing.T) {
 	if cfg.ServerPort != "8080" {
 		t.Errorf("Expected default server_port '8080', got '%s'", cfg.ServerPort)
 	}
-	if cfg.BitRateKbs != 128 {
-		t.Errorf("Expected default bit_rate_kbs 128, got %d", cfg.BitRateKbs)
-	}
 }
 
 func TestSaveAllConfig(t *testing.T) {
@@ -100,8 +97,6 @@ func TestSaveAllConfig(t *testing.T) {
 		ServerPort:        "9090",
 		ServerHost:        "127.0.0.1",
 		OpenBrowser:       false,
-		BitRateKbs:        256,
-		SampleRateHz:      48000,
 		DefaultSpeed:      1.5,
 		DefaultPitch:      0.8,
 		ChapterGapSeconds: 5,
@@ -121,9 +116,6 @@ func TestSaveAllConfig(t *testing.T) {
 
 	if loaded.ServerPort != "9090" {
 		t.Errorf("Expected server_port '9090', got '%s'", loaded.ServerPort)
-	}
-	if loaded.BitRateKbs != 256 {
-		t.Errorf("Expected bit_rate_kbs 256, got %d", loaded.BitRateKbs)
 	}
 	if loaded.OpenBrowser != false {
 		t.Error("Expected open_browser false")
@@ -268,9 +260,6 @@ func TestDefaultConfig(t *testing.T) {
 
 	if cfg.ServerPort != "8080" {
 		t.Errorf("Expected default server_port '8080', got '%s'", cfg.ServerPort)
-	}
-	if cfg.BitRateKbs != 128 {
-		t.Errorf("Expected default bit_rate_kbs 128, got %d", cfg.BitRateKbs)
 	}
 	if cfg.MaxFileSizeMB != 250 {
 		t.Errorf("Expected default max_file_size_mb 250, got %d", cfg.MaxFileSizeMB)
