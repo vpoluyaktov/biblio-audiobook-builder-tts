@@ -211,18 +211,6 @@ func createMinimalWAV(path string, durationMs int) error {
 	return err
 }
 
-func putLittleEndian16(b []byte, v uint16) {
-	b[0] = byte(v)
-	b[1] = byte(v >> 8)
-}
-
-func putLittleEndian32(b []byte, v uint32) {
-	b[0] = byte(v)
-	b[1] = byte(v >> 8)
-	b[2] = byte(v >> 16)
-	b[3] = byte(v >> 24)
-}
-
 func TestBuildMultiPartM4BParallel_EmptyParts(t *testing.T) {
 	_, err := BuildMultiPartM4BParallel([]Part{}, "/tmp", "test", M4BOptions{}, 2)
 	if err == nil {

@@ -385,3 +385,76 @@ func GenerateSilence(duration time.Duration, outputPath string, sampleRate int) 
 
 	return nil
 }
+
+// GenerateSilentWAV creates a silent WAV audio file of the specified duration
+// This is useful for chapters with no speakable content to maintain chapter alignment
+func GenerateSilentWAV(duration time.Duration, outputPath string, sampleRate int) error {
+	if sampleRate == 0 {
+		sampleRate = 44100
+	}
+
+	numChannels := 1
+	bitsPerSample := 16
+	durationMs := int(duration.Milliseconds())
+	if durationMs < 100 {
+		durationMs = 100 // minimum 100ms
+	}
+
+	numSamples := sampleRate * durationMs / 1000
+	dataSize := numSamples * numChannels * (bitsPerSample / 8)
+
+	// WAV file header (44 bytes)
+	header := make([]byte, 44)
+
+	// RIFF header
+	copy(header[0:4], "RIFF")
+	putLittleEndian32(header[4:8], uint32(36+dataSize))
+	copy(header[8:12], "WAVE")
+
+	// fmt chunk
+	copy(header[12:16], "fmt ")
+	putLittleEndian32(header[16:20], 16) // chunk size
+	putLittleEndian16(header[20:22], 1)  // audio format (PCM)
+	putLittleEndian16(header[22:24], uint16(numChannels))
+	putLittleEndian32(header[24:28], uint32(sampleRate))
+	putLittleEndian32(header[28:32], uint32(sampleRate*numChannels*bitsPerSample/8)) // byte rate
+	putLittleEndian16(header[32:34], uint16(numChannels*bitsPerSample/8))            // block align
+	putLittleEndian16(header[34:36], uint16(bitsPerSample))
+
+	// data chunk
+	copy(header[36:40], "data")
+	putLittleEndian32(header[40:44], uint32(dataSize))
+
+	// Create file with header + silence data
+	f, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("failed to create silent WAV file: %w", err)
+	}
+	defer f.Close()
+
+	if _, err := f.Write(header); err != nil {
+		return fmt.Errorf("failed to write WAV header: %w", err)
+	}
+
+	// Write silence (zeros)
+	silence := make([]byte, dataSize)
+	if _, err := f.Write(silence); err != nil {
+		return fmt.Errorf("failed to write silence data: %w", err)
+	}
+
+	return nil
+}
+
+// putLittleEndian16 writes a uint16 in little-endian format
+func putLittleEndian16(b []byte, v uint16) {
+	b[0] = byte(v)
+	b[1] = byte(v >> 8)
+}
+
+// putLittleEndian32 writes a uint32 in little-endian format
+func putLittleEndian32(b []byte, v uint32) {
+	b[0] = byte(v)
+	b[1] = byte(v >> 8)
+	b[2] = byte(v >> 16)
+	b[3] = byte(v >> 24)
+}
