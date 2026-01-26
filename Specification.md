@@ -253,4 +253,22 @@ abb-tts:
 
 ---
 
+### fix/silent-wav-sample-rate (2026-01-25)
+
+**Problem**: Silent WAV files generated for empty chapters were hardcoded to 44100 Hz. When the first chapter of a book was empty (e.g., "Chapter 1" with no speakable content), the M4B auto-detection would pick up this 44100 Hz file instead of the TTS provider's actual sample rate (e.g., 48000 Hz for Silero), causing pitch issues in the final M4B audiobook.
+
+**Solution**:
+- Added `sample_rate` field to the `providers` table in the database schema
+- Set provider-specific sample rates: Silero (48000 Hz), OpenVoice/Google (44100 Hz), Azure/OpenAI/RHVoice (24000 Hz), eSpeak/OpenTTS (22050 Hz)
+- Updated silent WAV generation to use the provider's sample rate instead of hardcoded 44100 Hz
+- Added database migration to populate sample rates for existing providers
+
+**Files Changed**:
+- `internal/storage/db.go` - Added `sample_rate` column to providers table, added `SampleRate` field to `TTSProvider` struct, updated all SQL queries, added migration
+- `internal/server/worker.go` - Updated silent WAV generation to fetch and use provider's sample rate
+
+**Impact**: Ensures consistent sample rates throughout the audiobook conversion pipeline, preventing pitch distortion when books contain empty chapters.
+
+---
+
 *Last updated: 2026-01-25*

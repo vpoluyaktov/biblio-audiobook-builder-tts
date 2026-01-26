@@ -425,7 +425,18 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		chapterFileName := fmt.Sprintf("%02d_%s.wav", index+1, sanitizeFileName(chapter.Title))
 		outputPath := filepath.Join(outputDir, chapterFileName)
 
-		if err := audio.GenerateSilentWAV(1*time.Second, outputPath, 44100); err != nil {
+		// Get provider's sample rate, default to 48000 if not available
+		sampleRate := 48000
+		if providerInfo := w.ttsService.GetProviderInfo(job.Provider); providerInfo != nil {
+			// Cast db to *storage.DB to access GetProvider method
+			if db, ok := w.db.(*storage.DB); ok {
+				if dbProvider, err := db.GetProvider(providerInfo.ID); err == nil && dbProvider != nil && dbProvider.SampleRate > 0 {
+					sampleRate = dbProvider.SampleRate
+				}
+			}
+		}
+
+		if err := audio.GenerateSilentWAV(1*time.Second, outputPath, sampleRate); err != nil {
 			result.Error = fmt.Errorf("failed to generate silent audio: %v", err)
 			return result
 		}
