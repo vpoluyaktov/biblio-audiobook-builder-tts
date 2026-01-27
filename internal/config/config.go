@@ -18,6 +18,7 @@ type Config struct {
 	// Server settings
 	ServerPort  string `mapstructure:"server_port"`
 	ServerHost  string `mapstructure:"server_host"`
+	BasePath    string `mapstructure:"base_path"`
 	OpenBrowser bool   `mapstructure:"open_browser"`
 
 	// TTS settings
@@ -53,6 +54,7 @@ func Load(configFile string) (*Config, error) {
 	// Server settings
 	viper.SetDefault("server_port", "8080")
 	viper.SetDefault("server_host", "0.0.0.0")
+	viper.SetDefault("base_path", "")
 	viper.SetDefault("open_browser", true)
 
 	// TTS settings

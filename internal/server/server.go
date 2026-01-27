@@ -171,59 +171,84 @@ func (s *Server) Start() error {
 	// Setup routes
 	mux := http.NewServeMux()
 
+	// Get base path from config
+	basePath := s.cfg.BasePath
+	if basePath == "" {
+		basePath = "/"
+	}
+	// Ensure base path ends with /
+	if basePath != "/" && basePath[len(basePath)-1] != '/' {
+		basePath += "/"
+	}
+
+	// Helper function to create path with base
+	path := func(p string) string {
+		if basePath == "/" {
+			return p
+		}
+		return basePath + p[1:] // Remove leading / from p
+	}
+
 	// Static assets
-	mux.Handle("/assets/", http.FileServer(http.FS(assetsFS)))
+	mux.Handle(path("/assets/"), http.StripPrefix(basePath[:len(basePath)-1], http.FileServer(http.FS(assetsFS))))
 
 	// API endpoints
-	mux.HandleFunc("/api/jobs", s.handleJobs)
-	mux.HandleFunc("/api/jobs/", s.handleJob)
-	mux.HandleFunc("/api/upload", s.handleUpload)
-	mux.HandleFunc("/api/preview", s.handlePreview)
-	mux.HandleFunc("/api/preview/", s.handlePreviewByID)
-	mux.HandleFunc("/api/providers", s.handleProviders)
-	mux.HandleFunc("/api/providers/", s.handleProviderByID)
-	mux.HandleFunc("/api/voices", s.handleVoices)
-	mux.HandleFunc("/api/languages", s.handleLanguages)
-	mux.HandleFunc("/api/models", s.handleModels)
-	mux.HandleFunc("/api/pricing", s.handlePricing)
-	mux.HandleFunc("/api/config", s.handleConfig)
-	mux.HandleFunc("/api/settings", s.handleSettings)
-	mux.HandleFunc("/api/settings/test-audiobookshelf", s.handleTestAudiobookshelf)
-	mux.HandleFunc("/api/settings/test-opentts", s.handleTestOpenTTS)
-	mux.HandleFunc("/api/settings/test-rhvoice", s.handleTestRHVoice)
-	mux.HandleFunc("/api/settings/test-silero", s.handleTestSilero)
-	mux.HandleFunc("/api/test-voice", s.handleTestVoice)
-	mux.HandleFunc("/api/ws", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(path("/api/jobs"), s.handleJobs)
+	mux.HandleFunc(path("/api/jobs/"), s.handleJob)
+	mux.HandleFunc(path("/api/upload"), s.handleUpload)
+	mux.HandleFunc(path("/api/preview"), s.handlePreview)
+	mux.HandleFunc(path("/api/preview/"), s.handlePreviewByID)
+	mux.HandleFunc(path("/api/providers"), s.handleProviders)
+	mux.HandleFunc(path("/api/providers/"), s.handleProviderByID)
+	mux.HandleFunc(path("/api/voices"), s.handleVoices)
+	mux.HandleFunc(path("/api/languages"), s.handleLanguages)
+	mux.HandleFunc(path("/api/models"), s.handleModels)
+	mux.HandleFunc(path("/api/pricing"), s.handlePricing)
+	mux.HandleFunc(path("/api/config"), s.handleConfig)
+	mux.HandleFunc(path("/api/settings"), s.handleSettings)
+	mux.HandleFunc(path("/api/settings/test-audiobookshelf"), s.handleTestAudiobookshelf)
+	mux.HandleFunc(path("/api/settings/test-opentts"), s.handleTestOpenTTS)
+	mux.HandleFunc(path("/api/settings/test-rhvoice"), s.handleTestRHVoice)
+	mux.HandleFunc(path("/api/settings/test-silero"), s.handleTestSilero)
+	mux.HandleFunc(path("/api/test-voice"), s.handleTestVoice)
+	mux.HandleFunc(path("/api/ws"), func(w http.ResponseWriter, r *http.Request) {
 		ServeWS(s.hub, w, r)
 	})
 
 	// Noun endpoints (for text normalization)
-	mux.HandleFunc("/api/nouns", s.handleNouns)
-	mux.HandleFunc("/api/nouns/", s.handleNoun)
-	mux.HandleFunc("/api/nouns/languages", s.handleNounLanguages)
+	mux.HandleFunc(path("/api/nouns"), s.handleNouns)
+	mux.HandleFunc(path("/api/nouns/"), s.handleNoun)
+	mux.HandleFunc(path("/api/nouns/languages"), s.handleNounLanguages)
 
 	// OPDS endpoints
-	mux.HandleFunc("/api/opds/sources", s.handleOPDSSources)
-	mux.HandleFunc("/api/opds/sources/", s.handleOPDSSource)
-	mux.HandleFunc("/api/opds/test", s.handleOPDSTest)
-	mux.HandleFunc("/api/opds/browse", s.handleOPDSBrowse)
-	mux.HandleFunc("/api/opds/search", s.handleOPDSSearch)
-	mux.HandleFunc("/api/opds/download", s.handleOPDSDownload)
-	mux.HandleFunc("/api/opds/convert", s.handleOPDSConvert)
-	mux.HandleFunc("/api/opds/proxy", s.handleOPDSProxy)
+	mux.HandleFunc(path("/api/opds/sources"), s.handleOPDSSources)
+	mux.HandleFunc(path("/api/opds/sources/"), s.handleOPDSSource)
+	mux.HandleFunc(path("/api/opds/test"), s.handleOPDSTest)
+	mux.HandleFunc(path("/api/opds/browse"), s.handleOPDSBrowse)
+	mux.HandleFunc(path("/api/opds/search"), s.handleOPDSSearch)
+	mux.HandleFunc(path("/api/opds/download"), s.handleOPDSDownload)
+	mux.HandleFunc(path("/api/opds/convert"), s.handleOPDSConvert)
+	mux.HandleFunc(path("/api/opds/proxy"), s.handleOPDSProxy)
 
 	// Health check endpoint
-	mux.HandleFunc("/health", s.handleHealth)
+	mux.HandleFunc(path("/health"), s.handleHealth)
 
 	// Serve main page
-	mux.HandleFunc("/", s.handleIndex)
+	if basePath == "/" {
+		mux.HandleFunc("/", s.handleIndex)
+	} else {
+		mux.HandleFunc(basePath, s.handleIndex)
+		mux.HandleFunc(basePath[:len(basePath)-1], func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, basePath, http.StatusMovedPermanently)
+		})
+	}
 
 	s.httpServer = &http.Server{
 		Addr:    s.addr,
 		Handler: mux,
 	}
 
-	logger.Info("Server starting on %s", s.addr)
+	logger.Info("Server starting on %s (base path: %s)", s.addr, basePath)
 	return s.httpServer.ListenAndServe()
 }
 
