@@ -8,7 +8,7 @@ import (
 )
 
 func TestPreviewStore_CreatePreview(t *testing.T) {
-	store := NewPreviewStore(5 * time.Minute)
+	store := NewPreviewStore(5*time.Minute, "")
 
 	book := &parser.Book{
 		Title:       "Test Book",
@@ -58,7 +58,7 @@ func TestPreviewStore_CreatePreview(t *testing.T) {
 }
 
 func TestPreviewStore_GetPreview(t *testing.T) {
-	store := NewPreviewStore(5 * time.Minute)
+	store := NewPreviewStore(5*time.Minute, "")
 
 	book := &parser.Book{
 		Title:  "Test Book",
@@ -87,7 +87,7 @@ func TestPreviewStore_GetPreview(t *testing.T) {
 }
 
 func TestPreviewStore_DeletePreview(t *testing.T) {
-	store := NewPreviewStore(5 * time.Minute)
+	store := NewPreviewStore(5*time.Minute, "")
 
 	book := &parser.Book{
 		Title:  "Test Book",
@@ -110,7 +110,7 @@ func TestPreviewStore_DeletePreview(t *testing.T) {
 }
 
 func TestPreviewStore_CoverImage(t *testing.T) {
-	store := NewPreviewStore(5 * time.Minute)
+	store := NewPreviewStore(5*time.Minute, "")
 
 	coverData := []byte{0x89, 0x50, 0x4E, 0x47} // PNG magic bytes
 
@@ -185,7 +185,7 @@ func TestSplitWords(t *testing.T) {
 }
 
 func TestCostEstimates(t *testing.T) {
-	store := NewPreviewStore(5 * time.Minute)
+	store := NewPreviewStore(5*time.Minute, "")
 
 	// Create a book with 1 million characters
 	content := make([]byte, 1000000)

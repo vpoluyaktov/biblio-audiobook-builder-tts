@@ -60,7 +60,7 @@ type ConfigDB interface {
 
 // New creates a new server instance
 func New(addr string, cfg *config.Config, ttsService tts.Service) *Server {
-	previewStore := NewPreviewStore(30 * time.Minute) // 30 min TTL for previews
+	previewStore := NewPreviewStore(30*time.Minute, cfg.BasePath) // 30 min TTL for previews
 	hub := NewHub()
 
 	s := &Server{
