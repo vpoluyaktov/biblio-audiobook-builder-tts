@@ -6,6 +6,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
 	"net/http"
 	"os"
@@ -272,15 +273,39 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := templatesFS.ReadFile("templates/index.html")
+	tmplData, err := templatesFS.ReadFile("templates/index.html")
 	if err != nil {
 		http.Error(w, "Error loading page", http.StatusInternalServerError)
 		logger.Error("Template error: %v", err)
 		return
 	}
 
+	tmpl, err := template.New("index").Parse(string(tmplData))
+	if err != nil {
+		http.Error(w, "Error parsing template", http.StatusInternalServerError)
+		logger.Error("Template parse error: %v", err)
+		return
+	}
+
+	basePath := s.cfg.BasePath
+	if basePath == "" {
+		basePath = "/"
+	}
+	if basePath != "/" && basePath[len(basePath)-1] != '/' {
+		basePath += "/"
+	}
+
+	data := struct {
+		BasePath string
+	}{
+		BasePath: basePath[:len(basePath)-1], // Remove trailing slash for use in paths
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(data)
+	if err := tmpl.Execute(w, data); err != nil {
+		http.Error(w, "Error rendering template", http.StatusInternalServerError)
+		logger.Error("Template execution error: %v", err)
+	}
 }
 
 // handleJobs handles GET (list) and POST (create via JSON) for jobs
