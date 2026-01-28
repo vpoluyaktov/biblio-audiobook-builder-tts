@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -434,6 +435,7 @@ func (s *Server) handleOPDSDownload(w http.ResponseWriter, r *http.Request) {
 		Format   string `json:"format"`
 		Author   string `json:"author"`
 		SourceID string `json:"source_id"`
+		CoverURL string `json:"cover_url"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -517,6 +519,16 @@ func (s *Server) handleOPDSDownload(w http.ResponseWriter, r *http.Request) {
 
 	// Store the temp path in the preview for later use
 	preview.FilePath = tempPath
+
+	// Override cover URL with OPDS cover URL if provided
+	if req.CoverURL != "" {
+		// Use the proxy endpoint to serve the OPDS cover image
+		sourceParam := ""
+		if req.SourceID != "" {
+			sourceParam = "&source_id=" + url.QueryEscape(req.SourceID)
+		}
+		preview.CoverImageURL = fmt.Sprintf("/api/opds/proxy?url=%s%s", url.QueryEscape(req.CoverURL), sourceParam)
+	}
 
 	logger.Info("Downloaded and parsed OPDS book: %s (%d chapters)", preview.BookTitle, preview.TotalChapters)
 
