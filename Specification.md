@@ -306,4 +306,33 @@ remaining := path[idx+len(prefix):]  // Finds prefix position first
 
 ---
 
+### fix/opds-cover-image-url - OPDS Cover Image Display (2026-01-28)
+
+**Problem**: When downloading books from OPDS catalogs, the cover image was not displayed in the book preview dialog. The preview was returning a cover URL like `/api/preview/{id}/cover` which resulted in a 404 error, while the OPDS catalog's cover image was available and working through the proxy endpoint at `/api/opds/proxy?url=...`.
+
+**Root Cause**: The `handleOPDSDownload` endpoint was creating a preview from the downloaded book file, which attempted to extract the cover image from the book content. However, for OPDS books, the cover image URL from the OPDS catalog entry was not being passed through or utilized. The preview was setting `CoverImageURL` to `/api/preview/{id}/cover`, but this endpoint only works when the cover image is extracted from the book file and stored in the preview store. For OPDS books, the cover should use the catalog's cover URL through the proxy.
+
+**Solution**:
+- Modified the JavaScript `downloadAndConvert()` function to include the `cover_url` from the OPDS catalog entry in the download request
+- Updated the `handleOPDSDownload` endpoint to accept the `cover_url` parameter
+- When a cover URL is provided from OPDS, override the preview's `CoverImageURL` to use the proxy endpoint with proper URL encoding
+- Added `basePath` parameter to `PreviewStore` to ensure cover URLs for uploaded files also include the base path
+- Created `apiURL()` helper method in the `Server` struct to centralize base path handling in the backend
+- Frontend already had `apiUrl()` helper function that correctly handles base path for all API calls
+
+**Files Changed**:
+- `internal/server/assets/app.js` - Added `cover_url` field to the OPDS download request payload
+- `internal/server/opds_handlers.go` - Added `CoverURL` field to request struct, uses `apiURL()` helper for cover URL construction
+- `internal/server/preview.go` - Added `basePath` field to `PreviewStore`, updated `NewPreviewStore()` signature, fixed cover URL generation
+- `internal/server/server.go` - Added `apiURL()` helper method, updated `NewPreviewStore()` call to pass `basePath`
+- `internal/server/preview_test.go` - Updated all test calls to pass empty `basePath` parameter
+
+**Impact**: 
+- OPDS book previews now correctly display cover images from the OPDS catalog
+- Regular uploaded files also have correct cover URLs with base path
+- Centralized base path handling reduces code duplication and makes future maintenance easier
+- Both frontend and backend now have consistent helper methods for URL construction
+
+---
+
 *Last updated: 2026-01-28*

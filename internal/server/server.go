@@ -82,6 +82,11 @@ func (s *Server) SetDB(db ConfigDB) {
 	s.worker = NewWorker(db, s.hub, s.ttsService, s.cfg)
 }
 
+// apiURL generates an API URL with the configured base path
+func (s *Server) apiURL(path string) string {
+	return s.cfg.BasePath + path
+}
+
 // jobToStorageJob converts a server.Job to storage.Job for database persistence
 func jobToStorageJob(job *Job) *storage.Job {
 	// Convert worker progress
@@ -1675,6 +1680,11 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 
 	// Create preview
 	preview := s.previewStore.CreatePreview(book, header.Filename)
+
+	// Add basePath to cover URL if present
+	if preview.CoverImageURL != "" {
+		preview.CoverImageURL = s.apiURL(preview.CoverImageURL)
+	}
 
 	logger.Info("Created preview %s for %s (%d chapters, %d words)",
 		preview.ID, preview.BookTitle, preview.TotalChapters, preview.TotalWords)

@@ -2223,7 +2223,8 @@ class App {
                     title: this.currentOPDSBook?.title || 'book',
                     format: format,
                     author: this.currentOPDSBook?.authors?.[0] || '',
-                    source_id: this.currentOPDSSourceId || ''
+                    source_id: this.currentOPDSSourceId || '',
+                    cover_url: this.currentOPDSBook?.cover_url || this.currentOPDSBook?.thumbnail_url || ''
                 })
             });
 
