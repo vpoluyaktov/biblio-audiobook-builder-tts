@@ -60,7 +60,7 @@ type ConfigDB interface {
 
 // New creates a new server instance
 func New(addr string, cfg *config.Config, ttsService tts.Service) *Server {
-	previewStore := NewPreviewStore(30*time.Minute, cfg.BasePath) // 30 min TTL for previews
+	previewStore := NewPreviewStore(30 * time.Minute) // 30 min TTL for previews
 	hub := NewHub()
 
 	s := &Server{
@@ -1680,6 +1680,11 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 
 	// Create preview
 	preview := s.previewStore.CreatePreview(book, header.Filename)
+
+	// Add basePath to cover URL if present
+	if preview.CoverImageURL != "" {
+		preview.CoverImageURL = s.apiURL(preview.CoverImageURL)
+	}
 
 	logger.Info("Created preview %s for %s (%d chapters, %d words)",
 		preview.ID, preview.BookTitle, preview.TotalChapters, preview.TotalWords)

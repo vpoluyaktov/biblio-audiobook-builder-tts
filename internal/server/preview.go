@@ -238,16 +238,14 @@ type PreviewStore struct {
 	covers   map[string][]byte // preview ID -> cover image data
 	mu       sync.RWMutex
 	ttl      time.Duration
-	basePath string
 }
 
 // NewPreviewStore creates a new preview store with the given TTL
-func NewPreviewStore(ttl time.Duration, basePath string) *PreviewStore {
+func NewPreviewStore(ttl time.Duration) *PreviewStore {
 	ps := &PreviewStore{
 		previews: make(map[string]*Preview),
 		covers:   make(map[string][]byte),
 		ttl:      ttl,
-		basePath: basePath,
 	}
 	// Start cleanup goroutine
 	go ps.cleanupLoop()
@@ -320,7 +318,7 @@ func (ps *PreviewStore) CreatePreview(book *parser.Book, fileName string) *Previ
 
 	// Set cover image URL if available
 	if len(book.CoverImage) > 0 {
-		preview.CoverImageURL = fmt.Sprintf("%s/api/preview/%s/cover", ps.basePath, id)
+		preview.CoverImageURL = fmt.Sprintf("/api/preview/%s/cover", id)
 		ps.covers[id] = book.CoverImage
 	}
 
