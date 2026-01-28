@@ -1956,7 +1956,7 @@ class App {
         const coverUrl = entry.cover_url || entry.thumbnail_url;
         const sourceIdParam = this.currentOPDSSourceId ? `&source_id=${encodeURIComponent(this.currentOPDSSourceId)}` : '';
         const coverHtml = coverUrl 
-            ? `<img src="/api/opds/proxy?url=${encodeURIComponent(coverUrl)}${sourceIdParam}" alt="Cover" onerror="this.parentElement.innerHTML='<span class=\\'no-cover\\'>📖</span>'">`
+            ? `<img src="${apiUrl('/api/opds/proxy')}?url=${encodeURIComponent(coverUrl)}${sourceIdParam}" alt="Cover" onerror="this.parentElement.innerHTML='<span class=\'no-cover\'>📖</span>'">`
             : '<span class="no-cover">📖</span>';
 
         const authors = entry.authors && entry.authors.length > 0 
@@ -2150,7 +2150,7 @@ class App {
         const coverUrl = entry.cover_url || entry.thumbnail_url;
         const sourceIdParam = this.currentOPDSSourceId ? `&source_id=${encodeURIComponent(this.currentOPDSSourceId)}` : '';
         if (coverUrl) {
-            this.opdsBookCover.innerHTML = `<img src="/api/opds/proxy?url=${encodeURIComponent(coverUrl)}${sourceIdParam}" alt="Cover" onerror="this.parentElement.innerHTML='<span class=\\'no-cover\\'>No Cover</span>'">`;
+            this.opdsBookCover.innerHTML = `<img src="${apiUrl('/api/opds/proxy')}?url=${encodeURIComponent(coverUrl)}${sourceIdParam}" alt="Cover" onerror="this.parentElement.innerHTML='<span class=\'no-cover\'>No Cover</span>'">`;
         } else {
             this.opdsBookCover.innerHTML = '<span class="no-cover">No Cover</span>';
         }
