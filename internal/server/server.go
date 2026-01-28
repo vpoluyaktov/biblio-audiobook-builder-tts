@@ -277,12 +277,16 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	// BasePath for template - used to generate URLs in HTML
 	// This should be the external path users see (e.g., /abb-tts)
 	basePath := s.cfg.BasePath
+	logger.Info("Config BasePath value: '%s'", basePath)
+
 	if basePath == "" || basePath == "/" {
 		basePath = "" // No prefix for root path
 	} else {
 		// Ensure no trailing slash for use in template paths
 		basePath = strings.TrimSuffix(basePath, "/")
 	}
+
+	logger.Info("Template BasePath value: '%s'", basePath)
 
 	data := struct {
 		BasePath string
