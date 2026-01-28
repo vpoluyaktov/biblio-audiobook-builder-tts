@@ -190,8 +190,9 @@ func (s *Server) Start() error {
 		return basePath + p[1:] // Remove leading / from p
 	}
 
-	// Static assets
-	mux.Handle(path("/assets/"), http.StripPrefix(basePath[:len(basePath)-1], http.FileServer(http.FS(assetsFS))))
+	// Static assets - strip both base path and /assets/ prefix
+	assetsPath := path("/assets/")
+	mux.Handle(assetsPath, http.StripPrefix(strings.TrimSuffix(assetsPath, "/"), http.FileServer(http.FS(assetsFS))))
 
 	// API endpoints
 	mux.HandleFunc(path("/api/jobs"), s.handleJobs)
