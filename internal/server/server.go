@@ -82,6 +82,11 @@ func (s *Server) SetDB(db ConfigDB) {
 	s.worker = NewWorker(db, s.hub, s.ttsService, s.cfg)
 }
 
+// apiURL generates an API URL with the configured base path
+func (s *Server) apiURL(path string) string {
+	return s.cfg.BasePath + path
+}
+
 // jobToStorageJob converts a server.Job to storage.Job for database persistence
 func jobToStorageJob(job *Job) *storage.Job {
 	// Convert worker progress
