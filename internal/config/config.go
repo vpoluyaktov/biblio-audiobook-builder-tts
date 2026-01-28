@@ -45,6 +45,11 @@ func Load(configFile string) (*Config, error) {
 	viper.SetEnvPrefix("ABB_TTS")
 	viper.AutomaticEnv()
 
+	// Explicitly bind environment variables for nested config
+	viper.BindEnv("base_path")
+	viper.BindEnv("server_port")
+	viper.BindEnv("server_host")
+
 	// Basic settings
 	viper.SetDefault("log_file", "biblio-audiobook-builder-tts.log")
 	viper.SetDefault("temp_dir", "./temp")
