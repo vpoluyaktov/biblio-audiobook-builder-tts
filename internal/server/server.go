@@ -173,62 +173,69 @@ func (s *Server) Start() error {
 	// Setup routes
 	mux := http.NewServeMux()
 
-	// Note: Nginx strips the base path before forwarding requests,
-	// so we register routes WITHOUT the base path prefix.
-	// The base path is only used in HTML templates for generating URLs.
+	// Note: Routes are registered WITH the base path prefix.
+	// Nginx preserves the full path when forwarding requests.
+	// This allows the service to work on a sub-path.
+
+	basePath := s.cfg.BasePath
 
 	// Static assets - use sub-filesystem to serve from assets directory
 	assetsSubFS, err := fs.Sub(assetsFS, "assets")
 	if err != nil {
 		logger.Error("Failed to create assets sub-filesystem: %v", err)
 	} else {
-		// Nginx forwards /assets/style.css (base path already stripped)
-		mux.Handle("/assets/", http.StripPrefix("/assets", http.FileServer(http.FS(assetsSubFS))))
+		assetsPath := basePath + "/assets/"
+		mux.Handle(assetsPath, http.StripPrefix(basePath+"/assets", http.FileServer(http.FS(assetsSubFS))))
 	}
 
 	// API endpoints
-	mux.HandleFunc("/api/jobs", s.handleJobs)
-	mux.HandleFunc("/api/jobs/", s.handleJob)
-	mux.HandleFunc("/api/upload", s.handleUpload)
-	mux.HandleFunc("/api/preview", s.handlePreview)
-	mux.HandleFunc("/api/preview/", s.handlePreviewByID)
-	mux.HandleFunc("/api/providers", s.handleProviders)
-	mux.HandleFunc("/api/providers/", s.handleProviderByID)
-	mux.HandleFunc("/api/voices", s.handleVoices)
-	mux.HandleFunc("/api/languages", s.handleLanguages)
-	mux.HandleFunc("/api/models", s.handleModels)
-	mux.HandleFunc("/api/pricing", s.handlePricing)
-	mux.HandleFunc("/api/config", s.handleConfig)
-	mux.HandleFunc("/api/settings", s.handleSettings)
-	mux.HandleFunc("/api/settings/test-audiobookshelf", s.handleTestAudiobookshelf)
-	mux.HandleFunc("/api/settings/test-opentts", s.handleTestOpenTTS)
-	mux.HandleFunc("/api/settings/test-rhvoice", s.handleTestRHVoice)
-	mux.HandleFunc("/api/settings/test-silero", s.handleTestSilero)
-	mux.HandleFunc("/api/test-voice", s.handleTestVoice)
-	mux.HandleFunc("/api/ws", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(basePath+"/api/jobs", s.handleJobs)
+	mux.HandleFunc(basePath+"/api/jobs/", s.handleJob)
+	mux.HandleFunc(basePath+"/api/upload", s.handleUpload)
+	mux.HandleFunc(basePath+"/api/preview", s.handlePreview)
+	mux.HandleFunc(basePath+"/api/preview/", s.handlePreviewByID)
+	mux.HandleFunc(basePath+"/api/providers", s.handleProviders)
+	mux.HandleFunc(basePath+"/api/providers/", s.handleProviderByID)
+	mux.HandleFunc(basePath+"/api/voices", s.handleVoices)
+	mux.HandleFunc(basePath+"/api/languages", s.handleLanguages)
+	mux.HandleFunc(basePath+"/api/models", s.handleModels)
+	mux.HandleFunc(basePath+"/api/pricing", s.handlePricing)
+	mux.HandleFunc(basePath+"/api/config", s.handleConfig)
+	mux.HandleFunc(basePath+"/api/settings", s.handleSettings)
+	mux.HandleFunc(basePath+"/api/settings/test-audiobookshelf", s.handleTestAudiobookshelf)
+	mux.HandleFunc(basePath+"/api/settings/test-opentts", s.handleTestOpenTTS)
+	mux.HandleFunc(basePath+"/api/settings/test-rhvoice", s.handleTestRHVoice)
+	mux.HandleFunc(basePath+"/api/settings/test-silero", s.handleTestSilero)
+	mux.HandleFunc(basePath+"/api/test-voice", s.handleTestVoice)
+	mux.HandleFunc(basePath+"/api/ws", func(w http.ResponseWriter, r *http.Request) {
 		ServeWS(s.hub, w, r)
 	})
 
 	// Noun endpoints (for text normalization)
-	mux.HandleFunc("/api/nouns", s.handleNouns)
-	mux.HandleFunc("/api/nouns/", s.handleNoun)
-	mux.HandleFunc("/api/nouns/languages", s.handleNounLanguages)
+	mux.HandleFunc(basePath+"/api/nouns", s.handleNouns)
+	mux.HandleFunc(basePath+"/api/nouns/", s.handleNoun)
+	mux.HandleFunc(basePath+"/api/nouns/languages", s.handleNounLanguages)
 
 	// OPDS endpoints
-	mux.HandleFunc("/api/opds/sources", s.handleOPDSSources)
-	mux.HandleFunc("/api/opds/sources/", s.handleOPDSSource)
-	mux.HandleFunc("/api/opds/test", s.handleOPDSTest)
-	mux.HandleFunc("/api/opds/browse", s.handleOPDSBrowse)
-	mux.HandleFunc("/api/opds/search", s.handleOPDSSearch)
-	mux.HandleFunc("/api/opds/download", s.handleOPDSDownload)
-	mux.HandleFunc("/api/opds/convert", s.handleOPDSConvert)
-	mux.HandleFunc("/api/opds/proxy", s.handleOPDSProxy)
+	mux.HandleFunc(basePath+"/api/opds/sources", s.handleOPDSSources)
+	mux.HandleFunc(basePath+"/api/opds/sources/", s.handleOPDSSource)
+	mux.HandleFunc(basePath+"/api/opds/test", s.handleOPDSTest)
+	mux.HandleFunc(basePath+"/api/opds/browse", s.handleOPDSBrowse)
+	mux.HandleFunc(basePath+"/api/opds/search", s.handleOPDSSearch)
+	mux.HandleFunc(basePath+"/api/opds/download", s.handleOPDSDownload)
+	mux.HandleFunc(basePath+"/api/opds/convert", s.handleOPDSConvert)
+	mux.HandleFunc(basePath+"/api/opds/proxy", s.handleOPDSProxy)
 
 	// Health check endpoint
-	mux.HandleFunc("/health", s.handleHealth)
+	mux.HandleFunc(basePath+"/health", s.handleHealth)
 
-	// Serve main page at root
-	mux.HandleFunc("/", s.handleIndex)
+	// Serve main page at base path
+	if basePath == "" {
+		mux.HandleFunc("/", s.handleIndex)
+	} else {
+		mux.HandleFunc(basePath+"/", s.handleIndex)
+		mux.HandleFunc(basePath, s.handleIndex)
+	}
 
 	s.httpServer = &http.Server{
 		Addr:    s.addr,
@@ -254,8 +261,19 @@ func (s *Server) Stop(ctx context.Context) error {
 
 // handleIndex serves the main page
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
-	// Nginx strips the base path, so we only see "/" for the index
-	if r.URL.Path != "/" {
+	// Check if this is the index page (with or without trailing slash)
+	expectedPaths := []string{s.cfg.BasePath + "/", s.cfg.BasePath}
+	if s.cfg.BasePath == "" {
+		expectedPaths = []string{"/"}
+	}
+	isIndex := false
+	for _, path := range expectedPaths {
+		if r.URL.Path == path {
+			isIndex = true
+			break
+		}
+	}
+	if !isIndex {
 		http.NotFound(w, r)
 		return
 	}
