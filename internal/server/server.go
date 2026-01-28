@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -190,11 +191,16 @@ func (s *Server) Start() error {
 		return basePath + p[1:] // Remove leading / from p
 	}
 
-	// Static assets - need to strip the full path including base path and /assets
+	// Static assets - use sub-filesystem to serve from assets directory
 	assetsPath := path("/assets/")
-	// For ServeMux, the pattern with trailing / matches all paths with that prefix
-	// StripPrefix needs to remove everything before the filename
-	mux.Handle(assetsPath, http.StripPrefix(path("/assets"), http.FileServer(http.FS(assetsFS))))
+	// Create a sub-filesystem rooted at "assets" directory
+	assetsSubFS, err := fs.Sub(assetsFS, "assets")
+	if err != nil {
+		logger.Error("Failed to create assets sub-filesystem: %v", err)
+	} else {
+		// StripPrefix removes the /abb-tts/assets part, leaving just the filename
+		mux.Handle(assetsPath, http.StripPrefix(path("/assets"), http.FileServer(http.FS(assetsSubFS))))
+	}
 
 	// API endpoints
 	mux.HandleFunc(path("/api/jobs"), s.handleJobs)
