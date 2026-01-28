@@ -190,9 +190,11 @@ func (s *Server) Start() error {
 		return basePath + p[1:] // Remove leading / from p
 	}
 
-	// Static assets - strip both base path and /assets/ prefix
+	// Static assets - need to strip the full path including base path and /assets
 	assetsPath := path("/assets/")
-	mux.Handle(assetsPath, http.StripPrefix(strings.TrimSuffix(assetsPath, "/"), http.FileServer(http.FS(assetsFS))))
+	// For ServeMux, the pattern with trailing / matches all paths with that prefix
+	// StripPrefix needs to remove everything before the filename
+	mux.Handle(assetsPath, http.StripPrefix(path("/assets"), http.FileServer(http.FS(assetsFS))))
 
 	// API endpoints
 	mux.HandleFunc(path("/api/jobs"), s.handleJobs)
