@@ -1,5 +1,11 @@
 // Audiobook Builder TTS - Web Client
 
+// Helper function to construct API URLs with base path
+function apiUrl(path) {
+    const basePath = window.APP_BASE_PATH || '';
+    return basePath + path;
+}
+
 // localStorage key for TTS settings
 const TTS_SETTINGS_KEY = 'biblio_audiobook_builder_tts_settings';
 
@@ -335,7 +341,7 @@ class App {
     // WebSocket connection
     connectWebSocket() {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/api/ws`;
+        const wsUrl = `${protocol}//${window.location.host}${apiUrl('/api/ws')}`;
 
         this.ws = new WebSocket(wsUrl);
 
@@ -408,7 +414,7 @@ class App {
     // API calls
     async loadConfig() {
         try {
-            const response = await fetch('/api/config');
+            const response = await fetch(apiUrl('/api/config'));
             const config = await response.json();
             
             // Use saved speed/pitch from localStorage if available, otherwise use server defaults
@@ -427,7 +433,7 @@ class App {
     // Refresh a provider's voice list from the server
     async refreshProvider(providerId) {
         try {
-            const response = await fetch(`/api/providers/${providerId}/refresh`, {
+            const response = await fetch(apiUrl(`/api/providers/${providerId}/refresh`), {
                 method: 'POST'
             });
             if (response.ok) {
@@ -446,7 +452,7 @@ class App {
 
     async loadProviders() {
         try {
-            const response = await fetch('/api/providers');
+            const response = await fetch(apiUrl('/api/providers'));
             const data = await response.json();
             this.providers = data.providers || [];
             
@@ -492,7 +498,7 @@ class App {
     async loadLanguages() {
         try {
             const provider = this.providerSelect.value;
-            const response = await fetch(`/api/languages?provider=${provider}`);
+            const response = await fetch(apiUrl(`/api/languages?provider=${provider}`));
             const data = await response.json();
             const languages = data.languages || [];
 
@@ -530,7 +536,7 @@ class App {
         try {
             const provider = this.providerSelect.value;
             const language = this.languageSelect.value;
-            const response = await fetch(`/api/models?provider=${provider}&language=${language}`);
+            const response = await fetch(apiUrl(`/api/models?provider=${provider}&language=${language}`));
             const data = await response.json();
             const models = data.models || [];
 
@@ -574,7 +580,7 @@ class App {
             const language = this.languageSelect.value;
             const model = this.modelSelect.value;
             
-            const response = await fetch(`/api/voices?provider=${provider}&language=${language}&model=${model}`);
+            const response = await fetch(apiUrl(`/api/voices?provider=${provider}&language=${language}&model=${model}`));
             const data = await response.json();
             this.voices = data.voices || [];
 
@@ -612,7 +618,7 @@ class App {
 
     async loadJobs() {
         try {
-            const response = await fetch('/api/jobs');
+            const response = await fetch(apiUrl('/api/jobs'));
             const jobs = await response.json();
             
             this.jobs.clear();
@@ -760,7 +766,7 @@ class App {
                 reject(new Error('Upload cancelled'));
             });
 
-            xhr.open('POST', '/api/preview');
+            xhr.open('POST', apiUrl('/api/preview'));
             xhr.send(formData);
         });
     }
@@ -817,7 +823,7 @@ class App {
         }
 
         try {
-            const response = await fetch(`/api/pricing?provider=${provider}&chars=${chars}`);
+            const response = await fetch(apiUrl(`/api/pricing?provider=${provider}&chars=${chars}`));
             const data = await response.json();
 
             if (!data.models || data.models.length === 0) {
@@ -864,7 +870,7 @@ class App {
         this.confirmConvertBtn.innerHTML = '<span class="spinner">⏳</span> Starting...';
 
         try {
-            const response = await fetch('/api/opds/convert', {
+            const response = await fetch(apiUrl('/api/opds/convert'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -981,7 +987,7 @@ class App {
                 reject(new Error('Upload cancelled'));
             });
 
-            xhr.open('POST', '/api/upload');
+            xhr.open('POST', apiUrl('/api/upload'));
             xhr.send(formData);
         });
     }
@@ -1174,7 +1180,7 @@ class App {
         if (!confirm('Are you sure you want to delete this job?')) return;
 
         try {
-            const response = await fetch(`/api/jobs/${id}`, {
+            const response = await fetch(apiUrl(`/api/jobs/${id}`), {
                 method: 'DELETE'
             });
 
@@ -1240,7 +1246,7 @@ class App {
 
     async loadSettings() {
         try {
-            const response = await fetch('/api/settings');
+            const response = await fetch(apiUrl('/api/settings'));
             if (response.ok) {
                 this.settings = await response.json();
             }
@@ -1289,7 +1295,7 @@ class App {
         if (!tbody) return;
         
         try {
-            const response = await fetch('/api/providers');
+            const response = await fetch(apiUrl('/api/providers'));
             const data = await response.json();
             this.providersData = data.providers || [];
             
@@ -1418,7 +1424,7 @@ class App {
         }
         
         try {
-            const response = await fetch(`/api/providers/${providerId}`, {
+            const response = await fetch(apiUrl(`/api/providers/${providerId}`), {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updateData)
@@ -1458,7 +1464,7 @@ class App {
         }
         
         try {
-            const response = await fetch(`/api/providers/${providerId}/test`, {
+            const response = await fetch(apiUrl(`/api/providers/${providerId}/test`), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(testData)
@@ -1513,7 +1519,7 @@ class App {
         try {
             const settings = this.collectSettingsForm();
             
-            const response = await fetch('/api/settings', {
+            const response = await fetch(apiUrl('/api/settings'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(settings)
@@ -1550,7 +1556,7 @@ class App {
         this.absConnectionResult.className = 'connection-result';
 
         try {
-            const response = await fetch('/api/settings/test-audiobookshelf', {
+            const response = await fetch(apiUrl('/api/settings/test-audiobookshelf'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ url, user, password })
@@ -1584,7 +1590,7 @@ class App {
         this.openTTSConnectionResult.className = 'connection-result';
 
         try {
-            const response = await fetch('/api/settings/test-opentts', {
+            const response = await fetch(apiUrl('/api/settings/test-opentts'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ url })
@@ -1618,7 +1624,7 @@ class App {
         this.rhvoiceConnectionResult.className = 'connection-result';
 
         try {
-            const response = await fetch('/api/settings/test-rhvoice', {
+            const response = await fetch(apiUrl('/api/settings/test-rhvoice'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ url })
@@ -1652,7 +1658,7 @@ class App {
         this.sileroConnectionResult.className = 'connection-result';
 
         try {
-            const response = await fetch('/api/settings/test-silero', {
+            const response = await fetch(apiUrl('/api/settings/test-silero'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ url })
@@ -1738,7 +1744,7 @@ class App {
         this.testVoiceAudio.style.display = 'none';
 
         try {
-            const response = await fetch('/api/test-voice', {
+            const response = await fetch(apiUrl('/api/test-voice'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ provider, voice, text, speed, pitch })
@@ -1780,7 +1786,7 @@ class App {
     // OPDS Methods
     async loadOPDSSources() {
         try {
-            const response = await fetch('/api/opds/sources');
+            const response = await fetch(apiUrl('/api/opds/sources'));
             if (response.ok) {
                 const data = await response.json();
                 this.opdsSources = data.sources || [];
@@ -1835,11 +1841,11 @@ class App {
         this.showOPDSLoading(true);
 
         try {
-            let apiUrl = `/api/opds/browse?url=${encodeURIComponent(url)}`;
+            let browseUrl = apiUrl(`/api/opds/browse?url=${encodeURIComponent(url)}`);
             if (this.currentOPDSSourceId) {
-                apiUrl += `&source_id=${encodeURIComponent(this.currentOPDSSourceId)}`;
+                browseUrl += `&source_id=${encodeURIComponent(this.currentOPDSSourceId)}`;
             }
-            const response = await fetch(apiUrl);
+            const response = await fetch(browseUrl);
             if (!response.ok) {
                 const data = await response.json();
                 throw new Error(data.error || 'Failed to fetch catalog');
@@ -2050,7 +2056,7 @@ class App {
                 type: searchType
             });
 
-            const response = await fetch(`/api/opds/search?${params}`);
+            const response = await fetch(apiUrl(`/api/opds/search?${params}`));
             if (!response.ok) {
                 const error = await response.json();
                 throw new Error(error.error || 'Search failed');
@@ -2209,7 +2215,7 @@ class App {
         this.showToast('Downloading book...', 'info');
 
         try {
-            const response = await fetch('/api/opds/download', {
+            const response = await fetch(apiUrl('/api/opds/download'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -2319,7 +2325,7 @@ class App {
 
         try {
             const isEdit = id !== '';
-            const endpoint = isEdit ? `/api/opds/sources/${id}` : '/api/opds/sources';
+            const endpoint = isEdit ? apiUrl(`/api/opds/sources/${id}`) : apiUrl('/api/opds/sources');
             const method = isEdit ? 'PUT' : 'POST';
             
             const body = { name, url, description, username, enabled };
@@ -2370,7 +2376,7 @@ class App {
         resultEl.className = 'connection-result';
 
         try {
-            const response = await fetch('/api/opds/test', {
+            const response = await fetch(apiUrl('/api/opds/test'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ url, username, password })
@@ -2394,7 +2400,7 @@ class App {
         if (!confirm('Are you sure you want to delete this source?')) return;
 
         try {
-            const response = await fetch(`/api/opds/sources/${id}`, {
+            const response = await fetch(apiUrl(`/api/opds/sources/${id}`), {
                 method: 'DELETE'
             });
 
