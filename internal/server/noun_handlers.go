@@ -62,15 +62,17 @@ func (s *Server) handleNouns(w http.ResponseWriter, r *http.Request) {
 
 // handleNoun handles operations on a specific noun
 func (s *Server) handleNoun(w http.ResponseWriter, r *http.Request) {
-	// Extract noun ID from path: /api/nouns/{id}
+	// Extract noun ID from path: {basePath}/api/nouns/{id}
 	path := r.URL.Path
+	// Find the position of "/api/nouns/" in the path
 	prefix := "/api/nouns/"
-	if len(path) <= len(prefix) {
+	idx := strings.Index(path, prefix)
+	if idx == -1 || len(path) <= idx+len(prefix) {
 		http.Error(w, "Noun ID required", http.StatusBadRequest)
 		return
 	}
 
-	idStr := path[len(prefix):]
+	idStr := path[idx+len(prefix):]
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid noun ID", http.StatusBadRequest)

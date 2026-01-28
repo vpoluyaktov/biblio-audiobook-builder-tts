@@ -333,21 +333,23 @@ func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 
 // handleJob handles operations on a specific job
 func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
-	// Extract job ID from path: /api/jobs/{id} or /api/jobs/{id}/download
+	// Extract job ID from path: {basePath}/api/jobs/{id} or {basePath}/api/jobs/{id}/download
 	path := r.URL.Path
+	// Find the position of "/api/jobs/" in the path
 	prefix := "/api/jobs/"
-	if len(path) <= len(prefix) {
+	idx := strings.Index(path, prefix)
+	if idx == -1 || len(path) <= idx+len(prefix) {
 		http.Error(w, "Job ID required", http.StatusBadRequest)
 		return
 	}
 
-	remaining := path[len(prefix):]
+	remaining := path[idx+len(prefix):]
 	var jobID string
 	var action string
 
-	if idx := indexOf(remaining, "/"); idx != -1 {
-		jobID = remaining[:idx]
-		action = remaining[idx+1:]
+	if slashIdx := strings.Index(remaining, "/"); slashIdx != -1 {
+		jobID = remaining[:slashIdx]
+		action = remaining[slashIdx+1:]
 	} else {
 		jobID = remaining
 	}
@@ -779,21 +781,23 @@ func (s *Server) handleProviderByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract provider ID and action from path: /api/providers/{id} or /api/providers/{id}/test
+	// Extract provider ID and action from path: {basePath}/api/providers/{id} or {basePath}/api/providers/{id}/test
 	path := r.URL.Path
+	// Find the position of "/api/providers/" in the path
 	prefix := "/api/providers/"
-	if len(path) <= len(prefix) {
+	idx := strings.Index(path, prefix)
+	if idx == -1 || len(path) <= idx+len(prefix) {
 		http.Error(w, "Provider ID required", http.StatusBadRequest)
 		return
 	}
 
-	remaining := path[len(prefix):]
+	remaining := path[idx+len(prefix):]
 	var providerID string
 	var action string
 
-	if idx := indexOf(remaining, "/"); idx != -1 {
-		providerID = remaining[:idx]
-		action = remaining[idx+1:]
+	if slashIdx := strings.Index(remaining, "/"); slashIdx != -1 {
+		providerID = remaining[:slashIdx]
+		action = remaining[slashIdx+1:]
 	} else {
 		providerID = remaining
 	}
@@ -1690,19 +1694,26 @@ func (s *Server) handlePreviewByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse path: /api/preview/{id} or /api/preview/{id}/cover
+	// Parse path: {basePath}/api/preview/{id} or {basePath}/api/preview/{id}/cover
 	path := r.URL.Path
-	path = path[len("/api/preview/"):]
+	// Find the position of "/api/preview/" in the path
+	prefix := "/api/preview/"
+	idx := strings.Index(path, prefix)
+	if idx == -1 {
+		http.Error(w, "Invalid preview path", http.StatusBadRequest)
+		return
+	}
+	remaining := path[idx+len(prefix):]
 
 	// Check if this is a cover request
-	if len(path) > 6 && path[len(path)-6:] == "/cover" {
-		id := path[:len(path)-6]
+	if len(remaining) > 6 && remaining[len(remaining)-6:] == "/cover" {
+		id := remaining[:len(remaining)-6]
 		s.servePreviewCover(w, r, id)
 		return
 	}
 
 	// Get preview by ID
-	id := path
+	id := remaining
 	preview, exists := s.previewStore.GetPreview(id)
 	if !exists {
 		s.jsonError(w, http.StatusNotFound, "Preview not found")
