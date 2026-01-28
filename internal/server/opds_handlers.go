@@ -68,18 +68,20 @@ func (s *Server) handleOPDSSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract source ID from path: /api/opds/sources/{id}
+	// Extract source ID from path: {basePath}/api/opds/sources/{id}
 	path := r.URL.Path
+	// Find the position of "/api/opds/sources/" in the path
 	prefix := "/api/opds/sources/"
-	if len(path) <= len(prefix) {
+	idx := strings.Index(path, prefix)
+	if idx == -1 || len(path) <= idx+len(prefix) {
 		http.Error(w, "Source ID required", http.StatusBadRequest)
 		return
 	}
 
-	sourceID := path[len(prefix):]
+	sourceID := path[idx+len(prefix):]
 	// Remove any trailing path segments
-	if idx := strings.Index(sourceID, "/"); idx != -1 {
-		sourceID = sourceID[:idx]
+	if slashIdx := strings.Index(sourceID, "/"); slashIdx != -1 {
+		sourceID = sourceID[:slashIdx]
 	}
 
 	switch r.Method {
