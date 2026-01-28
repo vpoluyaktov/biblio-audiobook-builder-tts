@@ -13,6 +13,10 @@ import (
 func FileName(name string) string {
 	// Replace characters problematic for file systems and shell/ffmpeg arguments
 	replacer := strings.NewReplacer(
+		// Problematic substrings (must be before single-character replacements)
+		"...", "_", // Triple dot ellipsis (problematic for some audiobook servers)
+		"..", "_", // Double dot (parent directory reference)
+
 		// File system reserved characters
 		"/", "_",
 		"\\", "_",

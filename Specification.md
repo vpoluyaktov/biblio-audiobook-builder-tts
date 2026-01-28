@@ -335,4 +335,17 @@ remaining := path[idx+len(prefix):]  // Finds prefix position first
 
 ---
 
+### fix/sanitize-ellipsis - Ellipsis in Filenames (2026-01-28)
+
+**Problem**: Book titles starting with `...` (ellipsis) created problematic file paths that some audiobook servers (like Audiobookshelf) couldn't handle properly. Example: `...И двадцать четыре жемчужины` would create paths like `/data/И_двадцать_четыре_жемчужины/Людмила_Васильева_-_...И_двадцать_четыре_жемчужины, Part 1.m4b`.
+
+**Solution**: Added `...` (triple dot ellipsis) and `..` (double dot) to the list of sanitized substrings in the filename sanitizer. These are replaced with underscores, which are then collapsed with other underscores and trimmed from the ends.
+
+**Files Changed**:
+- `internal/sanitize/filename.go` - Added `...` and `..` to the `strings.NewReplacer` list
+
+**Impact**: Audiobook files with ellipsis in their titles will now have clean, compatible filenames.
+
+---
+
 *Last updated: 2026-01-28*
