@@ -271,4 +271,39 @@ abb-tts:
 
 ---
 
-*Last updated: 2026-01-25*
+### fix/path-based-routing - Handler Path Parsing (2026-01-28)
+
+**Problem**: When using path-based routing with a base path (e.g., `/abb-tts`), several API handlers were failing with errors like "Unknown action" (400) or "Provider not found" (404). This specifically affected the Silero TTS provider configuration in the settings window, where testing the connection and saving provider settings would fail.
+
+**Root Cause**: Multiple request handlers were using incorrect path parsing logic that assumed the URL path started with the API prefix (e.g., `/api/providers/`), but when a base path was configured, the actual path was `/abb-tts/api/providers/...`. The handlers were slicing the path at the wrong position, causing incorrect extraction of IDs and actions.
+
+**Solution**:
+- Updated `handleJob()` to use `strings.Index()` to find `/api/jobs/` prefix position
+- Updated `handleProviderByID()` to use `strings.Index()` to find `/api/providers/` prefix position
+- Updated `handlePreviewByID()` to use `strings.Index()` to find `/api/preview/` prefix position
+- Updated `handleNoun()` to use `strings.Index()` to find `/api/nouns/` prefix position
+- All handlers now correctly extract remaining path segments after finding the prefix, regardless of base path
+
+**Example Fix**:
+```go
+// Before (incorrect):
+remaining := path[len(prefix):]  // Assumes path starts with prefix
+
+// After (correct):
+idx := strings.Index(path, prefix)
+if idx == -1 || len(path) <= idx+len(prefix) {
+    http.Error(w, "Invalid path", http.StatusBadRequest)
+    return
+}
+remaining := path[idx+len(prefix):]  // Finds prefix position first
+```
+
+**Files Changed**:
+- `internal/server/server.go` - Fixed `handleJob()`, `handleProviderByID()`, `handlePreviewByID()`
+- `internal/server/noun_handlers.go` - Fixed `handleNoun()`
+
+**Impact**: Resolves all path-based routing issues for provider configuration, job management, preview operations, and noun dictionary management when using a base path.
+
+---
+
+*Last updated: 2026-01-28*
