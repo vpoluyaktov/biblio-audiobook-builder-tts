@@ -527,7 +527,7 @@ func (s *Server) handleOPDSDownload(w http.ResponseWriter, r *http.Request) {
 		if req.SourceID != "" {
 			sourceParam = "&source_id=" + url.QueryEscape(req.SourceID)
 		}
-		preview.CoverImageURL = fmt.Sprintf("/api/opds/proxy?url=%s%s", url.QueryEscape(req.CoverURL), sourceParam)
+		preview.CoverImageURL = fmt.Sprintf("%s/api/opds/proxy?url=%s%s", s.cfg.BasePath, url.QueryEscape(req.CoverURL), sourceParam)
 	}
 
 	logger.Info("Downloaded and parsed OPDS book: %s (%d chapters)", preview.BookTitle, preview.TotalChapters)
