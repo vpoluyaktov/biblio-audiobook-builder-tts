@@ -138,7 +138,7 @@ Each provider is stored in the `providers` table with:
 | `ABB_TTS_HOST` | Server host | `0.0.0.0` |
 | `ABB_TTS_PORT` | Server port | `9901` |
 | `ABB_TTS_SERVER_URL` | Silero TTS URL | `http://tts-silero:9902` |
-| `ABB_TTS_OPDS_SERVER_URL` | OPDS server URL | `http://opds-server:9903` |
+| `ABB_TTS_OPDS_SERVER_URL` | Biblio Catalog URL | `http://biblio-catalog:80/catalog` |
 
 ### Command Line Flags
 
@@ -210,7 +210,7 @@ abb-tts:
     - "9901:9901"
   environment:
     - ABB_TTS_SERVER_URL=http://tts-silero:9902
-    - ABB_TTS_OPDS_SERVER_URL=http://opds-server:9903
+    - ABB_TTS_OPDS_SERVER_URL=http://biblio-catalog:80/catalog
     - ABB_TTS_TEMP_DIR=/data
   volumes:
     - ./data/abb_tts/db:/db
@@ -226,7 +226,7 @@ abb-tts:
 | `ABB_TTS_TEMP_DIR` | Working directory for ebook downloads, chapter files, and audiobooks | `./temp` |
 | `ABB_TTS_LOG_FILE` | Log file path | `biblio-audiobook-builder-tts.log` |
 | `ABB_TTS_SERVER_URL` | Silero TTS server URL | `http://tts-silero:9902` |
-| `ABB_TTS_OPDS_SERVER_URL` | OPDS server URL | `http://opds-server:9903` |
+| `ABB_TTS_OPDS_SERVER_URL` | Biblio Catalog URL | `http://biblio-catalog:80/catalog` |
 
 ---
 
