@@ -1,6 +1,6 @@
 # Biblio Audiobook Builder TTS
 
-> Part of the [BiblioHub](https://github.com/vpoluyaktov/BiblioHub) application suite
+> Part of the [BiblioHub](https://github.com/vpoluyaktov/biblio-hub) application suite
 
 ## Overview
 
@@ -11,10 +11,10 @@
 - **Server-Client Architecture**: Offloads CPU-intensive TTS processing to a remote server
 - **Drop-and-Forget Model**: Start a conversion, close the browser, reconnect later to check progress
 - **Multi-Client Support**: Multiple users can upload, monitor, and download jobs simultaneously
-- **Multiple TTS Engines**: Local (eSpeak), cloud (Google, OpenAI, Azure), and self-hosted (Silero, OpenTTS, RHVoice)
+- **Multiple TTS Engines**: Local (eSpeak), cloud (Google, OpenAI), and self-hosted (Silero, OpenVoice, OpenTTS, RHVoice)
 - **Real-time Progress**: WebSocket-based live updates on conversion status
 - **M4B Output**: Generates audiobooks with chapter markers, metadata, and cover art
-- **OPDS Integration**: Browse and convert books directly from OPDS catalogs
+- **OPDS Integration**: Browse and convert books directly from Biblio Catalog via OPDS
 - **Audiobookshelf Integration**: Auto-upload completed audiobooks
 
 ## Architecture
@@ -136,8 +136,9 @@ Each provider is stored in the `providers` table with:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ABB_TTS_HOST` | Server host | `0.0.0.0` |
-| `ABB_TTS_PORT` | Server port | `9901` |
-| `ABB_TTS_SERVER_URL` | Silero TTS URL | `http://tts-silero:9902` |
+| `ABB_TTS_PORT` | Server port | `80` |
+| `ABB_TTS_BASE_PATH` | URL base path for path-based routing | `/abb-tts` |
+| `ABB_TTS_SERVER_URL` | Silero TTS URL | `http://tts-silero:80/tts-silero` |
 | `ABB_TTS_OPDS_SERVER_URL` | Biblio Catalog URL | `http://biblio-catalog:80/catalog` |
 
 ### Command Line Flags
@@ -201,151 +202,37 @@ Flags:
 
 ## Docker Deployment
 
-Part of BiblioHub Docker Swarm stack:
+Part of BiblioHub Docker Swarm stack. Access via `http://localhost:9900/abb-tts/`
 
 ```yaml
 abb-tts:
   image: vpoluyaktov/bibliohub-audiobook-builder-tts:dev-latest
-  ports:
-    - "9901:9901"
   environment:
-    - ABB_TTS_SERVER_URL=http://tts-silero:9902
+    - ABB_TTS_HOST=0.0.0.0
+    - ABB_TTS_PORT=80
+    - ABB_TTS_BASE_PATH=/abb-tts
+    - ABB_TTS_SERVER_URL=http://tts-silero:80/tts-silero
     - ABB_TTS_OPDS_SERVER_URL=http://biblio-catalog:80/catalog
     - ABB_TTS_TEMP_DIR=/data
+    - ABB_TTS_LOG_FILE=/logs/abb_tts.log
   volumes:
     - ./data/abb_tts/db:/db
-    - ./data/abb_tts/data:/data
+    - ./data/abb_tts/temp:/data
+    - ./data/abb_tts/logs:/logs
 ```
 
-### Environment Variables
+### Docker Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ABB_TTS_HOST` | Server host | `0.0.0.0` |
-| `ABB_TTS_PORT` | Server port | `9901` |
-| `ABB_TTS_TEMP_DIR` | Working directory for ebook downloads, chapter files, and audiobooks | `./temp` |
-| `ABB_TTS_LOG_FILE` | Log file path | `biblio-audiobook-builder-tts.log` |
-| `ABB_TTS_SERVER_URL` | Silero TTS server URL | `http://tts-silero:9902` |
+| `ABB_TTS_PORT` | Server port | `80` |
+| `ABB_TTS_BASE_PATH` | URL base path for path-based routing | `/abb-tts` |
+| `ABB_TTS_TEMP_DIR` | Working directory for ebook downloads, chapter files, and audiobooks | `/data` |
+| `ABB_TTS_LOG_FILE` | Log file path | `/logs/abb_tts.log` |
+| `ABB_TTS_SERVER_URL` | Silero TTS server URL | `http://tts-silero:80/tts-silero` |
 | `ABB_TTS_OPDS_SERVER_URL` | Biblio Catalog URL | `http://biblio-catalog:80/catalog` |
 
 ---
 
-## Recent Changes
-
-### fix/auto-detect-sample-rate (2026-01-25)
-
-**Problem**: M4B audiobooks were being encoded with incorrect pitch when the source WAV sample rate didn't match the configured output sample rate. For example, Silero TTS outputs at 48000 Hz, but the M4B builder was configured to use 44100 Hz, causing pitch to drop.
-
-**Solution**: 
-- Removed configurable `bit_rate_kbs` and `sample_rate_hz` settings from the application
-- M4B builder now auto-detects the sample rate from the first source WAV file
-- FFmpeg determines optimal bitrate automatically
-- Removed Audio Settings section from the Settings UI
-
-**Files Changed**:
-- `internal/audio/m4b.go` - Added `getAudioSampleRate()` function, auto-detect sample rate in `BuildFromFiles()`
-- `internal/storage/db.go` - Removed `BitRateKbs` and `SampleRateHz` from Config struct
-- `internal/config/config.go` - Removed bit rate and sample rate config fields
-- `internal/server/settings.go` - Removed bit rate and sample rate from settings API
-- `internal/server/worker.go` - Updated M4B options to not pass sample rate
-- `internal/server/templates/index.html` - Removed Audio Settings section from UI
-- `internal/server/assets/app.js` - Removed bit rate and sample rate from settings JS
-
----
-
-### fix/silent-wav-sample-rate (2026-01-25)
-
-**Problem**: Silent WAV files generated for empty chapters were hardcoded to 44100 Hz. When the first chapter of a book was empty (e.g., "Chapter 1" with no speakable content), the M4B auto-detection would pick up this 44100 Hz file instead of the TTS provider's actual sample rate (e.g., 48000 Hz for Silero), causing pitch issues in the final M4B audiobook.
-
-**Solution**:
-- Added `sample_rate` field to the `providers` table in the database schema
-- Set provider-specific sample rates: Silero (48000 Hz), OpenVoice/Google (44100 Hz), Azure/OpenAI/RHVoice (24000 Hz), eSpeak/OpenTTS (22050 Hz)
-- Updated silent WAV generation to use the provider's sample rate instead of hardcoded 44100 Hz
-- Added database migration to populate sample rates for existing providers
-
-**Files Changed**:
-- `internal/storage/db.go` - Added `sample_rate` column to providers table, added `SampleRate` field to `TTSProvider` struct, updated all SQL queries, added migration
-- `internal/server/worker.go` - Updated silent WAV generation to fetch and use provider's sample rate
-
-**Impact**: Ensures consistent sample rates throughout the audiobook conversion pipeline, preventing pitch distortion when books contain empty chapters.
-
----
-
-### fix/path-based-routing - Handler Path Parsing (2026-01-28)
-
-**Problem**: When using path-based routing with a base path (e.g., `/abb-tts`), several API handlers were failing with errors like "Unknown action" (400) or "Provider not found" (404). This specifically affected the Silero TTS provider configuration in the settings window, where testing the connection and saving provider settings would fail.
-
-**Root Cause**: Multiple request handlers were using incorrect path parsing logic that assumed the URL path started with the API prefix (e.g., `/api/providers/`), but when a base path was configured, the actual path was `/abb-tts/api/providers/...`. The handlers were slicing the path at the wrong position, causing incorrect extraction of IDs and actions.
-
-**Solution**:
-- Updated `handleJob()` to use `strings.Index()` to find `/api/jobs/` prefix position
-- Updated `handleProviderByID()` to use `strings.Index()` to find `/api/providers/` prefix position
-- Updated `handlePreviewByID()` to use `strings.Index()` to find `/api/preview/` prefix position
-- Updated `handleNoun()` to use `strings.Index()` to find `/api/nouns/` prefix position
-- All handlers now correctly extract remaining path segments after finding the prefix, regardless of base path
-
-**Example Fix**:
-```go
-// Before (incorrect):
-remaining := path[len(prefix):]  // Assumes path starts with prefix
-
-// After (correct):
-idx := strings.Index(path, prefix)
-if idx == -1 || len(path) <= idx+len(prefix) {
-    http.Error(w, "Invalid path", http.StatusBadRequest)
-    return
-}
-remaining := path[idx+len(prefix):]  // Finds prefix position first
-```
-
-**Files Changed**:
-- `internal/server/server.go` - Fixed `handleJob()`, `handleProviderByID()`, `handlePreviewByID()`
-- `internal/server/noun_handlers.go` - Fixed `handleNoun()`
-
-**Impact**: Resolves all path-based routing issues for provider configuration, job management, preview operations, and noun dictionary management when using a base path.
-
----
-
-### fix/opds-cover-image-url - OPDS Cover Image Display (2026-01-28)
-
-**Problem**: When downloading books from OPDS catalogs, the cover image was not displayed in the book preview dialog. The preview was returning a cover URL like `/api/preview/{id}/cover` which resulted in a 404 error, while the OPDS catalog's cover image was available and working through the proxy endpoint at `/api/opds/proxy?url=...`.
-
-**Root Cause**: The `handleOPDSDownload` endpoint was creating a preview from the downloaded book file, which attempted to extract the cover image from the book content. However, for OPDS books, the cover image URL from the OPDS catalog entry was not being passed through or utilized. The preview was setting `CoverImageURL` to `/api/preview/{id}/cover`, but this endpoint only works when the cover image is extracted from the book file and stored in the preview store. For OPDS books, the cover should use the catalog's cover URL through the proxy.
-
-**Solution**:
-- Modified the JavaScript `downloadAndConvert()` function to include the `cover_url` from the OPDS catalog entry in the download request
-- Updated the `handleOPDSDownload` endpoint to accept the `cover_url` parameter
-- When a cover URL is provided from OPDS, override the preview's `CoverImageURL` to use the proxy endpoint with proper URL encoding
-- Added `basePath` parameter to `PreviewStore` to ensure cover URLs for uploaded files also include the base path
-- Created `apiURL()` helper method in the `Server` struct to centralize base path handling in the backend
-- Frontend already had `apiUrl()` helper function that correctly handles base path for all API calls
-
-**Files Changed**:
-- `internal/server/assets/app.js` - Added `cover_url` field to the OPDS download request payload
-- `internal/server/opds_handlers.go` - Added `CoverURL` field to request struct, uses `apiURL()` helper for cover URL construction
-- `internal/server/preview.go` - Added `basePath` field to `PreviewStore`, updated `NewPreviewStore()` signature, fixed cover URL generation
-- `internal/server/server.go` - Added `apiURL()` helper method, updated `NewPreviewStore()` call to pass `basePath`
-- `internal/server/preview_test.go` - Updated all test calls to pass empty `basePath` parameter
-
-**Impact**: 
-- OPDS book previews now correctly display cover images from the OPDS catalog
-- Regular uploaded files also have correct cover URLs with base path
-- Centralized base path handling reduces code duplication and makes future maintenance easier
-- Both frontend and backend now have consistent helper methods for URL construction
-
----
-
-### fix/sanitize-ellipsis - Ellipsis in Filenames (2026-01-28)
-
-**Problem**: Book titles starting with `...` (ellipsis) created problematic file paths that some audiobook servers (like Audiobookshelf) couldn't handle properly. Example: `...И двадцать четыре жемчужины` would create paths like `/data/И_двадцать_четыре_жемчужины/Людмила_Васильева_-_...И_двадцать_четыре_жемчужины, Part 1.m4b`.
-
-**Solution**: Added `...` (triple dot ellipsis) and `..` (double dot) to the list of sanitized substrings in the filename sanitizer. These are replaced with underscores, which are then collapsed with other underscores and trimmed from the ends.
-
-**Files Changed**:
-- `internal/sanitize/filename.go` - Added `...` and `..` to the `strings.NewReplacer` list
-
-**Impact**: Audiobook files with ellipsis in their titles will now have clean, compatible filenames.
-
----
-
-*Last updated: 2026-01-28*
+*Last updated: 2026-01-29*

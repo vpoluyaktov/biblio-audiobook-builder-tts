@@ -1,79 +1,92 @@
 # Biblio Audiobook Builder TTS
 
-> Part of the [BiblioHub](https://github.com/vpoluyaktov/BiblioHub) application suite
+> Part of the [BiblioHub](https://github.com/vpoluyaktov/biblio-hub) application suite
 
 ## Description
 
-Biblio Audiobook Builder TTS is a powerful tool that converts electronic books in .epub and .fb2 formats into audiobooks using text-to-speech technology. It supports both local and cloud-based TTS services, allowing you to create high-quality audiobooks from your digital library.
+Biblio Audiobook Builder TTS is a server-based application that converts e-books (EPUB, FB2) into audiobooks using text-to-speech technology. It provides a web interface for uploading books, monitoring conversion progress, and downloading completed audiobooks.
 
 ## Features
-- TUI interface for easy interaction
-- Support for .epub and .fb2 book formats
-- Multiple TTS providers (local and cloud-based)
-- Customizable voice selection
-- Adjustable speech parameters (speed, pitch)
-- Audiobook metadata management
-- M4B audiobook format output
-- Integration with Audiobookshelf server
 
-## Installation
+- **Web Interface**: Upload books, monitor progress, download audiobooks
+- **Drop-and-Forget**: Start conversion, close browser, reconnect later
+- **Multiple TTS Engines**: Local (eSpeak), cloud (Google, OpenAI), self-hosted (Silero, OpenVoice)
+- **EPUB and FB2 Support**: Parse and convert popular e-book formats
+- **M4B Output**: Audiobooks with chapter markers, metadata, and cover art
+- **OPDS Integration**: Browse and convert books from Biblio Catalog
+- **Audiobookshelf Integration**: Auto-upload completed audiobooks
+- **Real-time Progress**: WebSocket-based live updates
+
+## Quick Start (Docker)
+
+The recommended way to run Audiobook Builder TTS is as part of the [BiblioHub](https://github.com/vpoluyaktov/biblio-hub) Docker Swarm stack:
+
+```bash
+# Clone BiblioHub and all service repositories
+git clone https://github.com/vpoluyaktov/biblio-hub.git
+git clone https://github.com/vpoluyaktov/biblio-audiobook-builder-tts.git
+git clone https://github.com/vpoluyaktov/biblio-tts-server-silero.git
+git clone https://github.com/vpoluyaktov/biblio-ebooks-catalog.git
+
+# Start the stack
+cd biblio-hub
+cp .env.example .env
+./scripts/start_stack.sh
+```
+
+Access at: `http://localhost:9900/abb-tts/`
+
+## Standalone Installation
 
 ### Prerequisites
 
-To use Audiobook Builder TTS, you need to have the following utilities installed:
+- **Go 1.21+**
+- **ffmpeg** and **ffprobe** (for audio processing)
 
-- **ffmpeg** (for audio processing)
-- **ffprobe** (for audio metadata)
-
-For Linux:
 ```bash
+# Linux
 sudo apt install ffmpeg
-```
 
-For MacOS (using Homebrew):
-```bash
+# macOS
 brew install ffmpeg
 ```
 
-For Windows, visit [ffmpeg website](https://ffmpeg.org/download.html) for installation instructions.
+### Build and Run
 
-## Build Instructions
+```bash
+git clone https://github.com/vpoluyaktov/biblio-audiobook-builder-tts.git
+cd biblio-audiobook-builder-tts
+go build
+./biblio-audiobook-builder-tts
+```
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/vpoluyaktov/biblio-audiobook-builder-tts.git
-   ```
-
-2. Ensure Go is installed on your system
-
-3. Build the application:
-   ```bash
-   cd biblio-audiobook-builder-tts
-   go build
-   ```
+The web interface will open at `http://localhost:9901`
 
 ## Configuration
 
-The application can be configured using the `biblio-audiobook-builder-tts.config.yaml` file. Key configuration options include:
+### Environment Variables
 
-- Log file location
-- Output directory for audiobooks
-- Temporary processing directory
-- Default TTS voice
-- Default TTS provider
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ABB_TTS_HOST` | Server host | `0.0.0.0` |
+| `ABB_TTS_PORT` | Server port | `9901` |
+| `ABB_TTS_BASE_PATH` | URL base path (for reverse proxy) | `/` |
+| `ABB_TTS_SERVER_URL` | Silero TTS server URL | - |
+| `ABB_TTS_OPDS_SERVER_URL` | Biblio Catalog URL | - |
 
-## Usage
+### Command Line Flags
 
-1. Run the application:
-   ```bash
-   ./biblio-audiobook-builder-tts
-   ```
+```bash
+./biblio-audiobook-builder-tts --port 8080 --no-browser --log-level DEBUG
+```
 
-2. Follow the TUI interface to:
-   - Select an input book file
-   - Choose TTS voice and provider
-   - Adjust speech parameters
-   - Generate the audiobook
+## Documentation
+
+See [Specification.md](Specification.md) for detailed technical documentation including:
+- REST API reference
+- TTS provider configuration
+- Project structure
+- Docker deployment details
 
 ## Contributing
 
