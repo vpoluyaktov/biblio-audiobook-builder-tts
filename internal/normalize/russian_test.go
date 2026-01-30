@@ -928,29 +928,29 @@ func TestRussianRomanNumerals(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "Часть I - cardinal feminine",
+			name:     "Часть I - ordinal feminine",
 			input:    "Часть I",
-			expected: "Часть одна",
+			expected: "Часть первая",
 		},
 		{
-			name:     "Часть II - cardinal feminine",
+			name:     "Часть II - ordinal feminine",
 			input:    "Часть II",
-			expected: "Часть две",
+			expected: "Часть вторая",
 		},
 		{
-			name:     "Глава III - cardinal feminine",
+			name:     "Глава III - ordinal feminine",
 			input:    "Глава III",
-			expected: "Глава три",
+			expected: "Глава третья",
 		},
 		{
-			name:     "Глава IX - cardinal feminine",
+			name:     "Глава IX - ordinal feminine",
 			input:    "Глава IX",
-			expected: "Глава девять",
+			expected: "Глава девятая",
 		},
 		{
-			name:     "Том V - cardinal masculine",
+			name:     "Том V - ordinal masculine",
 			input:    "Том V",
-			expected: "Том пять",
+			expected: "Том пятый",
 		},
 		{
 			name:     "I Глава - ordinal feminine",

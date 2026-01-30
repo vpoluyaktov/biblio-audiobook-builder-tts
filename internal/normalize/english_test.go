@@ -214,24 +214,24 @@ func TestEnglishRomanNumerals(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "Part I - cardinal",
+			name:     "Part I - ordinal",
 			input:    "Part I",
-			expected: "Part one",
+			expected: "Part first",
 		},
 		{
-			name:     "Part IV - cardinal",
+			name:     "Part IV - ordinal",
 			input:    "Part IV",
-			expected: "Part four",
+			expected: "Part fourth",
 		},
 		{
-			name:     "Chapter VII - cardinal",
+			name:     "Chapter VII - ordinal",
 			input:    "Chapter VII",
-			expected: "Chapter seven",
+			expected: "Chapter seventh",
 		},
 		{
-			name:     "Chapter X - cardinal",
+			name:     "Chapter X - ordinal",
 			input:    "Chapter X",
-			expected: "Chapter ten",
+			expected: "Chapter tenth",
 		},
 		{
 			name:     "I Chapter - ordinal",
@@ -246,7 +246,7 @@ func TestEnglishRomanNumerals(t *testing.T) {
 		{
 			name:     "Multiple parts",
 			input:    "Part I, Part II, Part III",
-			expected: "Part one, Part two, Part three",
+			expected: "Part first, Part second, Part third",
 		},
 	}
 

@@ -301,14 +301,15 @@ func ProcessRomanNumerals(text, lang string, converter NumberConverter, nounDB *
 		var ctx Context
 		switch position {
 		case RomanAfterNoun:
-			// "Part I", "Глава III" → cardinal with noun's gender
-			// For chapter/part titles, we typically want cardinal: "Part one", "Часть одна"
+			// "Part I", "Глава III" → use noun's trigger form (ordinal for chapters/parts)
+			// "Часть I" → "Часть первая", "Глава III" → "Глава третья"
 			ctx = Context{
-				Form:   Cardinal,
+				Form:   Ordinal,
 				Gender: Masculine,
 				Case:   Nominative,
 			}
 			if nounInfo != nil {
+				ctx.Form = nounInfo.TriggerForm
 				ctx.Gender = nounInfo.Gender
 			}
 
