@@ -983,3 +983,80 @@ func TestRussianRomanNumerals(t *testing.T) {
 		})
 	}
 }
+
+func TestRussianFindRomanNumerals(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []RomanMatch
+	}{
+		{
+			name:  "I Глава (Roman before noun)",
+			input: "I Глава",
+			expected: []RomanMatch{
+				{Start: 0, End: 1, Roman: "I", Value: 1, WordBefore: "", WordAfter: "Глава"},
+			},
+		},
+		{
+			name:  "Глава III",
+			input: "Глава III",
+			expected: []RomanMatch{
+				{Start: 11, End: 14, Roman: "III", Value: 3, WordBefore: "Глава", WordAfter: ""},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FindRomanNumerals(tt.input)
+			if len(result) != len(tt.expected) {
+				t.Errorf("FindRomanNumerals(%q) returned %d matches, want %d", tt.input, len(result), len(tt.expected))
+				return
+			}
+			for i, match := range result {
+				exp := tt.expected[i]
+				if match.Roman != exp.Roman || match.Value != exp.Value {
+					t.Errorf("FindRomanNumerals(%q)[%d] = {Roman: %q, Value: %d}, want {Roman: %q, Value: %d}",
+						tt.input, i, match.Roman, match.Value, exp.Roman, exp.Value)
+				}
+			}
+		})
+	}
+}
+
+func TestRussianDetermineRomanPosition(t *testing.T) {
+	nounDB := NewNounDatabase()
+
+	tests := []struct {
+		name         string
+		match        RomanMatch
+		expectedPos  RomanPosition
+		expectedNoun bool
+	}{
+		{
+			name:         "Глава III - after noun",
+			match:        RomanMatch{Roman: "III", Value: 3, WordBefore: "Глава", WordAfter: ""},
+			expectedPos:  RomanAfterNoun,
+			expectedNoun: true,
+		},
+		{
+			name:         "I Глава - before noun",
+			match:        RomanMatch{Roman: "I", Value: 1, WordBefore: "", WordAfter: "Глава"},
+			expectedPos:  RomanBeforeNoun,
+			expectedNoun: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pos, nounInfo := DetermineRomanPosition(tt.match, "ru", nounDB)
+			if pos != tt.expectedPos {
+				t.Errorf("DetermineRomanPosition() position = %v, want %v", pos, tt.expectedPos)
+			}
+			hasNoun := nounInfo != nil
+			if hasNoun != tt.expectedNoun {
+				t.Errorf("DetermineRomanPosition() hasNoun = %v, want %v", hasNoun, tt.expectedNoun)
+			}
+		})
+	}
+}
