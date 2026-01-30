@@ -11,26 +11,26 @@ const PartSeparatorMarker = "\n{{PART_SEPARATOR}}\n"
 
 // DefaultPartSeparatorPatterns contains common scene/part separator patterns
 var DefaultPartSeparatorPatterns = []string{
-	`^\s*\*\s*\*\s*\*\s*$`,     // * * *
-	`^\s*\*{3,}\s*$`,           // *** or more
-	`^\s*-\s*-\s*-\s*$`,        // - - -
-	`^\s*-{3,}\s*$`,            // --- or more
-	`^\s*•\s*•\s*•\s*$`,        // • • •
-	`^\s*~\s*~\s*~\s*$`,        // ~ ~ ~
-	`^\s*#\s*#\s*#\s*$`,        // # # #
-	`^\s*\.\s*\.\s*\.\s*$`,     // . . .
-	`^\s*○\s*○\s*○\s*$`,        // ○ ○ ○
-	`^\s*●\s*●\s*●\s*$`,        // ● ● ●
-	`^\s*◆\s*◆\s*◆\s*$`,        // ◆ ◆ ◆
-	`^\s*◇\s*◇\s*◇\s*$`,        // ◇ ◇ ◇
-	`^\s*□\s*□\s*□\s*$`,        // □ □ □
-	`^\s*■\s*■\s*■\s*$`,        // ■ ■ ■
-	`^\s*☆\s*☆\s*☆\s*$`,        // ☆ ☆ ☆
-	`^\s*★\s*★\s*★\s*$`,        // ★ ★ ★
-	`^\s*×\s*×\s*×\s*$`,        // × × ×
-	`^\s*\+\s*\+\s*\+\s*$`,     // + + +
-	`^\s*=\s*=\s*=\s*$`,        // = = =
-	`^\s*_{3,}\s*$`,            // ___ or more
+	`^\s*\*\s*\*\s*\*\s*$`, // * * *
+	`^\s*\*{3,}[.\s]*$`,    // *** or more (with optional trailing period/spaces)
+	`^\s*-\s*-\s*-\s*$`,    // - - -
+	`^\s*-{3,}[.\s]*$`,     // --- or more (with optional trailing period/spaces)
+	`^\s*•\s*•\s*•\s*$`,    // • • •
+	`^\s*~\s*~\s*~\s*$`,    // ~ ~ ~
+	`^\s*#\s*#\s*#\s*$`,    // # # #
+	`^\s*\.\s*\.\s*\.\s*$`, // . . .
+	`^\s*○\s*○\s*○\s*$`,    // ○ ○ ○
+	`^\s*●\s*●\s*●\s*$`,    // ● ● ●
+	`^\s*◆\s*◆\s*◆\s*$`,    // ◆ ◆ ◆
+	`^\s*◇\s*◇\s*◇\s*$`,    // ◇ ◇ ◇
+	`^\s*□\s*□\s*□\s*$`,    // □ □ □
+	`^\s*■\s*■\s*■\s*$`,    // ■ ■ ■
+	`^\s*☆\s*☆\s*☆\s*$`,    // ☆ ☆ ☆
+	`^\s*★\s*★\s*★\s*$`,    // ★ ★ ★
+	`^\s*×\s*×\s*×\s*$`,    // × × ×
+	`^\s*\+\s*\+\s*\+\s*$`, // + + +
+	`^\s*=\s*=\s*=\s*$`,    // = = =
+	`^\s*_{3,}\s*$`,        // ___ or more
 }
 
 // PartSeparatorDetector detects and marks part/scene separators in text

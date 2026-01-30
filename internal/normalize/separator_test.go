@@ -23,6 +23,11 @@ func TestPartSeparatorDetector_DetectAndMark(t *testing.T) {
 			expected: "First part.\n" + PartSeparatorMarker + "\nSecond part.",
 		},
 		{
+			name:     "triple asterisks with period",
+			input:    "Part one.\n***.\nPart two.",
+			expected: "Part one.\n" + PartSeparatorMarker + "\nPart two.",
+		},
+		{
 			name:     "dashes with spaces",
 			input:    "First part.\n- - -\nSecond part.",
 			expected: "First part.\n" + PartSeparatorMarker + "\nSecond part.",
