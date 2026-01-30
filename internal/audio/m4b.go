@@ -160,15 +160,33 @@ func (b *M4BBuilder) buildChapterList(audioFiles []string) ([]Chapter, error) {
 }
 
 // createConcatFile creates the ffmpeg concat demuxer file
+// If GapBetweenChaps is set, it generates and inserts silence audio files between chapters
 func (b *M4BBuilder) createConcatFile(audioFiles []string, outputPath string) error {
 	var lines []string
-	for _, file := range audioFiles {
+
+	// Generate silence file if gap is configured
+	var silenceFile string
+	if b.options.GapBetweenChaps > 0 {
+		silenceFile = filepath.Join(b.tempDir, "silence.wav")
+		if err := GenerateSilentWAV(b.options.GapBetweenChaps, silenceFile, b.sampleRate); err != nil {
+			return fmt.Errorf("failed to generate silence file: %w", err)
+		}
+	}
+
+	for i, file := range audioFiles {
 		// FFmpeg concat demuxer requires escaping of special characters:
 		// - backslash must be escaped first (\ -> \\)
 		// - single quote must be escaped (' -> \')
 		escaped := strings.ReplaceAll(file, "\\", "\\\\")
 		escaped = strings.ReplaceAll(escaped, "'", "\\'")
 		lines = append(lines, fmt.Sprintf("file '%s'", escaped))
+
+		// Insert silence between chapters (not after the last one)
+		if silenceFile != "" && i < len(audioFiles)-1 {
+			escapedSilence := strings.ReplaceAll(silenceFile, "\\", "\\\\")
+			escapedSilence = strings.ReplaceAll(escapedSilence, "'", "\\'")
+			lines = append(lines, fmt.Sprintf("file '%s'", escapedSilence))
+		}
 	}
 	content := strings.Join(lines, "\n")
 	return ioutil.WriteFile(outputPath, []byte(content), 0644)

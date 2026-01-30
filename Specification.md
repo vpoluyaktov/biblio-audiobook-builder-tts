@@ -173,6 +173,7 @@ Flags:
 - Settings UI with provider management
 - SQLite persistence
 - Silent audio generation for chapters with no speakable content (maintains chapter alignment)
+- Chapter gap silence insertion (configurable via `chapter_gap_seconds` setting)
 
 ### In Progress 🔄
 
@@ -235,4 +236,4 @@ abb-tts:
 
 ---
 
-*Last updated: 2026-01-29*
+*Last updated: 2026-01-30*
