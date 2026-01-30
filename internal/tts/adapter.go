@@ -135,8 +135,12 @@ func (a *Adapter) ConvertToSpeech(text string, voice string, options *Conversion
 		// Apply SSML wrapping per-chunk if provider supports it
 		chunkToConvert := chunk
 		if options != nil && options.SSMLSupport {
-			chunkToConvert = ssml.WrapTextInSSML(chunk, options.UseSentencePauses)
-			logger.Debug("Applied SSML wrapping to chunk %d/%d (sentence pauses: %v)", i+1, len(chunks), options.UseSentencePauses)
+			chunkToConvert = ssml.WrapTextInSSMLWithOptions(chunk, ssml.SSMLOptions{
+				UseSentencePauses:     options.UseSentencePauses,
+				ConvertDashesToBreaks: options.ConvertDashesToBreaks,
+				DashBreakDurationMs:   options.DashBreakDurationMs,
+			})
+			logger.Debug("Applied SSML wrapping to chunk %d/%d (sentence pauses: %v, dash breaks: %v)", i+1, len(chunks), options.UseSentencePauses, options.ConvertDashesToBreaks)
 		}
 
 		// Convert this chunk with retry logic for transient failures
@@ -230,8 +234,12 @@ func (a *Adapter) ConvertToSpeechWithChunks(text string, voice string, options *
 		// Apply SSML wrapping per-chunk if provider supports it
 		chunkToConvert := chunk
 		if options != nil && options.SSMLSupport {
-			chunkToConvert = ssml.WrapTextInSSML(chunk, options.UseSentencePauses)
-			logger.Debug("Applied SSML wrapping to chunk %d/%d (sentence pauses: %v)", i+1, len(chunks), options.UseSentencePauses)
+			chunkToConvert = ssml.WrapTextInSSMLWithOptions(chunk, ssml.SSMLOptions{
+				UseSentencePauses:     options.UseSentencePauses,
+				ConvertDashesToBreaks: options.ConvertDashesToBreaks,
+				DashBreakDurationMs:   options.DashBreakDurationMs,
+			})
+			logger.Debug("Applied SSML wrapping to chunk %d/%d (sentence pauses: %v, dash breaks: %v)", i+1, len(chunks), options.UseSentencePauses, options.ConvertDashesToBreaks)
 		}
 
 		// Convert this chunk with retry logic for transient failures

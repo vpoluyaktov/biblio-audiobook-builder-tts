@@ -34,15 +34,16 @@ type JobDB interface {
 
 // Worker processes conversion jobs from the queue
 type Worker struct {
-	db         JobDB
-	hub        *Hub
-	ttsService tts.Service
-	cfg        *config.Config
-	sanitizer  *sanitize.TextSanitizer
-	normalizer *normalize.Processor
-	ctx        context.Context
-	cancel     context.CancelFunc
-	wg         sync.WaitGroup
+	db                JobDB
+	hub               *Hub
+	ttsService        tts.Service
+	cfg               *config.Config
+	sanitizer         *sanitize.TextSanitizer
+	normalizer        *normalize.Processor
+	separatorDetector *normalize.PartSeparatorDetector
+	ctx               context.Context
+	cancel            context.CancelFunc
+	wg                sync.WaitGroup
 }
 
 // NewWorker creates a new job worker
@@ -67,15 +68,23 @@ func NewWorker(db JobDB, hub *Hub, ttsService tts.Service, cfg *config.Config) *
 		}
 	}
 
+	// Initialize part separator detector if enabled
+	var separatorDetector *normalize.PartSeparatorDetector
+	if cfg.DetectPartSeparators {
+		separatorDetector = normalize.NewPartSeparatorDetector()
+		logger.Info("Part separator detection enabled")
+	}
+
 	return &Worker{
-		db:         db,
-		hub:        hub,
-		ttsService: ttsService,
-		cfg:        cfg,
-		sanitizer:  textSanitizer,
-		normalizer: normalize.NewProcessor(),
-		ctx:        ctx,
-		cancel:     cancel,
+		db:                db,
+		hub:               hub,
+		ttsService:        ttsService,
+		cfg:               cfg,
+		sanitizer:         textSanitizer,
+		normalizer:        normalize.NewProcessor(),
+		separatorDetector: separatorDetector,
+		ctx:               ctx,
+		cancel:            cancel,
 	}
 }
 
@@ -401,6 +410,11 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 	// Apply text sanitization (pronunciation rules) to chapter content
 	content = w.sanitizer.Sanitize(content)
 
+	// Detect and mark part separators if enabled
+	if w.separatorDetector != nil {
+		content = w.separatorDetector.DetectAndMark(content)
+	}
+
 	// Note: SSML wrapping is applied per-chunk in the TTS adapter, not here
 	// This allows proper chunking of long chapters before SSML tags are added
 
@@ -446,6 +460,17 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		return result
 	}
 
+	// Check if provider supports SSML
+	ssmlSupport := false
+	if providerInfo := w.ttsService.GetProviderInfo(job.Provider); providerInfo != nil {
+		ssmlSupport = providerInfo.SSMLSupport
+	}
+
+	// Check if content has part separators that need silence insertion
+	if normalize.HasPartSeparators(content) {
+		return w.convertChapterWithParts(job, chapter, content, index, outputDir, workerID, ssmlSupport)
+	}
+
 	// Progress callback for per-chunk updates
 	progressCb := func(chunkIndex, totalChunks int, chunkText string) {
 		job.SetWorkerProgress(workerID, index, chapter.Title, chunkIndex+1, totalChunks)
@@ -453,21 +478,17 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		w.saveJob(job) // Save to database so TUI can see worker progress
 	}
 
-	// Check if provider supports SSML
-	ssmlSupport := false
-	if providerInfo := w.ttsService.GetProviderInfo(job.Provider); providerInfo != nil {
-		ssmlSupport = providerInfo.SSMLSupport
-	}
-
 	// Convert chapter with progress tracking
 	reader, err := w.ttsService.ConvertToSpeechWithProgress(content, &tts.ConversionOptions{
-		Voice:             job.Voice,
-		Provider:          job.Provider,
-		Speed:             job.Speed,
-		Pitch:             job.Pitch,
-		Language:          job.Language,
-		SSMLSupport:       ssmlSupport,
-		UseSentencePauses: job.UseSentencePauses,
+		Voice:                 job.Voice,
+		Provider:              job.Provider,
+		Speed:                 job.Speed,
+		Pitch:                 job.Pitch,
+		Language:              job.Language,
+		SSMLSupport:           ssmlSupport,
+		UseSentencePauses:     job.UseSentencePauses,
+		ConvertDashesToBreaks: w.cfg.ConvertDashesToBreaks,
+		DashBreakDurationMs:   w.cfg.DashBreakDurationMs,
 	}, progressCb)
 	if err != nil {
 		result.Error = fmt.Errorf("TTS conversion failed: %v", err)
@@ -492,6 +513,153 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 
 	// Mark worker as done with this chapter
 	job.ClearWorkerProgress(workerID)
+
+	result.OutputPath = outputPath
+	return result
+}
+
+// convertChapterWithParts handles chapters that contain part separators
+// It splits the content, generates TTS for each part, inserts silence between parts,
+// and concatenates the audio files into a single chapter audio file
+func (w *Worker) convertChapterWithParts(job *Job, chapter parser.Chapter, content string, index int, outputDir string, workerID int, ssmlSupport bool) ChapterResult {
+	result := ChapterResult{Index: index}
+
+	// Split content at separator markers
+	parts := normalize.SplitByMarker(content)
+	numParts := len(parts)
+
+	logger.Info("Chapter %d (%s) has %d parts separated by scene breaks", index+1, chapter.Title, numParts)
+
+	// Get provider's sample rate for silence generation
+	sampleRate := 48000
+	if providerInfo := w.ttsService.GetProviderInfo(job.Provider); providerInfo != nil {
+		if db, ok := w.db.(*storage.DB); ok {
+			if dbProvider, err := db.GetProvider(providerInfo.ID); err == nil && dbProvider != nil && dbProvider.SampleRate > 0 {
+				sampleRate = dbProvider.SampleRate
+			}
+		}
+	}
+
+	// Determine silence duration between parts
+	partGapSeconds := w.cfg.PartGapSeconds
+	if partGapSeconds <= 0 {
+		partGapSeconds = w.cfg.ChapterGapSeconds // Fall back to chapter gap
+	}
+	if partGapSeconds <= 0 {
+		partGapSeconds = 2 // Default 2 seconds
+	}
+
+	// Create temp directory for part files
+	partsDir := filepath.Join(outputDir, fmt.Sprintf("chapter_%02d_parts", index+1))
+	if err := os.MkdirAll(partsDir, 0755); err != nil {
+		result.Error = fmt.Errorf("failed to create parts directory: %v", err)
+		return result
+	}
+	defer os.RemoveAll(partsDir) // Clean up temp parts directory
+
+	// Generate silence file for between parts
+	silenceFile := filepath.Join(partsDir, "silence.wav")
+	if err := audio.GenerateSilentWAV(time.Duration(partGapSeconds)*time.Second, silenceFile, sampleRate); err != nil {
+		result.Error = fmt.Errorf("failed to generate silence file: %v", err)
+		return result
+	}
+
+	// Process each part and collect audio files
+	var audioFiles []string
+	lang := job.Language
+	if lang == "" {
+		lang = "en"
+	}
+
+	for partIdx, partContent := range parts {
+		// Skip empty parts
+		if strings.TrimSpace(partContent) == "" {
+			continue
+		}
+
+		// Check if part has speakable content
+		if !sanitize.HasSpeakableContentForLanguage(partContent, lang) {
+			logger.Debug("Part %d of chapter %d has no speakable content, skipping", partIdx+1, index+1)
+			continue
+		}
+
+		// Progress callback for this part
+		progressCb := func(chunkIndex, totalChunks int, chunkText string) {
+			// Show progress as "part X of Y, chunk Z of N"
+			overallProgress := partIdx*100/numParts + (chunkIndex+1)*100/(numParts*totalChunks)
+			job.SetWorkerProgress(workerID, index, fmt.Sprintf("%s (part %d/%d)", chapter.Title, partIdx+1, numParts), overallProgress, 100)
+			w.broadcastJobProgress(job)
+		}
+
+		// Convert part to speech
+		reader, err := w.ttsService.ConvertToSpeechWithProgress(partContent, &tts.ConversionOptions{
+			Voice:                 job.Voice,
+			Provider:              job.Provider,
+			Speed:                 job.Speed,
+			Pitch:                 job.Pitch,
+			Language:              job.Language,
+			SSMLSupport:           ssmlSupport,
+			UseSentencePauses:     job.UseSentencePauses,
+			ConvertDashesToBreaks: w.cfg.ConvertDashesToBreaks,
+			DashBreakDurationMs:   w.cfg.DashBreakDurationMs,
+		}, progressCb)
+		if err != nil {
+			result.Error = fmt.Errorf("TTS conversion failed for part %d: %v", partIdx+1, err)
+			return result
+		}
+
+		// Save part audio file
+		partFileName := fmt.Sprintf("part_%02d.wav", partIdx+1)
+		partPath := filepath.Join(partsDir, partFileName)
+
+		partFile, err := os.Create(partPath)
+		if err != nil {
+			result.Error = fmt.Errorf("failed to create part file: %v", err)
+			return result
+		}
+
+		if _, err := partFile.ReadFrom(reader); err != nil {
+			partFile.Close()
+			result.Error = fmt.Errorf("failed to write part audio: %v", err)
+			return result
+		}
+		partFile.Close()
+
+		// Add part audio to list
+		audioFiles = append(audioFiles, partPath)
+
+		// Add silence between parts (not after the last part)
+		if partIdx < numParts-1 {
+			audioFiles = append(audioFiles, silenceFile)
+		}
+	}
+
+	// If no audio files were generated, create a silent placeholder
+	if len(audioFiles) == 0 {
+		chapterFileName := fmt.Sprintf("%02d_%s.wav", index+1, sanitizeFileName(chapter.Title))
+		outputPath := filepath.Join(outputDir, chapterFileName)
+		if err := audio.GenerateSilentWAV(1*time.Second, outputPath, sampleRate); err != nil {
+			result.Error = fmt.Errorf("failed to generate silent audio: %v", err)
+			return result
+		}
+		result.OutputPath = outputPath
+		result.Skipped = true
+		return result
+	}
+
+	// Concatenate all parts into final chapter audio
+	chapterFileName := fmt.Sprintf("%02d_%s.wav", index+1, sanitizeFileName(chapter.Title))
+	outputPath := filepath.Join(outputDir, chapterFileName)
+
+	if err := audio.ConcatWAVFiles(audioFiles, outputPath); err != nil {
+		result.Error = fmt.Errorf("failed to concatenate parts: %v", err)
+		return result
+	}
+
+	// Mark worker as done with this chapter
+	job.ClearWorkerProgress(workerID)
+
+	logger.Info("Chapter %d (%s) converted with %d parts and silence gaps", index+1, chapter.Title, numParts)
 
 	result.OutputPath = outputPath
 	return result
