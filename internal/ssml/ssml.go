@@ -178,20 +178,38 @@ func escapeXML(text string) string {
 	return text
 }
 
-// PausePattern defines a pattern that should be converted to an SSML break
-type PausePattern struct {
-	Pattern     *regexp.Regexp
-	Replacement string // What to replace with (use %s for break tag placeholder)
+// PausePatternDef defines a pattern that should be converted to an SSML break
+// Pattern is a regex string, Replacement uses %s as placeholder for break tag
+type PausePatternDef struct {
+	Pattern     string
+	Replacement string
 }
 
-// DefaultPausePatterns contains patterns that should trigger pauses in TTS
+// DefaultPausePatternDefs contains patterns that should trigger pauses in TTS
 // These are applied in order, so more specific patterns should come first
-var DefaultPausePatterns = []PausePattern{
+var DefaultPausePatternDefs = []PausePatternDef{
 	// Ellipsis: "..." or "…" - adds pause after ellipsis
-	{regexp.MustCompile(`\.{3,}`), `...%s`},
-	{regexp.MustCompile(`…`), `…%s`},
+	{`\.{3,}`, `...%s`},
+	{`…`, `…%s`},
 	// Inline dashes: " - ", " — ", " – " (with surrounding spaces)
-	{regexp.MustCompile(`\s+[-—–]\s+`), ` %s `},
+	{`\s+[-—–]\s+`, ` %s `},
+}
+
+// compiledPausePatterns holds the compiled regex patterns (initialized once)
+var compiledPausePatterns []struct {
+	Pattern     *regexp.Regexp
+	Replacement string
+}
+
+func init() {
+	compiledPausePatterns = make([]struct {
+		Pattern     *regexp.Regexp
+		Replacement string
+	}, len(DefaultPausePatternDefs))
+	for i, def := range DefaultPausePatternDefs {
+		compiledPausePatterns[i].Pattern = regexp.MustCompile(def.Pattern)
+		compiledPausePatterns[i].Replacement = def.Replacement
+	}
 }
 
 // breakPlaceholder is used to protect break tags from XML escaping
@@ -204,7 +222,7 @@ func ConvertPausePatterns(text string, breakDurationMs int) string {
 		breakDurationMs = 300 // Default 300ms pause
 	}
 
-	for _, p := range DefaultPausePatterns {
+	for _, p := range compiledPausePatterns {
 		replacement := strings.Replace(p.Replacement, "%s", breakPlaceholder, 1)
 		text = p.Pattern.ReplaceAllString(text, replacement)
 	}
