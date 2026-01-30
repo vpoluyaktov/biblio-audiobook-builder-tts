@@ -1279,6 +1279,8 @@ class App {
         document.getElementById('cfg-chapter-gap').value = s.chapter_gap_seconds || 2;
         document.getElementById('cfg-max-file-size').value = s.max_file_size_mb || 250;
         document.getElementById('cfg-concurrent-encoders').value = s.concurrent_encoders || 2;
+        document.getElementById('cfg-detect-part-separators').checked = s.detect_part_separators !== false;
+        document.getElementById('cfg-part-gap').value = s.part_gap_seconds || 2;
         
         // Audiobookshelf tab
         document.getElementById('cfg-abs-url').value = s.audiobookshelf_url || '';
@@ -1506,6 +1508,8 @@ class App {
             chapter_gap_seconds: parseInt(document.getElementById('cfg-chapter-gap').value),
             max_file_size_mb: parseInt(document.getElementById('cfg-max-file-size').value),
             concurrent_encoders: parseInt(document.getElementById('cfg-concurrent-encoders').value),
+            detect_part_separators: document.getElementById('cfg-detect-part-separators').checked,
+            part_gap_seconds: parseInt(document.getElementById('cfg-part-gap').value),
             
             // Audiobookshelf
             audiobookshelf_url: document.getElementById('cfg-abs-url').value,

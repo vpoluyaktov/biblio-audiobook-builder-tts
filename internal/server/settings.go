@@ -28,8 +28,10 @@ type SettingsRequest struct {
 	PronunciationDictFile   string  `json:"pronunciation_dict_file"`
 
 	// Output
-	ChapterGapSeconds int `json:"chapter_gap_seconds"`
-	MaxFileSizeMB     int `json:"max_file_size_mb"`
+	ChapterGapSeconds    int  `json:"chapter_gap_seconds"`
+	PartGapSeconds       int  `json:"part_gap_seconds"`
+	DetectPartSeparators bool `json:"detect_part_separators"`
+	MaxFileSizeMB        int  `json:"max_file_size_mb"`
 
 	// Performance
 	ConcurrentEncoders int `json:"concurrent_encoders"`
@@ -77,8 +79,10 @@ func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
 		PronunciationDictFile:   s.cfg.PronunciationDictFile,
 
 		// Output
-		ChapterGapSeconds: s.cfg.ChapterGapSeconds,
-		MaxFileSizeMB:     s.cfg.MaxFileSizeMB,
+		ChapterGapSeconds:    s.cfg.ChapterGapSeconds,
+		PartGapSeconds:       s.cfg.PartGapSeconds,
+		DetectPartSeparators: s.cfg.DetectPartSeparators,
+		MaxFileSizeMB:        s.cfg.MaxFileSizeMB,
 
 		// Performance
 		ConcurrentEncoders: s.cfg.ConcurrentEncoders,
@@ -165,6 +169,12 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 	if wasProvided("chapter_gap_seconds") {
 		s.cfg.ChapterGapSeconds = req.ChapterGapSeconds
 	}
+	if wasProvided("part_gap_seconds") {
+		s.cfg.PartGapSeconds = req.PartGapSeconds
+	}
+	if wasProvided("detect_part_separators") {
+		s.cfg.DetectPartSeparators = req.DetectPartSeparators
+	}
 	if wasProvided("max_file_size_mb") {
 		s.cfg.MaxFileSizeMB = req.MaxFileSizeMB
 	}
@@ -204,6 +214,8 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 			"default_speed":             {fmt.Sprintf("%.2f", req.DefaultSpeed), wasProvided("default_speed")},
 			"default_pitch":             {fmt.Sprintf("%.2f", req.DefaultPitch), wasProvided("default_pitch")},
 			"chapter_gap_seconds":       {fmt.Sprintf("%d", req.ChapterGapSeconds), wasProvided("chapter_gap_seconds")},
+			"part_gap_seconds":          {fmt.Sprintf("%d", req.PartGapSeconds), wasProvided("part_gap_seconds")},
+			"detect_part_separators":    {fmt.Sprintf("%t", req.DetectPartSeparators), wasProvided("detect_part_separators")},
 			"pronunciation_dict_file":   {req.PronunciationDictFile, wasProvided("pronunciation_dict_file")},
 			"use_default_pronunciation": {fmt.Sprintf("%t", req.UseDefaultPronunciation), wasProvided("use_default_pronunciation")},
 			"max_file_size_mb":          {fmt.Sprintf("%d", req.MaxFileSizeMB), wasProvided("max_file_size_mb")},

@@ -458,6 +458,22 @@
                             <small>Number of parallel M4B encoders</small>
                         </div>
                     </div>
+                    <div class="settings-section">
+                        <h3>📖 Part Separator Detection</h3>
+                        <p class="section-description">
+                            Detect scene breaks (*** --- etc.) within chapters and insert silence between parts.
+                        </p>
+                        <div class="form-group checkbox-group">
+                            <input type="checkbox" id="cfg-detect-part-separators" checked>
+                            <label for="cfg-detect-part-separators">Enable Part Separator Detection</label>
+                            <small>Automatically detect and add pauses at scene breaks like *** or ---</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="cfg-part-gap">Gap Between Parts (seconds)</label>
+                            <input type="number" id="cfg-part-gap" min="0" max="10" value="2">
+                            <small>Silence duration inserted between detected parts/scenes</small>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Audiobookshelf Tab -->
