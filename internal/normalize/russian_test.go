@@ -918,3 +918,145 @@ func TestRussianFallbackGenderDetection(t *testing.T) {
 		})
 	}
 }
+
+func TestRussianRomanNumerals(t *testing.T) {
+	p := NewProcessor()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Часть I - ordinal feminine",
+			input:    "Часть I",
+			expected: "Часть первая",
+		},
+		{
+			name:     "Часть II - ordinal feminine",
+			input:    "Часть II",
+			expected: "Часть вторая",
+		},
+		{
+			name:     "Глава III - ordinal feminine",
+			input:    "Глава III",
+			expected: "Глава третья",
+		},
+		{
+			name:     "Глава IX - ordinal feminine",
+			input:    "Глава IX",
+			expected: "Глава девятая",
+		},
+		{
+			name:     "Том V - ordinal masculine",
+			input:    "Том V",
+			expected: "Том пятый",
+		},
+		{
+			name:     "I Глава - ordinal feminine",
+			input:    "I Глава",
+			expected: "первая Глава",
+		},
+		{
+			name:     "II Часть - ordinal feminine",
+			input:    "II Часть",
+			expected: "вторая Часть",
+		},
+		{
+			name:     "III Том - ordinal masculine",
+			input:    "III Том",
+			expected: "третий Том",
+		},
+		{
+			name:     "IX Глава - ordinal feminine",
+			input:    "IX Глава",
+			expected: "девятая Глава",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := p.Process(tt.input, "ru")
+			if result != tt.expected {
+				t.Errorf("Process(%q, ru) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestRussianFindRomanNumerals(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []RomanMatch
+	}{
+		{
+			name:  "I Глава (Roman before noun)",
+			input: "I Глава",
+			expected: []RomanMatch{
+				{Start: 0, End: 1, Roman: "I", Value: 1, WordBefore: "", WordAfter: "Глава"},
+			},
+		},
+		{
+			name:  "Глава III",
+			input: "Глава III",
+			expected: []RomanMatch{
+				{Start: 11, End: 14, Roman: "III", Value: 3, WordBefore: "Глава", WordAfter: ""},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FindRomanNumerals(tt.input)
+			if len(result) != len(tt.expected) {
+				t.Errorf("FindRomanNumerals(%q) returned %d matches, want %d", tt.input, len(result), len(tt.expected))
+				return
+			}
+			for i, match := range result {
+				exp := tt.expected[i]
+				if match.Roman != exp.Roman || match.Value != exp.Value {
+					t.Errorf("FindRomanNumerals(%q)[%d] = {Roman: %q, Value: %d}, want {Roman: %q, Value: %d}",
+						tt.input, i, match.Roman, match.Value, exp.Roman, exp.Value)
+				}
+			}
+		})
+	}
+}
+
+func TestRussianDetermineRomanPosition(t *testing.T) {
+	nounDB := NewNounDatabase()
+
+	tests := []struct {
+		name         string
+		match        RomanMatch
+		expectedPos  RomanPosition
+		expectedNoun bool
+	}{
+		{
+			name:         "Глава III - after noun",
+			match:        RomanMatch{Roman: "III", Value: 3, WordBefore: "Глава", WordAfter: ""},
+			expectedPos:  RomanAfterNoun,
+			expectedNoun: true,
+		},
+		{
+			name:         "I Глава - before noun",
+			match:        RomanMatch{Roman: "I", Value: 1, WordBefore: "", WordAfter: "Глава"},
+			expectedPos:  RomanBeforeNoun,
+			expectedNoun: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pos, nounInfo := DetermineRomanPosition(tt.match, "ru", nounDB)
+			if pos != tt.expectedPos {
+				t.Errorf("DetermineRomanPosition() position = %v, want %v", pos, tt.expectedPos)
+			}
+			hasNoun := nounInfo != nil
+			if hasNoun != tt.expectedNoun {
+				t.Errorf("DetermineRomanPosition() hasNoun = %v, want %v", hasNoun, tt.expectedNoun)
+			}
+		})
+	}
+}

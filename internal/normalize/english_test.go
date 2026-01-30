@@ -204,3 +204,143 @@ func BenchmarkEnglishOrdinal(b *testing.B) {
 		}
 	})
 }
+
+func TestEnglishRomanNumerals(t *testing.T) {
+	p := NewProcessor()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Part I - cardinal",
+			input:    "Part I",
+			expected: "Part one",
+		},
+		{
+			name:     "Part IV - cardinal",
+			input:    "Part IV",
+			expected: "Part four",
+		},
+		{
+			name:     "Chapter VII - cardinal",
+			input:    "Chapter VII",
+			expected: "Chapter seven",
+		},
+		{
+			name:     "Chapter X - cardinal",
+			input:    "Chapter X",
+			expected: "Chapter ten",
+		},
+		{
+			name:     "I Chapter - ordinal",
+			input:    "I Chapter",
+			expected: "first Chapter",
+		},
+		{
+			name:     "III Part - ordinal",
+			input:    "III Part",
+			expected: "third Part",
+		},
+		{
+			name:     "Multiple parts",
+			input:    "Part I, Part II, Part III",
+			expected: "Part one, Part two, Part three",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := p.Process(tt.input, "en")
+			if result != tt.expected {
+				t.Errorf("Process(%q, en) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestEnglishFindRomanNumerals(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []RomanMatch
+	}{
+		{
+			name:  "Part I",
+			input: "Part I",
+			expected: []RomanMatch{
+				{Start: 5, End: 6, Roman: "I", Value: 1, WordBefore: "Part", WordAfter: ""},
+			},
+		},
+		{
+			name:  "Chapter VII",
+			input: "Chapter VII",
+			expected: []RomanMatch{
+				{Start: 8, End: 11, Roman: "VII", Value: 7, WordBefore: "Chapter", WordAfter: ""},
+			},
+		},
+		{
+			name:  "Multiple Roman numerals",
+			input: "Part I and Part II",
+			expected: []RomanMatch{
+				{Start: 5, End: 6, Roman: "I", Value: 1, WordBefore: "Part", WordAfter: "and"},
+				{Start: 16, End: 18, Roman: "II", Value: 2, WordBefore: "Part", WordAfter: ""},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FindRomanNumerals(tt.input)
+			if len(result) != len(tt.expected) {
+				t.Errorf("FindRomanNumerals(%q) returned %d matches, want %d", tt.input, len(result), len(tt.expected))
+				return
+			}
+			for i, match := range result {
+				exp := tt.expected[i]
+				if match.Roman != exp.Roman || match.Value != exp.Value {
+					t.Errorf("FindRomanNumerals(%q)[%d] = {Roman: %q, Value: %d}, want {Roman: %q, Value: %d}",
+						tt.input, i, match.Roman, match.Value, exp.Roman, exp.Value)
+				}
+			}
+		})
+	}
+}
+
+func TestEnglishDetermineRomanPosition(t *testing.T) {
+	nounDB := NewNounDatabase()
+
+	tests := []struct {
+		name         string
+		match        RomanMatch
+		expectedPos  RomanPosition
+		expectedNoun bool
+	}{
+		{
+			name:         "Part I - after noun",
+			match:        RomanMatch{Roman: "I", Value: 1, WordBefore: "Part", WordAfter: ""},
+			expectedPos:  RomanAfterNoun,
+			expectedNoun: true,
+		},
+		{
+			name:         "I Chapter - before noun",
+			match:        RomanMatch{Roman: "I", Value: 1, WordBefore: "", WordAfter: "Chapter"},
+			expectedPos:  RomanBeforeNoun,
+			expectedNoun: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pos, nounInfo := DetermineRomanPosition(tt.match, "en", nounDB)
+			if pos != tt.expectedPos {
+				t.Errorf("DetermineRomanPosition() position = %v, want %v", pos, tt.expectedPos)
+			}
+			hasNoun := nounInfo != nil
+			if hasNoun != tt.expectedNoun {
+				t.Errorf("DetermineRomanPosition() hasNoun = %v, want %v", hasNoun, tt.expectedNoun)
+			}
+		})
+	}
+}

@@ -174,6 +174,7 @@ Flags:
 - SQLite persistence
 - Silent audio generation for chapters with no speakable content (maintains chapter alignment)
 - Chapter gap silence insertion (configurable via `chapter_gap_seconds` setting)
+- Roman numeral normalization for chapter/part titles (I, II, III, IV, etc.)
 
 ### In Progress 🔄
 
