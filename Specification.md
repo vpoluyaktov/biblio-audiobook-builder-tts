@@ -176,6 +176,7 @@ Flags:
 - Chapter gap silence insertion (configurable via `chapter_gap_seconds` setting)
 - Roman numeral normalization for chapter/part titles (I, II, III, IV, etc.)
 - Part separator silence detection (detects `***`, `---`, `• • •`, etc. and inserts silence between parts)
+- SSML pause patterns for dashes and ellipsis (converts ` - ` and `...` to `<break>` tags for TTS)
 
 ### In Progress 🔄
 
@@ -318,6 +319,50 @@ var DefaultPartSeparatorPatterns = []string{
 4. Each part is converted to speech separately
 5. Silence audio (duration: `PartGapSeconds`) is inserted between parts
 6. All parts are concatenated into the final chapter audio file
+
+---
+
+## Feature: SSML Pause Patterns ✅ IMPLEMENTED
+
+### Problem Statement
+
+Some TTS providers don't naturally pause on certain punctuation marks like inline dashes (`цель - дыра`) or ellipsis (`там... были`). This results in words running together without natural pauses.
+
+### Solution
+
+Convert pause-triggering punctuation to SSML `<break>` tags when the TTS provider supports SSML.
+
+**Status**: ✅ Implemented
+
+**Files modified/created**:
+- `internal/ssml/ssml.go` - Added `DefaultPausePatternDefs` and pause conversion logic
+- `internal/config/config.go` - Added `ConvertDashesToBreaks` and `DashBreakDurationMs` config fields
+- `internal/storage/db.go` - Added storage support for new config fields
+- `internal/server/settings.go` - Added UI settings support
+- `internal/server/templates/index.html` - Added "Dash Pause (SSML)" settings section
+
+**Configuration**:
+```go
+ConvertDashesToBreaks   bool    `mapstructure:"convert_dashes_to_breaks"`  // Enable pause conversion (default: true)
+DashBreakDurationMs     int     `mapstructure:"dash_break_duration_ms"`    // Pause duration in ms (default: 300)
+```
+
+**Pause patterns**:
+```go
+var DefaultPausePatternDefs = []PausePatternDef{
+    // Ellipsis: "..." or "…" - adds pause after ellipsis
+    {`\.{3,}`, `...%s`},
+    {`…`, `…%s`},
+    // Inline dashes: " - ", " — ", " – " (with surrounding spaces)
+    {`\s+[-—–]\s+`, ` %s `},
+}
+```
+
+**How it works**:
+1. When `ConvertDashesToBreaks` is enabled and the TTS provider supports SSML
+2. Text is scanned for pause patterns (dashes, ellipsis)
+3. Patterns are replaced with the original punctuation plus a `<break time="Xms"/>` tag
+4. Example: `"цель - дыра"` → `"цель <break time="300ms"/> дыра"`
 
 ---
 
