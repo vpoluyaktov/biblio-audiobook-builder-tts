@@ -178,22 +178,44 @@ func escapeXML(text string) string {
 	return text
 }
 
-// inlineDashPattern matches inline dashes used as em-dashes (with surrounding spaces)
-// Matches: " - " (space-hyphen-space), " — " (em-dash), " – " (en-dash)
-var inlineDashPattern = regexp.MustCompile(`\s+[-—–]\s+`)
+// PausePattern defines a pattern that should be converted to an SSML break
+type PausePattern struct {
+	Pattern     *regexp.Regexp
+	Replacement string // What to replace with (use %s for break tag placeholder)
+}
 
-// dashBreakPlaceholder is used to protect break tags from XML escaping
-const dashBreakPlaceholder = "\x01BREAK\x01"
+// DefaultPausePatterns contains patterns that should trigger pauses in TTS
+// These are applied in order, so more specific patterns should come first
+var DefaultPausePatterns = []PausePattern{
+	// Ellipsis: "..." or "…" - adds pause after ellipsis
+	{regexp.MustCompile(`\.{3,}`), `...%s`},
+	{regexp.MustCompile(`…`), `…%s`},
+	// Inline dashes: " - ", " — ", " – " (with surrounding spaces)
+	{regexp.MustCompile(`\s+[-—–]\s+`), ` %s `},
+}
 
-// ConvertDashesToBreaks replaces inline dashes with SSML break tags
-// This helps TTS engines that don't naturally pause on dashes
-// The break duration is configurable (default 300ms for a natural pause)
-func ConvertDashesToBreaks(text string, breakDurationMs int) string {
+// breakPlaceholder is used to protect break tags from XML escaping
+const breakPlaceholder = "\x01BREAK\x01"
+
+// ConvertPausePatterns replaces pause patterns with SSML break tags
+// This helps TTS engines that don't naturally pause on certain punctuation
+func ConvertPausePatterns(text string, breakDurationMs int) string {
 	if breakDurationMs <= 0 {
 		breakDurationMs = 300 // Default 300ms pause
 	}
-	breakTag := fmt.Sprintf(`<break time="%dms"/>`, breakDurationMs)
-	return inlineDashPattern.ReplaceAllString(text, " "+breakTag+" ")
+
+	for _, p := range DefaultPausePatterns {
+		replacement := strings.Replace(p.Replacement, "%s", breakPlaceholder, 1)
+		text = p.Pattern.ReplaceAllString(text, replacement)
+	}
+
+	return text
+}
+
+// ConvertDashesToBreaks is kept for backward compatibility
+// Deprecated: Use ConvertPausePatterns instead
+func ConvertDashesToBreaks(text string, breakDurationMs int) string {
+	return ConvertPausePatterns(text, breakDurationMs)
 }
 
 // ConvertDashesToBreaksDefault uses the default 300ms break duration
@@ -201,22 +223,28 @@ func ConvertDashesToBreaksDefault(text string) string {
 	return ConvertDashesToBreaks(text, 300)
 }
 
-// escapeXMLWithDashBreaks escapes XML but preserves dash-to-break conversions
-// It first replaces dashes with placeholders, escapes XML, then restores break tags
-func escapeXMLWithDashBreaks(text string, breakDurationMs int) string {
+// escapeXMLWithPauseBreaks escapes XML but preserves pause pattern-to-break conversions
+// It first replaces pause patterns with placeholders, escapes XML, then restores break tags
+func escapeXMLWithPauseBreaks(text string, breakDurationMs int) string {
 	if breakDurationMs <= 0 {
 		breakDurationMs = 300
 	}
 
-	// Replace inline dashes with placeholder
-	text = inlineDashPattern.ReplaceAllString(text, " "+dashBreakPlaceholder+" ")
+	// Replace pause patterns with placeholder
+	text = ConvertPausePatterns(text, breakDurationMs)
 
 	// Escape XML characters
 	text = escapeXML(text)
 
 	// Restore break tags (placeholders are not affected by XML escaping)
 	breakTag := fmt.Sprintf(`<break time="%dms"/>`, breakDurationMs)
-	text = strings.ReplaceAll(text, dashBreakPlaceholder, breakTag)
+	text = strings.ReplaceAll(text, breakPlaceholder, breakTag)
 
 	return text
+}
+
+// escapeXMLWithDashBreaks is kept for backward compatibility
+// Deprecated: Use escapeXMLWithPauseBreaks instead
+func escapeXMLWithDashBreaks(text string, breakDurationMs int) string {
+	return escapeXMLWithPauseBreaks(text, breakDurationMs)
 }

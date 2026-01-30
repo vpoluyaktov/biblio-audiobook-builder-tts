@@ -205,6 +205,31 @@ func TestWrapTextInSSMLWithOptions_DashesToBreaks(t *testing.T) {
 	if strings.Contains(resultDisabled, "<break") {
 		t.Errorf("Break tag should not be present when disabled, got: %s", resultDisabled)
 	}
+
+	// Test ellipsis conversion
+	inputEllipsis := "Если бы там... были просто люди"
+	resultEllipsis := WrapTextInSSMLWithOptions(inputEllipsis, SSMLOptions{
+		UseSentencePauses:     false,
+		ConvertDashesToBreaks: true,
+		DashBreakDurationMs:   300,
+	})
+	if !strings.Contains(resultEllipsis, `<break time="300ms"/>`) {
+		t.Errorf("Expected break tag after ellipsis, got: %s", resultEllipsis)
+	}
+	if !strings.Contains(resultEllipsis, "...") {
+		t.Errorf("Ellipsis should be preserved, got: %s", resultEllipsis)
+	}
+
+	// Test unicode ellipsis
+	inputUnicodeEllipsis := "Мягкие… податливые тела"
+	resultUnicodeEllipsis := WrapTextInSSMLWithOptions(inputUnicodeEllipsis, SSMLOptions{
+		UseSentencePauses:     false,
+		ConvertDashesToBreaks: true,
+		DashBreakDurationMs:   300,
+	})
+	if !strings.Contains(resultUnicodeEllipsis, `<break time="300ms"/>`) {
+		t.Errorf("Expected break tag after unicode ellipsis, got: %s", resultUnicodeEllipsis)
+	}
 }
 
 func TestSplitIntoParagraphs(t *testing.T) {
