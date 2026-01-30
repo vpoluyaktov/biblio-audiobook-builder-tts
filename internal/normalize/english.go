@@ -42,8 +42,17 @@ var (
 	}
 )
 
+// EnglishProcessor implements LanguageProcessor for English-specific text processing.
+type EnglishProcessor struct {
+	nounDB *NounDatabase
+}
+
+// Ensure EnglishProcessor implements LanguageProcessor.
+var _ LanguageProcessor = (*EnglishProcessor)(nil)
+
 func init() {
 	Register(&EnglishConverter{})
+	RegisterLanguageProcessor("en", &EnglishProcessor{nounDB: NewNounDatabase()})
 }
 
 // LanguageCode returns the ISO 639-1 language code.
@@ -127,6 +136,47 @@ func (e *EnglishConverter) cardinalRecursive(n int64) string {
 		}
 		return trillions + " trillion " + e.cardinalRecursive(remainder)
 	}
+}
+
+// PreProcess handles English-specific preprocessing before number replacement.
+// It converts Roman numerals to Arabic numbers based on context.
+func (p *EnglishProcessor) PreProcess(text string, converter NumberConverter) string {
+	return ProcessRomanNumerals(text, "en", converter, p.nounDB)
+}
+
+// DetectContext determines grammatical context from surrounding words for English.
+// English doesn't have grammatical gender, so this mainly handles ordinal triggers.
+func (p *EnglishProcessor) DetectContext(wordBefore, wordAfter string, nounDB *NounDatabase) (Context, bool) {
+	ctx := DefaultContext()
+
+	// Check word before - handles patterns like "Chapter 5"
+	if wordBefore != "" {
+		if info, ok := nounDB.Lookup("en", wordBefore); ok {
+			ctx.Form = info.TriggerForm
+			return ctx, true
+		}
+	}
+
+	// Check word after - handles patterns like "5 dollars"
+	if wordAfter != "" {
+		if _, ok := nounDB.Lookup("en", wordAfter); ok {
+			ctx.Form = Cardinal
+			return ctx, true
+		}
+	}
+
+	return ctx, false
+}
+
+// PostProcessContext applies English-specific post-processing.
+// English doesn't need case transformations, so this is a no-op.
+func (p *EnglishProcessor) PostProcessContext(words string, ctx Context) string {
+	return words
+}
+
+// GetChapterGender returns Masculine as English doesn't have grammatical gender.
+func (p *EnglishProcessor) GetChapterGender() Gender {
+	return Masculine
 }
 
 // toOrdinal converts a number to ordinal words (first, second, third).

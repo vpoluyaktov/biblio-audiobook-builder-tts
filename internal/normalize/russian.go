@@ -88,14 +88,16 @@ var scaleOrdinalRU = map[Gender][]string{
 }
 
 // RussianProcessor implements LanguageProcessor for Russian-specific text processing.
-type RussianProcessor struct{}
+type RussianProcessor struct {
+	nounDB *NounDatabase
+}
 
 // Ensure RussianProcessor implements LanguageProcessor.
 var _ LanguageProcessor = (*RussianProcessor)(nil)
 
 func init() {
 	Register(&RussianConverter{})
-	RegisterLanguageProcessor("ru", &RussianProcessor{})
+	RegisterLanguageProcessor("ru", &RussianProcessor{nounDB: NewNounDatabase()})
 }
 
 // RussianOrdinalSuffixPattern matches Russian ordinal suffixes after numbers
@@ -776,11 +778,14 @@ func (r *RussianConverter) ordinalWithScale(n int64, gender Gender) string {
 }
 
 // PreProcess handles Russian-specific preprocessing before number replacement.
-// It processes ordinal suffixes like "1996-м году" and abbreviations like "гг." before general number processing.
+// It processes Roman numerals, ordinal suffixes like "1996-м году" and abbreviations like "гг." before general number processing.
 func (p *RussianProcessor) PreProcess(text string, converter NumberConverter) string {
 	result := text
 
-	// First, expand "гг." abbreviation to "годов"
+	// First, process Roman numerals (e.g., "Глава I" → "Глава одна", "I Глава" → "Первая Глава")
+	result = ProcessRomanNumerals(result, "ru", converter, p.nounDB)
+
+	// Expand "гг." abbreviation to "годов"
 	result = RussianYearAbbrevPattern.ReplaceAllString(result, "годов")
 
 	// Find all ordinal suffix matches from end to start
