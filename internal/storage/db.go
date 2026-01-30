@@ -37,6 +37,10 @@ type Config struct {
 	DefaultSpeed            float64 `json:"default_speed"`
 	DefaultPitch            float64 `json:"default_pitch"`
 	ChapterGapSeconds       int     `json:"chapter_gap_seconds"`
+	PartGapSeconds          int     `json:"part_gap_seconds"`
+	DetectPartSeparators    bool    `json:"detect_part_separators"`
+	ConvertDashesToBreaks   bool    `json:"convert_dashes_to_breaks"`
+	DashBreakDurationMs     int     `json:"dash_break_duration_ms"`
 	PronunciationDictFile   string  `json:"pronunciation_dict_file"`
 	UseDefaultPronunciation bool    `json:"use_default_pronunciation"`
 	MaxFileSizeMB           int     `json:"max_file_size_mb"`
@@ -327,6 +331,18 @@ func (db *DB) GetAllConfig() (*Config, error) {
 	if v, ok := configMap["chapter_gap_seconds"]; ok {
 		fmt.Sscanf(v, "%d", &cfg.ChapterGapSeconds)
 	}
+	if v, ok := configMap["part_gap_seconds"]; ok {
+		fmt.Sscanf(v, "%d", &cfg.PartGapSeconds)
+	}
+	if v, ok := configMap["detect_part_separators"]; ok {
+		cfg.DetectPartSeparators = v == "true"
+	}
+	if v, ok := configMap["convert_dashes_to_breaks"]; ok {
+		cfg.ConvertDashesToBreaks = v == "true"
+	}
+	if v, ok := configMap["dash_break_duration_ms"]; ok {
+		fmt.Sscanf(v, "%d", &cfg.DashBreakDurationMs)
+	}
 	if v, ok := configMap["pronunciation_dict_file"]; ok {
 		cfg.PronunciationDictFile = v
 	}
@@ -418,6 +434,10 @@ func DefaultConfig() *Config {
 		DefaultSpeed:            1.0,
 		DefaultPitch:            1.0,
 		ChapterGapSeconds:       2,
+		PartGapSeconds:          2,
+		DetectPartSeparators:    true,
+		ConvertDashesToBreaks:   true,
+		DashBreakDurationMs:     300,
 		PronunciationDictFile:   "",
 		UseDefaultPronunciation: true,
 		MaxFileSizeMB:           250,
@@ -1395,6 +1415,10 @@ func (c *Config) ToAppConfig() map[string]interface{} {
 		"default_speed":             c.DefaultSpeed,
 		"default_pitch":             c.DefaultPitch,
 		"chapter_gap_seconds":       c.ChapterGapSeconds,
+		"part_gap_seconds":          c.PartGapSeconds,
+		"detect_part_separators":    c.DetectPartSeparators,
+		"convert_dashes_to_breaks":  c.ConvertDashesToBreaks,
+		"dash_break_duration_ms":    c.DashBreakDurationMs,
 		"pronunciation_dict_file":   c.PronunciationDictFile,
 		"use_default_pronunciation": c.UseDefaultPronunciation,
 		"max_file_size_mb":          c.MaxFileSizeMB,
