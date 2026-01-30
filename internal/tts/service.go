@@ -41,13 +41,15 @@ type ProviderInfo struct {
 
 // ConversionOptions contains settings for TTS conversion
 type ConversionOptions struct {
-	Voice             string
-	Provider          string
-	Speed             float64
-	Pitch             float64
-	Language          string // ISO 639-1 language code (e.g., "en", "ru")
-	SSMLSupport       bool   // Whether to wrap chunks in SSML tags
-	UseSentencePauses bool   // Whether to add paragraph/sentence pauses (requires SSMLSupport)
+	Voice                 string
+	Provider              string
+	Speed                 float64
+	Pitch                 float64
+	Language              string // ISO 639-1 language code (e.g., "en", "ru")
+	SSMLSupport           bool   // Whether to wrap chunks in SSML tags
+	UseSentencePauses     bool   // Whether to add paragraph/sentence pauses (requires SSMLSupport)
+	ConvertDashesToBreaks bool   // Convert inline dashes to SSML break tags (requires SSMLSupport)
+	DashBreakDurationMs   int    // Duration of break for dashes in milliseconds (default 300)
 }
 
 // Voice represents a TTS voice

@@ -474,6 +474,22 @@
                             <small>Silence duration inserted between detected parts/scenes</small>
                         </div>
                     </div>
+                    <div class="settings-section">
+                        <h3>⏸️ Dash Pause (SSML)</h3>
+                        <p class="section-description">
+                            Convert inline dashes (— or -) to SSML break tags for TTS providers that support SSML.
+                        </p>
+                        <div class="form-group checkbox-group">
+                            <input type="checkbox" id="cfg-convert-dashes-to-breaks" checked>
+                            <label for="cfg-convert-dashes-to-breaks">Convert Dashes to Pauses</label>
+                            <small>Insert pauses at inline dashes like "цель - дыра" (requires SSML support)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="cfg-dash-break-duration">Dash Pause Duration (ms)</label>
+                            <input type="number" id="cfg-dash-break-duration" min="100" max="2000" value="300">
+                            <small>Duration of pause at dashes in milliseconds (default: 300ms)</small>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Audiobookshelf Tab -->

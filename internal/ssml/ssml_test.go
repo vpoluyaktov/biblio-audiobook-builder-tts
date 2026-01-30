@@ -160,6 +160,53 @@ func TestWrapTextInSSML_WithoutSentencePauses(t *testing.T) {
 	_ = expected // silence unused variable warning
 }
 
+func TestWrapTextInSSMLWithOptions_DashesToBreaks(t *testing.T) {
+	// Test dash-to-break conversion
+	input := "цель - дыра"
+	result := WrapTextInSSMLWithOptions(input, SSMLOptions{
+		UseSentencePauses:     false,
+		ConvertDashesToBreaks: true,
+		DashBreakDurationMs:   300,
+	})
+
+	if !strings.Contains(result, `<break time="300ms"/>`) {
+		t.Errorf("Expected break tag in output, got: %s", result)
+	}
+	if strings.Contains(result, " - ") {
+		t.Errorf("Dash should be replaced with break tag, got: %s", result)
+	}
+
+	// Test with custom duration
+	result2 := WrapTextInSSMLWithOptions(input, SSMLOptions{
+		UseSentencePauses:     false,
+		ConvertDashesToBreaks: true,
+		DashBreakDurationMs:   500,
+	})
+	if !strings.Contains(result2, `<break time="500ms"/>`) {
+		t.Errorf("Expected 500ms break tag, got: %s", result2)
+	}
+
+	// Test with em-dash
+	inputEmDash := "цель — дыра"
+	resultEmDash := WrapTextInSSMLWithOptions(inputEmDash, SSMLOptions{
+		UseSentencePauses:     false,
+		ConvertDashesToBreaks: true,
+		DashBreakDurationMs:   300,
+	})
+	if !strings.Contains(resultEmDash, `<break time="300ms"/>`) {
+		t.Errorf("Expected break tag for em-dash, got: %s", resultEmDash)
+	}
+
+	// Test disabled conversion
+	resultDisabled := WrapTextInSSMLWithOptions(input, SSMLOptions{
+		UseSentencePauses:     false,
+		ConvertDashesToBreaks: false,
+	})
+	if strings.Contains(resultDisabled, "<break") {
+		t.Errorf("Break tag should not be present when disabled, got: %s", resultDisabled)
+	}
+}
+
 func TestSplitIntoParagraphs(t *testing.T) {
 	tests := []struct {
 		input    string

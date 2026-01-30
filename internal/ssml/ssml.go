@@ -3,6 +3,7 @@
 package ssml
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -14,17 +15,44 @@ var sentenceEndPattern = regexp.MustCompile(`([.!?։؟])(\s+|$)`)
 // ellipsisPattern matches ellipsis to avoid splitting on each dot
 var ellipsisPattern = regexp.MustCompile(`\.{2,}`)
 
+// SSMLOptions contains options for SSML text wrapping
+type SSMLOptions struct {
+	UseSentencePauses     bool // Add paragraph/sentence tags for natural pauses
+	ConvertDashesToBreaks bool // Convert inline dashes to SSML break tags
+	DashBreakDurationMs   int  // Duration of break for dashes (default 300ms)
+}
+
 // WrapTextInSSML converts plain text to SSML format.
 // If useSentencePauses is true, adds paragraph and sentence tags for natural pauses.
 // If useSentencePauses is false, only wraps in <speak> tags without paragraph/sentence markup.
 func WrapTextInSSML(text string, useSentencePauses bool) string {
+	return WrapTextInSSMLWithOptions(text, SSMLOptions{
+		UseSentencePauses:     useSentencePauses,
+		ConvertDashesToBreaks: false, // Default to false for backward compatibility
+	})
+}
+
+// WrapTextInSSMLWithOptions converts plain text to SSML format with full options control.
+func WrapTextInSSMLWithOptions(text string, opts SSMLOptions) string {
 	if strings.TrimSpace(text) == "" {
 		return "<speak></speak>"
 	}
 
+	// Choose the appropriate escape function based on options
+	escapeFunc := escapeXML
+	if opts.ConvertDashesToBreaks {
+		breakMs := opts.DashBreakDurationMs
+		if breakMs <= 0 {
+			breakMs = 300
+		}
+		escapeFunc = func(t string) string {
+			return escapeXMLWithDashBreaks(t, breakMs)
+		}
+	}
+
 	// Simple wrapper without paragraph/sentence pauses
-	if !useSentencePauses {
-		return "<speak>" + escapeXML(text) + "</speak>"
+	if !opts.UseSentencePauses {
+		return "<speak>" + escapeFunc(text) + "</speak>"
 	}
 
 	// Full SSML with paragraph and sentence tags
@@ -48,7 +76,7 @@ func WrapTextInSSML(text string, useSentencePauses bool) string {
 				continue
 			}
 			result.WriteString("  <s>")
-			result.WriteString(escapeXML(sent))
+			result.WriteString(escapeFunc(sent))
 			result.WriteString("</s>\n")
 		}
 
@@ -147,5 +175,48 @@ func escapeXML(text string) string {
 	text = strings.ReplaceAll(text, ">", "&gt;")
 	text = strings.ReplaceAll(text, "\"", "&quot;")
 	text = strings.ReplaceAll(text, "'", "&apos;")
+	return text
+}
+
+// inlineDashPattern matches inline dashes used as em-dashes (with surrounding spaces)
+// Matches: " - " (space-hyphen-space), " — " (em-dash), " – " (en-dash)
+var inlineDashPattern = regexp.MustCompile(`\s+[-—–]\s+`)
+
+// dashBreakPlaceholder is used to protect break tags from XML escaping
+const dashBreakPlaceholder = "\x01BREAK\x01"
+
+// ConvertDashesToBreaks replaces inline dashes with SSML break tags
+// This helps TTS engines that don't naturally pause on dashes
+// The break duration is configurable (default 300ms for a natural pause)
+func ConvertDashesToBreaks(text string, breakDurationMs int) string {
+	if breakDurationMs <= 0 {
+		breakDurationMs = 300 // Default 300ms pause
+	}
+	breakTag := fmt.Sprintf(`<break time="%dms"/>`, breakDurationMs)
+	return inlineDashPattern.ReplaceAllString(text, " "+breakTag+" ")
+}
+
+// ConvertDashesToBreaksDefault uses the default 300ms break duration
+func ConvertDashesToBreaksDefault(text string) string {
+	return ConvertDashesToBreaks(text, 300)
+}
+
+// escapeXMLWithDashBreaks escapes XML but preserves dash-to-break conversions
+// It first replaces dashes with placeholders, escapes XML, then restores break tags
+func escapeXMLWithDashBreaks(text string, breakDurationMs int) string {
+	if breakDurationMs <= 0 {
+		breakDurationMs = 300
+	}
+
+	// Replace inline dashes with placeholder
+	text = inlineDashPattern.ReplaceAllString(text, " "+dashBreakPlaceholder+" ")
+
+	// Escape XML characters
+	text = escapeXML(text)
+
+	// Restore break tags (placeholders are not affected by XML escaping)
+	breakTag := fmt.Sprintf(`<break time="%dms"/>`, breakDurationMs)
+	text = strings.ReplaceAll(text, dashBreakPlaceholder, breakTag)
+
 	return text
 }

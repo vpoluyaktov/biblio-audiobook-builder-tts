@@ -480,13 +480,15 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 
 	// Convert chapter with progress tracking
 	reader, err := w.ttsService.ConvertToSpeechWithProgress(content, &tts.ConversionOptions{
-		Voice:             job.Voice,
-		Provider:          job.Provider,
-		Speed:             job.Speed,
-		Pitch:             job.Pitch,
-		Language:          job.Language,
-		SSMLSupport:       ssmlSupport,
-		UseSentencePauses: job.UseSentencePauses,
+		Voice:                 job.Voice,
+		Provider:              job.Provider,
+		Speed:                 job.Speed,
+		Pitch:                 job.Pitch,
+		Language:              job.Language,
+		SSMLSupport:           ssmlSupport,
+		UseSentencePauses:     job.UseSentencePauses,
+		ConvertDashesToBreaks: w.cfg.ConvertDashesToBreaks,
+		DashBreakDurationMs:   w.cfg.DashBreakDurationMs,
 	}, progressCb)
 	if err != nil {
 		result.Error = fmt.Errorf("TTS conversion failed: %v", err)
@@ -591,13 +593,15 @@ func (w *Worker) convertChapterWithParts(job *Job, chapter parser.Chapter, conte
 
 		// Convert part to speech
 		reader, err := w.ttsService.ConvertToSpeechWithProgress(partContent, &tts.ConversionOptions{
-			Voice:             job.Voice,
-			Provider:          job.Provider,
-			Speed:             job.Speed,
-			Pitch:             job.Pitch,
-			Language:          job.Language,
-			SSMLSupport:       ssmlSupport,
-			UseSentencePauses: job.UseSentencePauses,
+			Voice:                 job.Voice,
+			Provider:              job.Provider,
+			Speed:                 job.Speed,
+			Pitch:                 job.Pitch,
+			Language:              job.Language,
+			SSMLSupport:           ssmlSupport,
+			UseSentencePauses:     job.UseSentencePauses,
+			ConvertDashesToBreaks: w.cfg.ConvertDashesToBreaks,
+			DashBreakDurationMs:   w.cfg.DashBreakDurationMs,
 		}, progressCb)
 		if err != nil {
 			result.Error = fmt.Errorf("TTS conversion failed for part %d: %v", partIdx+1, err)
