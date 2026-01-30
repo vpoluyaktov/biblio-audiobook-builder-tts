@@ -918,3 +918,68 @@ func TestRussianFallbackGenderDetection(t *testing.T) {
 		})
 	}
 }
+
+func TestRussianRomanNumerals(t *testing.T) {
+	p := NewProcessor()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Часть I - cardinal feminine",
+			input:    "Часть I",
+			expected: "Часть одна",
+		},
+		{
+			name:     "Часть II - cardinal feminine",
+			input:    "Часть II",
+			expected: "Часть две",
+		},
+		{
+			name:     "Глава III - cardinal feminine",
+			input:    "Глава III",
+			expected: "Глава три",
+		},
+		{
+			name:     "Глава IX - cardinal feminine",
+			input:    "Глава IX",
+			expected: "Глава девять",
+		},
+		{
+			name:     "Том V - cardinal masculine",
+			input:    "Том V",
+			expected: "Том пять",
+		},
+		{
+			name:     "I Глава - ordinal feminine",
+			input:    "I Глава",
+			expected: "первая Глава",
+		},
+		{
+			name:     "II Часть - ordinal feminine",
+			input:    "II Часть",
+			expected: "вторая Часть",
+		},
+		{
+			name:     "III Том - ordinal masculine",
+			input:    "III Том",
+			expected: "третий Том",
+		},
+		{
+			name:     "IX Глава - ordinal feminine",
+			input:    "IX Глава",
+			expected: "девятая Глава",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := p.Process(tt.input, "ru")
+			if result != tt.expected {
+				t.Errorf("Process(%q, ru) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}

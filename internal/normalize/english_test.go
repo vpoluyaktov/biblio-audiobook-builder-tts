@@ -204,3 +204,58 @@ func BenchmarkEnglishOrdinal(b *testing.B) {
 		}
 	})
 }
+
+func TestEnglishRomanNumerals(t *testing.T) {
+	p := NewProcessor()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Part I - cardinal",
+			input:    "Part I",
+			expected: "Part one",
+		},
+		{
+			name:     "Part IV - cardinal",
+			input:    "Part IV",
+			expected: "Part four",
+		},
+		{
+			name:     "Chapter VII - cardinal",
+			input:    "Chapter VII",
+			expected: "Chapter seven",
+		},
+		{
+			name:     "Chapter X - cardinal",
+			input:    "Chapter X",
+			expected: "Chapter ten",
+		},
+		{
+			name:     "I Chapter - ordinal",
+			input:    "I Chapter",
+			expected: "first Chapter",
+		},
+		{
+			name:     "III Part - ordinal",
+			input:    "III Part",
+			expected: "third Part",
+		},
+		{
+			name:     "Multiple parts",
+			input:    "Part I, Part II, Part III",
+			expected: "Part one, Part two, Part three",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := p.Process(tt.input, "en")
+			if result != tt.expected {
+				t.Errorf("Process(%q, en) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
