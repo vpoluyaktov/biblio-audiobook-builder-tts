@@ -180,6 +180,137 @@ Flags:
 
 - Parallel chapter processing
 - Test voice UI improvements
+- Part separator silence detection (see below)
+
+---
+
+## Feature: Part Separator Silence Detection
+
+### Problem Statement
+
+Some poorly formatted eBooks have only one or two chapters, but the actual content is divided into multiple parts/scenes separated by visual markers such as:
+- `* * *` or `***`
+- `---` or `- - -`
+- `• • •`
+- `~ ~ ~`
+- Multiple blank lines
+- Other decorative separators
+
+Currently, the `ChapterGapSeconds` setting only inserts silence between chapters. For books with minimal chapter structure, this means no pauses are inserted between logical parts, resulting in a continuous audio stream that lacks natural breaks.
+
+### Goal
+
+Detect part separators within chapter content and insert the same `ChapterGapSeconds` silence (or a configurable `PartGapSeconds`) between parts, improving the listening experience for poorly structured eBooks.
+
+### Solution Options
+
+#### Option 1: Regex-Based Separator Detection in Parser
+
+**Description**: Modify the EPUB/FB2 parsers to detect common separator patterns and split chapter content into sub-parts.
+
+**Implementation**:
+- Add regex patterns to detect separators: `^\s*[\*\-•~]{3,}\s*$`, `^\s*\*\s+\*\s+\*\s*$`, etc.
+- When a separator is detected, split the chapter `Content` into multiple segments
+- Add a new field to `Chapter` struct: `Parts []string` or use a separator marker
+
+**Pros**:
+- Clean separation at parse time
+- Separator patterns are removed from text (won't be spoken)
+- Easy to extend with new patterns
+
+**Cons**:
+- Requires modifying parser output structure
+- May need to handle edge cases (separators in dialogue, code blocks, etc.)
+
+#### Option 2: SSML Break Injection During Text Processing
+
+**Description**: Detect separators during SSML processing and inject `<break time="Xs"/>` tags.
+
+**Implementation**:
+- In `internal/ssml/` processing, scan for separator patterns
+- Replace separator lines with SSML break tags
+- Leverage existing SSML infrastructure
+
+**Pros**:
+- No parser changes needed
+- Works with existing SSML-capable TTS providers
+- Natural integration with pause handling
+
+**Cons**:
+- Only works with SSML-capable providers (Silero, Google, Azure, RHVoice)
+- eSpeak and OpenAI don't support SSML breaks
+
+#### Option 3: Audio-Level Silence Insertion in Worker
+
+**Description**: Detect separators in the worker during TTS processing and insert silence audio segments.
+
+**Implementation**:
+- Before sending text to TTS, scan for separator patterns
+- Split text at separators, generate TTS for each segment
+- Insert silence audio (using existing `generateSilence()`) between segments
+- Concatenate audio segments
+
+**Pros**:
+- Works with all TTS providers (no SSML dependency)
+- Uses existing silence generation infrastructure
+- Consistent behavior across providers
+
+**Cons**:
+- More complex audio handling
+- Increases number of TTS API calls (one per segment)
+
+#### Option 4: Hybrid Approach (Recommended)
+
+**Description**: Combine parser-level detection with audio-level silence insertion.
+
+**Implementation**:
+1. Add a `PartSeparatorPatterns` config option (list of regex patterns)
+2. Add `PartGapSeconds` config option (defaults to `ChapterGapSeconds`)
+3. In parser: detect and mark separators but keep content in single chapter
+4. In worker: when processing chapter text, split at separator markers and insert silence
+
+**Pros**:
+- Works with all TTS providers
+- Configurable patterns for different book styles
+- Separators are removed from spoken text
+- Minimal parser changes (just marking, not restructuring)
+
+**Cons**:
+- Slightly more complex than single-layer solutions
+
+### Recommended Approach
+
+**Option 4 (Hybrid)** is recommended because:
+1. It works universally with all TTS providers
+2. It's configurable for different separator styles
+3. It cleanly removes separators from spoken output
+4. It reuses existing silence generation code
+
+### Configuration
+
+New settings to add:
+```go
+// Config additions
+PartGapSeconds         int      `mapstructure:"part_gap_seconds"`          // Silence between parts (default: same as chapter_gap_seconds)
+DetectPartSeparators   bool     `mapstructure:"detect_part_separators"`    // Enable part separator detection
+PartSeparatorPatterns  []string `mapstructure:"part_separator_patterns"`   // Custom regex patterns
+```
+
+Default patterns:
+```go
+var DefaultPartSeparatorPatterns = []string{
+    `^\s*\*\s*\*\s*\*\s*$`,           // * * *
+    `^\s*\*{3,}\s*$`,                  // ***
+    `^\s*-\s*-\s*-\s*$`,               // - - -
+    `^\s*-{3,}\s*$`,                   // ---
+    `^\s*•\s*•\s*•\s*$`,               // • • •
+    `^\s*~\s*~\s*~\s*$`,               // ~ ~ ~
+    `^\s*#\s*#\s*#\s*$`,               // # # #
+    `^\s*\.\s*\.\s*\.\s*$`,            // . . .
+}
+```
+
+---
 
 ### Future Enhancements
 
