@@ -175,16 +175,16 @@ Flags:
 - Silent audio generation for chapters with no speakable content (maintains chapter alignment)
 - Chapter gap silence insertion (configurable via `chapter_gap_seconds` setting)
 - Roman numeral normalization for chapter/part titles (I, II, III, IV, etc.)
+- Part separator silence detection (detects `***`, `---`, `• • •`, etc. and inserts silence between parts)
 
 ### In Progress 🔄
 
 - Parallel chapter processing
 - Test voice UI improvements
-- Part separator silence detection (see below)
 
 ---
 
-## Feature: Part Separator Silence Detection
+## Feature: Part Separator Silence Detection ✅ IMPLEMENTED
 
 ### Problem Statement
 
@@ -278,25 +278,25 @@ Detect part separators within chapter content and insert the same `ChapterGapSec
 **Cons**:
 - Slightly more complex than single-layer solutions
 
-### Recommended Approach
+### Implementation (Option 4 - Hybrid Approach)
 
-**Option 4 (Hybrid)** is recommended because:
-1. It works universally with all TTS providers
-2. It's configurable for different separator styles
-3. It cleanly removes separators from spoken output
-4. It reuses existing silence generation code
+**Status**: ✅ Implemented
 
-### Configuration
+**Files modified/created**:
+- `internal/config/config.go` - Added `PartGapSeconds` and `DetectPartSeparators` config fields
+- `internal/normalize/separator.go` - Part separator detection module
+- `internal/normalize/separator_test.go` - Unit tests for separator detection
+- `internal/audio/m4b.go` - Added `ConcatWAVFiles()` function
+- `internal/server/worker.go` - Integrated separator detection and silence insertion
 
-New settings to add:
+**Configuration**:
 ```go
-// Config additions
-PartGapSeconds         int      `mapstructure:"part_gap_seconds"`          // Silence between parts (default: same as chapter_gap_seconds)
-DetectPartSeparators   bool     `mapstructure:"detect_part_separators"`    // Enable part separator detection
-PartSeparatorPatterns  []string `mapstructure:"part_separator_patterns"`   // Custom regex patterns
+// Config fields
+PartGapSeconds         int     `mapstructure:"part_gap_seconds"`          // Silence between parts (default: 2 seconds)
+DetectPartSeparators   bool    `mapstructure:"detect_part_separators"`    // Enable part separator detection (default: true)
 ```
 
-Default patterns:
+**Default patterns detected**:
 ```go
 var DefaultPartSeparatorPatterns = []string{
     `^\s*\*\s*\*\s*\*\s*$`,           // * * *
@@ -307,8 +307,17 @@ var DefaultPartSeparatorPatterns = []string{
     `^\s*~\s*~\s*~\s*$`,               // ~ ~ ~
     `^\s*#\s*#\s*#\s*$`,               // # # #
     `^\s*\.\s*\.\s*\.\s*$`,            // . . .
+    // ... and more (see separator.go)
 }
 ```
+
+**How it works**:
+1. When `DetectPartSeparators` is enabled (default: true), the worker scans chapter content for separator patterns
+2. Separators are replaced with internal markers
+3. Content is split at markers into parts
+4. Each part is converted to speech separately
+5. Silence audio (duration: `PartGapSeconds`) is inserted between parts
+6. All parts are concatenated into the final chapter audio file
 
 ---
 

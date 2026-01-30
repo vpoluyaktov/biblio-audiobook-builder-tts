@@ -25,6 +25,8 @@ type Config struct {
 	DefaultSpeed            float64 `mapstructure:"default_speed"`
 	DefaultPitch            float64 `mapstructure:"default_pitch"`
 	ChapterGapSeconds       int     `mapstructure:"chapter_gap_seconds"`       // Silence between chapters
+	PartGapSeconds          int     `mapstructure:"part_gap_seconds"`          // Silence between parts (scene breaks)
+	DetectPartSeparators    bool    `mapstructure:"detect_part_separators"`    // Enable part separator detection
 	PronunciationDictFile   string  `mapstructure:"pronunciation_dict_file"`   // Path to pronunciation dictionary
 	UseDefaultPronunciation bool    `mapstructure:"use_default_pronunciation"` // Use built-in pronunciation rules
 	MaxFileSizeMB           int     `mapstructure:"max_file_size_mb"`          // Max M4B file size before splitting
@@ -66,6 +68,8 @@ func Load(configFile string) (*Config, error) {
 	viper.SetDefault("default_speed", 1.0)
 	viper.SetDefault("default_pitch", 1.0)
 	viper.SetDefault("chapter_gap_seconds", 2)          // 2 seconds silence between chapters
+	viper.SetDefault("part_gap_seconds", 2)             // 2 seconds silence between parts (scene breaks)
+	viper.SetDefault("detect_part_separators", true)    // Enable part separator detection by default
 	viper.SetDefault("pronunciation_dict_file", "")     // Custom pronunciation dictionary
 	viper.SetDefault("use_default_pronunciation", true) // Use built-in pronunciation rules
 	viper.SetDefault("max_file_size_mb", 250)           // 250MB max file size before splitting
@@ -132,6 +136,12 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 	}
 	if v, ok := dbConfig["chapter_gap_seconds"].(float64); ok {
 		cfg.ChapterGapSeconds = int(v)
+	}
+	if v, ok := dbConfig["part_gap_seconds"].(float64); ok {
+		cfg.PartGapSeconds = int(v)
+	}
+	if v, ok := dbConfig["detect_part_separators"].(bool); ok {
+		cfg.DetectPartSeparators = v
 	}
 	if v, ok := dbConfig["pronunciation_dict_file"].(string); ok {
 		cfg.PronunciationDictFile = v

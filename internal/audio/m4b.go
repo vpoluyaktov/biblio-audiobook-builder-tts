@@ -427,6 +427,56 @@ func GenerateSilence(duration time.Duration, outputPath string, sampleRate int) 
 	return nil
 }
 
+// ConcatWAVFiles concatenates multiple WAV files into a single output file using ffmpeg
+// This is useful for combining audio parts with silence between them
+func ConcatWAVFiles(inputFiles []string, outputPath string) error {
+	if len(inputFiles) == 0 {
+		return fmt.Errorf("no input files provided")
+	}
+
+	if len(inputFiles) == 1 {
+		// Just copy the single file
+		input, err := os.ReadFile(inputFiles[0])
+		if err != nil {
+			return fmt.Errorf("failed to read input file: %w", err)
+		}
+		return os.WriteFile(outputPath, input, 0644)
+	}
+
+	// Create a temporary concat file for ffmpeg
+	tempDir := filepath.Dir(outputPath)
+	concatFile := filepath.Join(tempDir, "concat_parts.txt")
+
+	var lines []string
+	for _, f := range inputFiles {
+		escaped := strings.ReplaceAll(f, "\\", "\\\\")
+		escaped = strings.ReplaceAll(escaped, "'", "\\'")
+		lines = append(lines, fmt.Sprintf("file '%s'", escaped))
+	}
+
+	if err := os.WriteFile(concatFile, []byte(strings.Join(lines, "\n")), 0644); err != nil {
+		return fmt.Errorf("failed to create concat file: %w", err)
+	}
+	defer os.Remove(concatFile)
+
+	// Use ffmpeg to concatenate
+	cmd := exec.Command("ffmpeg",
+		"-y",
+		"-f", "concat",
+		"-safe", "0",
+		"-i", concatFile,
+		"-c", "copy",
+		outputPath,
+	)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to concatenate WAV files: %w\nOutput: %s", err, string(output))
+	}
+
+	return nil
+}
+
 // GenerateSilentWAV creates a silent WAV audio file of the specified duration
 // This is useful for chapters with no speakable content to maintain chapter alignment
 func GenerateSilentWAV(duration time.Duration, outputPath string, sampleRate int) error {
