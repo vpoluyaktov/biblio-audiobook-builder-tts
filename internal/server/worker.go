@@ -18,6 +18,7 @@ import (
 	"biblio-audiobook-builder-tts/internal/normalize"
 	"biblio-audiobook-builder-tts/internal/parser"
 	"biblio-audiobook-builder-tts/internal/sanitize"
+	"biblio-audiobook-builder-tts/internal/ssml"
 	"biblio-audiobook-builder-tts/internal/storage"
 	"biblio-audiobook-builder-tts/internal/tts"
 	"biblio-audiobook-builder-tts/internal/utils"
@@ -466,6 +467,21 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		ssmlSupport = providerInfo.SSMLSupport
 	}
 
+	// Save SSML debug file if SSML is enabled (before chunking)
+	if ssmlSupport {
+		ssmlText := ssml.AddSSMLBreaks(content, ssml.SSMLOptions{
+			SentenceBreakMs:       w.cfg.SentenceBreakMs,
+			ParagraphBreakMs:      w.cfg.ParagraphBreakMs,
+			ConvertDashesToBreaks: w.cfg.ConvertDashesToBreaks,
+			DashBreakDurationMs:   w.cfg.DashBreakDurationMs,
+		})
+		ssmlFileName := fmt.Sprintf("%02d_%s.ssml.txt", index+1, sanitizeFileName(chapter.Title))
+		ssmlFilePath := filepath.Join(outputDir, ssmlFileName)
+		if err := os.WriteFile(ssmlFilePath, []byte(ssmlText), 0644); err != nil {
+			logger.Warn("Failed to save SSML debug file '%s': %v", ssmlFileName, err)
+		}
+	}
+
 	// Check if content has part separators that need silence insertion
 	if normalize.HasPartSeparators(content) {
 		return w.convertChapterWithParts(job, chapter, content, index, outputDir, workerID, ssmlSupport)
@@ -530,6 +546,21 @@ func (w *Worker) convertChapterWithParts(job *Job, chapter parser.Chapter, conte
 	numParts := len(parts)
 
 	logger.Info("Chapter %d (%s) has %d parts separated by scene breaks", index+1, chapter.Title, numParts)
+
+	// Save SSML debug file if SSML is enabled (before chunking)
+	if ssmlSupport {
+		ssmlText := ssml.AddSSMLBreaks(content, ssml.SSMLOptions{
+			SentenceBreakMs:       w.cfg.SentenceBreakMs,
+			ParagraphBreakMs:      w.cfg.ParagraphBreakMs,
+			ConvertDashesToBreaks: w.cfg.ConvertDashesToBreaks,
+			DashBreakDurationMs:   w.cfg.DashBreakDurationMs,
+		})
+		ssmlFileName := fmt.Sprintf("%02d_%s.ssml.txt", index+1, sanitizeFileName(chapter.Title))
+		ssmlFilePath := filepath.Join(outputDir, ssmlFileName)
+		if err := os.WriteFile(ssmlFilePath, []byte(ssmlText), 0644); err != nil {
+			logger.Warn("Failed to save SSML debug file '%s': %v", ssmlFileName, err)
+		}
+	}
 
 	// Get provider's sample rate for silence generation
 	sampleRate := 48000
