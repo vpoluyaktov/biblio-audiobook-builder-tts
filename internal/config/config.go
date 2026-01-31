@@ -27,6 +27,8 @@ type Config struct {
 	ChapterGapSeconds       int     `mapstructure:"chapter_gap_seconds"`       // Silence between chapters
 	PartGapSeconds          int     `mapstructure:"part_gap_seconds"`          // Silence between parts (scene breaks)
 	DetectPartSeparators    bool    `mapstructure:"detect_part_separators"`    // Enable part separator detection
+	SentenceBreakMs         int     `mapstructure:"sentence_break_ms"`         // SSML break duration between sentences (default 500ms)
+	ParagraphBreakMs        int     `mapstructure:"paragraph_break_ms"`        // SSML break duration between paragraphs (default 800ms)
 	ConvertDashesToBreaks   bool    `mapstructure:"convert_dashes_to_breaks"`  // Convert inline dashes to SSML breaks
 	DashBreakDurationMs     int     `mapstructure:"dash_break_duration_ms"`    // Duration of dash break in ms (default 300)
 	PronunciationDictFile   string  `mapstructure:"pronunciation_dict_file"`   // Path to pronunciation dictionary
@@ -72,6 +74,8 @@ func Load(configFile string) (*Config, error) {
 	viper.SetDefault("chapter_gap_seconds", 2)          // 2 seconds silence between chapters
 	viper.SetDefault("part_gap_seconds", 2)             // 2 seconds silence between parts (scene breaks)
 	viper.SetDefault("detect_part_separators", true)    // Enable part separator detection by default
+	viper.SetDefault("sentence_break_ms", 500)          // 500ms pause between sentences
+	viper.SetDefault("paragraph_break_ms", 800)         // 800ms pause between paragraphs
 	viper.SetDefault("convert_dashes_to_breaks", true)  // Convert inline dashes to SSML breaks by default
 	viper.SetDefault("dash_break_duration_ms", 300)     // 300ms pause for dashes
 	viper.SetDefault("pronunciation_dict_file", "")     // Custom pronunciation dictionary
@@ -146,6 +150,16 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 	}
 	if v, ok := dbConfig["detect_part_separators"].(bool); ok {
 		cfg.DetectPartSeparators = v
+	}
+	if v, ok := dbConfig["sentence_break_ms"].(float64); ok {
+		cfg.SentenceBreakMs = int(v)
+	} else if v, ok := dbConfig["sentence_break_ms"].(int); ok {
+		cfg.SentenceBreakMs = v
+	}
+	if v, ok := dbConfig["paragraph_break_ms"].(float64); ok {
+		cfg.ParagraphBreakMs = int(v)
+	} else if v, ok := dbConfig["paragraph_break_ms"].(int); ok {
+		cfg.ParagraphBreakMs = v
 	}
 	if v, ok := dbConfig["convert_dashes_to_breaks"].(bool); ok {
 		cfg.ConvertDashesToBreaks = v

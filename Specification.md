@@ -180,8 +180,36 @@ Flags:
 
 ### In Progress 🔄
 
-- Parallel chapter processing
-- Test voice UI improvements
+- SSML break tag refactoring (replace `<p>`/`<s>` tags with `<break>` tags)
+
+---
+
+## Feature: SSML Break Tag Refactoring 🔄 IN PROGRESS
+
+### Problem Statement
+
+The current implementation uses SSML `<p>` (paragraph) and `<s>` (sentence) tags to add natural pauses between paragraphs and sentences. However, some TTS providers don't support these tags properly, while they do support `<break time="Xms"/>` tags correctly.
+
+### Goal
+
+Replace `<p>` and `<s>` SSML tags with explicit `<break>` tags with configurable durations based on average human speech patterns.
+
+### Implementation Plan
+
+**Recommended break durations** (based on speech research):
+- **Sentence break**: 500ms (typical pause between sentences)
+- **Paragraph break**: 800ms (longer pause for paragraph transitions)
+- **Inline dash/ellipsis**: 300ms (already implemented)
+
+**Changes required**:
+1. Remove `UseSentencePauses` config field
+2. Add `SentenceBreakMs` and `ParagraphBreakMs` config fields
+3. Modify SSML generation to insert `<break>` tags instead of `<p>`/`<s>` wrapper tags
+4. Move all pause settings from Output tab to TTS Settings tab in UI
+5. Remove "Add pauses between paragraphs and sentences" checkbox from main conversion page
+6. Update storage layer and settings API
+
+**Status**: 🔄 In Progress
 
 ---
 

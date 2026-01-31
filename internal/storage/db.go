@@ -39,6 +39,8 @@ type Config struct {
 	ChapterGapSeconds       int     `json:"chapter_gap_seconds"`
 	PartGapSeconds          int     `json:"part_gap_seconds"`
 	DetectPartSeparators    bool    `json:"detect_part_separators"`
+	SentenceBreakMs         int     `json:"sentence_break_ms"`
+	ParagraphBreakMs        int     `json:"paragraph_break_ms"`
 	ConvertDashesToBreaks   bool    `json:"convert_dashes_to_breaks"`
 	DashBreakDurationMs     int     `json:"dash_break_duration_ms"`
 	PronunciationDictFile   string  `json:"pronunciation_dict_file"`
@@ -337,6 +339,12 @@ func (db *DB) GetAllConfig() (*Config, error) {
 	if v, ok := configMap["detect_part_separators"]; ok {
 		cfg.DetectPartSeparators = v == "true"
 	}
+	if v, ok := configMap["sentence_break_ms"]; ok {
+		fmt.Sscanf(v, "%d", &cfg.SentenceBreakMs)
+	}
+	if v, ok := configMap["paragraph_break_ms"]; ok {
+		fmt.Sscanf(v, "%d", &cfg.ParagraphBreakMs)
+	}
 	if v, ok := configMap["convert_dashes_to_breaks"]; ok {
 		cfg.ConvertDashesToBreaks = v == "true"
 	}
@@ -436,6 +444,8 @@ func DefaultConfig() *Config {
 		ChapterGapSeconds:       2,
 		PartGapSeconds:          2,
 		DetectPartSeparators:    true,
+		SentenceBreakMs:         500,
+		ParagraphBreakMs:        800,
 		ConvertDashesToBreaks:   true,
 		DashBreakDurationMs:     300,
 		PronunciationDictFile:   "",
@@ -1417,6 +1427,8 @@ func (c *Config) ToAppConfig() map[string]interface{} {
 		"chapter_gap_seconds":       c.ChapterGapSeconds,
 		"part_gap_seconds":          c.PartGapSeconds,
 		"detect_part_separators":    c.DetectPartSeparators,
+		"sentence_break_ms":         c.SentenceBreakMs,
+		"paragraph_break_ms":        c.ParagraphBreakMs,
 		"convert_dashes_to_breaks":  c.ConvertDashesToBreaks,
 		"dash_break_duration_ms":    c.DashBreakDurationMs,
 		"pronunciation_dict_file":   c.PronunciationDictFile,
