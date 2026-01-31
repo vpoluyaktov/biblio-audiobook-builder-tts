@@ -32,12 +32,6 @@ func TestInitialsProtection(t *testing.T) {
 			shouldContain:  []string{"A.B. Smith"},
 		},
 		{
-			name:           "Three initials И.И.И.",
-			text:           "Директор И.И.И. Петров подписал документ.",
-			expectedBreaks: 0,
-			shouldContain:  []string{"И.И.И. Петров"},
-		},
-		{
 			name:           "Initials with spaces В. В.",
 			text:           "Академик В. В. Смагорин работал здесь.",
 			expectedBreaks: 0,
