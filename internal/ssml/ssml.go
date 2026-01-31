@@ -9,10 +9,14 @@ import (
 )
 
 // sentenceEndPattern matches sentence-ending punctuation
-// Includes: period, exclamation, question mark, Armenian question mark, Arabic question mark
-var sentenceEndPattern = regexp.MustCompile(`([.!?։؟])(\s+|$)`)
+// Includes various combinations found in ebooks:
+// - Single punctuation: . ! ?
+// - Multiple punctuation: !! !!! ?? ??? ?! !?
+// - Ellipsis: ... .... .....
+// - Unicode variants: Armenian ։, Arabic ؟, Interrobang ‽
+var sentenceEndPattern = regexp.MustCompile(`([.!?։؟‽]+)(\s+|$)`)
 
-// ellipsisPattern matches ellipsis to avoid splitting on each dot
+// ellipsisPattern matches ellipsis (2 or more dots)
 var ellipsisPattern = regexp.MustCompile(`\.{2,}`)
 
 // SSMLOptions contains options for SSML text wrapping
@@ -187,17 +191,11 @@ func splitIntoParagraphs(text string) []string {
 }
 
 // splitIntoSentences splits a paragraph into sentences.
-// Handles common sentence-ending punctuation while avoiding false splits
-// on abbreviations and decimal numbers.
+// Handles common sentence-ending punctuation including ellipsis
 func splitIntoSentences(text string) []string {
 	if strings.TrimSpace(text) == "" {
 		return nil
 	}
-
-	// Protect ellipsis from being split
-	text = ellipsisPattern.ReplaceAllStringFunc(text, func(s string) string {
-		return strings.Repeat("\x00", len(s)) // Placeholder
-	})
 
 	// Find all sentence boundaries
 	var sentences []string
@@ -216,9 +214,6 @@ func splitIntoSentences(text string) []string {
 		sentence := text[lastEnd:sentenceEnd]
 		sentence = strings.TrimSpace(sentence)
 
-		// Restore ellipsis
-		sentence = strings.ReplaceAll(sentence, "\x00", ".")
-
 		if sentence != "" {
 			sentences = append(sentences, sentence)
 		}
@@ -229,8 +224,6 @@ func splitIntoSentences(text string) []string {
 	// Add remaining text as the last sentence
 	if lastEnd < len(text) {
 		remaining := strings.TrimSpace(text[lastEnd:])
-		// Restore ellipsis
-		remaining = strings.ReplaceAll(remaining, "\x00", ".")
 		if remaining != "" {
 			sentences = append(sentences, remaining)
 		}
@@ -238,7 +231,6 @@ func splitIntoSentences(text string) []string {
 
 	// If no sentences were found, return the whole text as one sentence
 	if len(sentences) == 0 {
-		text = strings.ReplaceAll(text, "\x00", ".")
 		return []string{strings.TrimSpace(text)}
 	}
 

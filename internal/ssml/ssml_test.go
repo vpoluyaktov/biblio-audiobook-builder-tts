@@ -95,20 +95,24 @@ func TestWrapTextInSSML_XMLEscaping(t *testing.T) {
 }
 
 func TestWrapTextInSSML_Ellipsis(t *testing.T) {
-	// Ellipsis within a sentence should not cause splits
+	// Test that ellipsis is treated as a sentence boundary
 	input := "Wait... what happened next?"
-	result := WrapTextInSSML(input, true)
-
-	// Single sentence with ellipsis should have no breaks
-	if strings.Contains(result, "<break") {
-		t.Errorf("Single sentence should have no breaks, got: %s", result)
+	result := WrapTextInSSMLWithOptions(input, SSMLOptions{
+		SentenceBreakMs: 500,
+	})
+	// Ellipsis should create a sentence break
+	if strings.Count(result, "<break") != 1 {
+		t.Errorf("Expected 1 break after ellipsis, got: %s", result)
 	}
 
-	// Multiple sentences with ellipsis - should have 1 sentence break
+	// Test ellipsis in multiple sentences
 	input2 := "First sentence. Wait... Second sentence."
-	result2 := WrapTextInSSML(input2, true)
-	if strings.Count(result2, `<break time="500ms"/>`) != 1 {
-		t.Errorf("Expected 1 sentence break, got %d in: %s", strings.Count(result2, `<break time="500ms"/>`), result2)
+	result2 := WrapTextInSSMLWithOptions(input2, SSMLOptions{
+		SentenceBreakMs: 500,
+	})
+	// Should have 2 breaks: after period and after ellipsis
+	if strings.Count(result2, "<break") != 2 {
+		t.Errorf("Expected 2 sentence breaks, got %d in: %s", strings.Count(result2, "<break"), result2)
 	}
 }
 
@@ -275,7 +279,7 @@ func TestSplitIntoSentences(t *testing.T) {
 		{"One sentence.", 1},
 		{"First. Second.", 2},
 		{"Question? Answer!", 2},
-		{"Wait... really?", 1}, // Ellipsis doesn't end sentence, question mark does
+		{"Wait... really?", 2}, // Ellipsis now ends sentence, plus question mark
 		{"No punctuation", 1},
 		{"", 0},
 	}
