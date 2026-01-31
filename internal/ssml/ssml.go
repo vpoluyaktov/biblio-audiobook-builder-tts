@@ -19,6 +19,11 @@ var sentenceEndPattern = regexp.MustCompile(`([.!?։؟‽]+)(\s+|$)`)
 // ellipsisPattern matches ellipsis (2 or more dots)
 var ellipsisPattern = regexp.MustCompile(`\.{2,}`)
 
+// initialsPattern matches abbreviated initials like "В.В." or "A.B.C."
+// Matches one or more uppercase letters each followed by a dot, with optional spaces
+// Examples: В.В., A.B., И.И.И., V. V., A. B. C.
+var initialsPattern = regexp.MustCompile(`(?:\p{Lu}\.(?:\s*\p{Lu}\.)+)`)
+
 // SSMLOptions contains options for SSML text wrapping
 type SSMLOptions struct {
 	SentenceBreakMs       int  // Duration of break between sentences in ms (0 = no breaks)
@@ -192,10 +197,30 @@ func splitIntoParagraphs(text string) []string {
 
 // splitIntoSentences splits a paragraph into sentences.
 // Handles common sentence-ending punctuation including ellipsis
+// Protects abbreviated initials (like В.В. or A.B.) from being split
 func splitIntoSentences(text string) []string {
 	if strings.TrimSpace(text) == "" {
 		return nil
 	}
+
+	// Protect abbreviated initials from being split (e.g., В.В., A.B.C.)
+	// Replace them with placeholders
+	type initialReplacement struct {
+		placeholder string
+		original    string
+	}
+	var replacements []initialReplacement
+
+	text = initialsPattern.ReplaceAllStringFunc(text, func(match string) string {
+		// Remove spaces from initials for consistency (В. В. -> В.В.)
+		normalized := strings.ReplaceAll(match, " ", "")
+		placeholder := fmt.Sprintf("\x00INIT%d\x00", len(replacements))
+		replacements = append(replacements, initialReplacement{
+			placeholder: placeholder,
+			original:    normalized,
+		})
+		return placeholder
+	})
 
 	// Find all sentence boundaries
 	var sentences []string
@@ -231,7 +256,20 @@ func splitIntoSentences(text string) []string {
 
 	// If no sentences were found, return the whole text as one sentence
 	if len(sentences) == 0 {
-		return []string{strings.TrimSpace(text)}
+		text = strings.TrimSpace(text)
+		// Restore initials before returning
+		for _, repl := range replacements {
+			text = strings.ReplaceAll(text, repl.placeholder, repl.original)
+		}
+		return []string{text}
+	}
+
+	// Restore initials in all sentences
+	for i, sent := range sentences {
+		for _, repl := range replacements {
+			sent = strings.ReplaceAll(sent, repl.placeholder, repl.original)
+		}
+		sentences[i] = sent
 	}
 
 	return sentences
