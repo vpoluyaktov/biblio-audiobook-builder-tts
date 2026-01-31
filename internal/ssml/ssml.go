@@ -275,9 +275,3 @@ func escapeXMLWithPauseBreaks(text string, breakDurationMs int) string {
 
 	return text
 }
-
-// escapeXMLWithDashBreaks is kept for backward compatibility
-// Deprecated: Use escapeXMLWithPauseBreaks instead
-func escapeXMLWithDashBreaks(text string, breakDurationMs int) string {
-	return escapeXMLWithPauseBreaks(text, breakDurationMs)
-}
