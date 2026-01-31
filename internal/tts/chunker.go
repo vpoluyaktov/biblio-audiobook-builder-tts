@@ -147,6 +147,7 @@ func (c *Chunker) chunkBySize(text string) []string {
 }
 
 // findBreakPoint finds a good place to break the text (sentence end, word boundary)
+// It is SSML-aware and will not break inside SSML tags
 func (c *Chunker) findBreakPoint(text string, maxPos int) int {
 	if maxPos >= len(text) {
 		return len(text)
@@ -157,7 +158,10 @@ func (c *Chunker) findBreakPoint(text string, maxPos int) int {
 		if i < len(text) && (text[i] == '.' || text[i] == '!' || text[i] == '?') {
 			// Make sure it's followed by space or end
 			if i+1 >= len(text) || unicode.IsSpace(rune(text[i+1])) {
-				return i + 1
+				// Check if this position is inside an SSML tag
+				if !c.isInsideSSMLTag(text, i+1) {
+					return i + 1
+				}
 			}
 		}
 	}
@@ -166,13 +170,51 @@ func (c *Chunker) findBreakPoint(text string, maxPos int) int {
 	if c.config.PreserveWords {
 		for i := maxPos; i > maxPos/2; i-- {
 			if i < len(text) && unicode.IsSpace(rune(text[i])) {
-				return i + 1
+				// Check if this position is inside an SSML tag
+				if !c.isInsideSSMLTag(text, i+1) {
+					return i + 1
+				}
 			}
 		}
 	}
 
-	// Fall back to hard cut
+	// Fall back to hard cut, but ensure we don't cut inside an SSML tag
+	for i := maxPos; i > 0; i-- {
+		if !c.isInsideSSMLTag(text, i) {
+			return i
+		}
+	}
+
+	// Absolute fallback
 	return maxPos
+}
+
+// isInsideSSMLTag checks if a position in the text is inside an SSML tag
+func (c *Chunker) isInsideSSMLTag(text string, pos int) bool {
+	if pos <= 0 || pos > len(text) {
+		return false
+	}
+
+	// Look backwards for the nearest < or >
+	lastOpen := -1
+	lastClose := -1
+
+	for i := pos - 1; i >= 0; i-- {
+		if text[i] == '>' && lastClose == -1 {
+			lastClose = i
+		}
+		if text[i] == '<' && lastOpen == -1 {
+			lastOpen = i
+			break
+		}
+	}
+
+	// If we found an opening < after the last closing >, we're inside a tag
+	if lastOpen != -1 && (lastClose == -1 || lastOpen > lastClose) {
+		return true
+	}
+
+	return false
 }
 
 // enforceMaxSize ensures no chunk exceeds the maximum size
