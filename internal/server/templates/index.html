@@ -436,6 +436,36 @@
                             <small>Format: pattern → replacement (one per line)</small>
                         </div>
                     </div>
+                    <div class="settings-section">
+                        <h3>⏸️ SSML Pauses</h3>
+                        <p class="section-description">
+                            Configure pause durations using SSML break tags (for TTS providers that support SSML).
+                        </p>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="cfg-sentence-break">Sentence Break (ms)</label>
+                                <input type="number" id="cfg-sentence-break" min="0" max="2000" step="50" value="500">
+                                <small>Pause between sentences (0 = no pauses, default: 500ms)</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="cfg-paragraph-break">Paragraph Break (ms)</label>
+                                <input type="number" id="cfg-paragraph-break" min="0" max="3000" step="50" value="800">
+                                <small>Pause between paragraphs (0 = no pauses, default: 800ms)</small>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="cfg-convert-dashes" checked>
+                                Convert dashes to pauses
+                            </label>
+                            <small>Insert pauses at inline dashes like "цель — дыра"</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="cfg-dash-break-duration">Dash Pause Duration (ms)</label>
+                            <input type="number" id="cfg-dash-break-duration" min="100" max="2000" step="50" value="300">
+                            <small>Duration of pause at dashes (default: 300ms)</small>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Output Tab -->
@@ -472,22 +502,6 @@
                             <label for="cfg-part-gap">Gap Between Parts (seconds)</label>
                             <input type="number" id="cfg-part-gap" min="0" max="10" value="2">
                             <small>Silence duration inserted between detected parts/scenes</small>
-                        </div>
-                    </div>
-                    <div class="settings-section">
-                        <h3>⏸️ Dash Pause (SSML)</h3>
-                        <p class="section-description">
-                            Convert inline dashes (— or -) to SSML break tags for TTS providers that support SSML.
-                        </p>
-                        <div class="form-group checkbox-group">
-                            <input type="checkbox" id="cfg-convert-dashes-to-breaks" checked>
-                            <label for="cfg-convert-dashes-to-breaks">Convert Dashes to Pauses</label>
-                            <small>Insert pauses at inline dashes like "цель - дыра" (requires SSML support)</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="cfg-dash-break-duration">Dash Pause Duration (ms)</label>
-                            <input type="number" id="cfg-dash-break-duration" min="100" max="2000" value="300">
-                            <small>Duration of pause at dashes in milliseconds (default: 300ms)</small>
                         </div>
                     </div>
                 </div>
