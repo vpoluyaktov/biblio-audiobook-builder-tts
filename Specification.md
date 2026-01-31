@@ -178,6 +178,8 @@ Flags:
 - Part separator silence detection (detects `***`, `---`, `• • •`, etc. and inserts silence between parts)
 - SSML pause patterns for dashes and ellipsis (converts ` - ` and `...` to `<break>` tags for TTS)
 - SSML break tag support for sentence and paragraph pauses (configurable durations instead of `<p>`/`<s>` tags)
+- SSML-first chunking to preserve pauses across chunk boundaries
+- SSML-aware chunker that never splits SSML tags
 
 ### In Progress 🔄
 
@@ -231,6 +233,87 @@ ParagraphBreakMs  int  `mapstructure:"paragraph_break_ms"`  // Default: 800ms
 4. Setting a value to 0 disables that type of break
 5. All pause settings (sentence, paragraph, dash, ellipsis) are now consolidated in the TTS Settings tab
 6. Maintains backward compatibility with legacy `UseSentencePauses` flag
+
+---
+
+## Feature: SSML-First Chunking ✅ IMPLEMENTED
+
+### Problem Statement
+
+The previous implementation had a critical flaw where SSML break tags were added to each chunk independently. This caused pauses to be lost at chunk boundaries:
+
+**Example of the bug:**
+```
+Original text: "Sentence 1. Sentence 2. Sentence 3."
+Chunked as:
+  Chunk 1: "Sentence 1. Sentence 2."
+  Chunk 2: "Sentence 3."
+
+SSML wrapping (per chunk):
+  Chunk 1: <speak>Sentence 1.<break time="500ms"/>Sentence 2.</speak>
+  Chunk 2: <speak>Sentence 3.</speak>
+
+Result: Pause between Sentence 1 and 2 ✓
+        NO pause between Sentence 2 and 3 ❌ (chunk boundary)
+```
+
+### Solution
+
+Implement **SSML-first chunking**: Add SSML break tags to the entire chapter text BEFORE chunking, then chunk the SSML-enriched text.
+
+**New flow:**
+```
+1. Get chapter text from parser
+2. Add ALL SSML break tags to the full text (if SSML enabled)
+3. Chunk the SSML-enriched text (chunker is SSML-aware, won't break tags)
+4. Wrap each chunk in <speak></speak> tags only
+5. Send to TTS
+```
+
+### Implementation
+
+**Status**: ✅ Implemented
+
+**Key changes:**
+
+1. **New function `AddSSMLBreaks()`** (`internal/ssml/ssml.go`)
+   - Adds break tags to text without `<speak>` wrapper
+   - Used for pre-chunking SSML processing
+
+2. **SSML-aware chunker** (`internal/tts/chunker.go`)
+   - Added `isInsideSSMLTag()` helper function
+   - Modified `findBreakPoint()` to never break inside SSML tags
+   - Ensures tags like `<break time="500ms"/>` remain intact
+
+3. **Updated adapter** (`internal/tts/adapter.go`)
+   - Calls `AddSSMLBreaks()` on entire text before chunking
+   - Chunks now contain SSML breaks embedded in the text
+   - Only wraps chunks in `<speak>` tags (breaks already present)
+
+**Benefits:**
+- ✅ All sentence/paragraph pauses preserved across chunk boundaries
+- ✅ No pauses lost at chunk boundaries
+- ✅ Simpler implementation (no chunk metadata needed)
+- ✅ SSML tags never split across chunks
+- ✅ Works within TTS engine chunk size limits (900 chars)
+
+**Example with fix:**
+```
+Original text: "Sentence 1. Sentence 2. Sentence 3."
+
+After AddSSMLBreaks():
+"Sentence 1.<break time="500ms"/>Sentence 2.<break time="500ms"/>Sentence 3."
+
+After chunking (if needed):
+  Chunk 1: "Sentence 1.<break time="500ms"/>Sentence 2."
+  Chunk 2: "<break time="500ms"/>Sentence 3."
+
+After wrapping:
+  Chunk 1: <speak>Sentence 1.<break time="500ms"/>Sentence 2.</speak>
+  Chunk 2: <speak><break time="500ms"/>Sentence 3.</speak>
+
+Result: ALL pauses preserved ✅
+```
 
 ---
 
