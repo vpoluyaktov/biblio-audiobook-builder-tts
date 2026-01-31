@@ -93,8 +93,22 @@ type ProgressCallback func(chunkIndex, totalChunks int, chunkText string)
 // ConvertToSpeech converts text to speech, handling chunking automatically
 // Returns concatenated audio data from all chunks
 func (a *Adapter) ConvertToSpeech(text string, voice string, options *ConversionOptions, progressCb ProgressCallback) (io.Reader, error) {
-	// Split text into chunks
-	chunks := a.chunker.Chunk(text)
+	// SSML-first approach: Add SSML breaks to entire text BEFORE chunking
+	// This ensures breaks are preserved across chunk boundaries
+	textToChunk := text
+	if options != nil && options.SSMLSupport {
+		textToChunk = ssml.AddSSMLBreaks(text, ssml.SSMLOptions{
+			SentenceBreakMs:       options.SentenceBreakMs,
+			ParagraphBreakMs:      options.ParagraphBreakMs,
+			ConvertDashesToBreaks: options.ConvertDashesToBreaks,
+			DashBreakDurationMs:   options.DashBreakDurationMs,
+		})
+		logger.Debug("Added SSML breaks to text before chunking (sentence: %dms, paragraph: %dms, dashes: %v)",
+			options.SentenceBreakMs, options.ParagraphBreakMs, options.ConvertDashesToBreaks)
+	}
+
+	// Split text into chunks (now with SSML breaks already embedded)
+	chunks := a.chunker.Chunk(textToChunk)
 
 	if len(chunks) == 0 {
 		return nil, fmt.Errorf("no text to convert")
@@ -132,16 +146,12 @@ func (a *Adapter) ConvertToSpeech(text string, voice string, options *Conversion
 			continue
 		}
 
-		// Apply SSML wrapping per-chunk if provider supports it
+		// Wrap chunk in <speak> tags if SSML is supported
+		// Note: breaks are already in the text from pre-processing
 		chunkToConvert := chunk
 		if options != nil && options.SSMLSupport {
-			chunkToConvert = ssml.WrapTextInSSMLWithOptions(chunk, ssml.SSMLOptions{
-				SentenceBreakMs:       options.SentenceBreakMs,
-				ParagraphBreakMs:      options.ParagraphBreakMs,
-				ConvertDashesToBreaks: options.ConvertDashesToBreaks,
-				DashBreakDurationMs:   options.DashBreakDurationMs,
-			})
-			logger.Debug("Applied SSML wrapping to chunk %d/%d (sentence break: %dms, paragraph break: %dms, dash breaks: %v)", i+1, len(chunks), options.SentenceBreakMs, options.ParagraphBreakMs, options.ConvertDashesToBreaks)
+			chunkToConvert = "<speak>" + chunk + "</speak>"
+			logger.Debug("Wrapped chunk %d/%d in <speak> tags", i+1, len(chunks))
 		}
 
 		// Convert this chunk with retry logic for transient failures
@@ -198,7 +208,20 @@ func (a *Adapter) ConvertToSpeech(text string, voice string, options *Conversion
 // ConvertToSpeechWithChunks converts text and returns individual chunk results
 // Useful when you need to process chunks separately (e.g., for streaming)
 func (a *Adapter) ConvertToSpeechWithChunks(text string, voice string, options *ConversionOptions, progressCb ProgressCallback) ([]io.Reader, error) {
-	chunks := a.chunker.Chunk(text)
+	// SSML-first approach: Add SSML breaks to entire text BEFORE chunking
+	textToChunk := text
+	if options != nil && options.SSMLSupport {
+		textToChunk = ssml.AddSSMLBreaks(text, ssml.SSMLOptions{
+			SentenceBreakMs:       options.SentenceBreakMs,
+			ParagraphBreakMs:      options.ParagraphBreakMs,
+			ConvertDashesToBreaks: options.ConvertDashesToBreaks,
+			DashBreakDurationMs:   options.DashBreakDurationMs,
+		})
+		logger.Debug("Added SSML breaks to text before chunking (sentence: %dms, paragraph: %dms, dashes: %v)",
+			options.SentenceBreakMs, options.ParagraphBreakMs, options.ConvertDashesToBreaks)
+	}
+
+	chunks := a.chunker.Chunk(textToChunk)
 
 	if len(chunks) == 0 {
 		return nil, fmt.Errorf("no text to convert")
@@ -232,16 +255,12 @@ func (a *Adapter) ConvertToSpeechWithChunks(text string, voice string, options *
 			continue
 		}
 
-		// Apply SSML wrapping per-chunk if provider supports it
+		// Wrap chunk in <speak> tags if SSML is supported
+		// Note: breaks are already in the text from pre-processing
 		chunkToConvert := chunk
 		if options != nil && options.SSMLSupport {
-			chunkToConvert = ssml.WrapTextInSSMLWithOptions(chunk, ssml.SSMLOptions{
-				SentenceBreakMs:       options.SentenceBreakMs,
-				ParagraphBreakMs:      options.ParagraphBreakMs,
-				ConvertDashesToBreaks: options.ConvertDashesToBreaks,
-				DashBreakDurationMs:   options.DashBreakDurationMs,
-			})
-			logger.Debug("Applied SSML wrapping to chunk %d/%d (sentence break: %dms, paragraph break: %dms, dash breaks: %v)", i+1, len(chunks), options.SentenceBreakMs, options.ParagraphBreakMs, options.ConvertDashesToBreaks)
+			chunkToConvert = "<speak>" + chunk + "</speak>"
+			logger.Debug("Wrapped chunk %d/%d in <speak> tags", i+1, len(chunks))
 		}
 
 		// Convert this chunk with retry logic for transient failures

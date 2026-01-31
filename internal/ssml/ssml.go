@@ -26,14 +26,77 @@ type SSMLOptions struct {
 	UseSentencePauses bool // Legacy: Add paragraph/sentence tags for natural pauses
 }
 
-// WrapTextInSSML converts plain text to SSML format.
-// If useSentencePauses is true, adds paragraph and sentence tags for natural pauses.
-// If useSentencePauses is false, only wraps in <speak> tags without paragraph/sentence markup.
+// WrapTextInSSML wraps text in SSML speak tags with optional sentence/paragraph pauses
 func WrapTextInSSML(text string, useSentencePauses bool) string {
 	return WrapTextInSSMLWithOptions(text, SSMLOptions{
-		UseSentencePauses:     useSentencePauses,
-		ConvertDashesToBreaks: false, // Default to false for backward compatibility
+		UseSentencePauses: useSentencePauses,
 	})
+}
+
+// AddSSMLBreaks adds SSML break tags to text without wrapping in <speak> tags.
+// This is used to pre-process text before chunking, so breaks are preserved across chunk boundaries.
+// The text should later be wrapped in <speak> tags per chunk.
+func AddSSMLBreaks(text string, opts SSMLOptions) string {
+	if strings.TrimSpace(text) == "" {
+		return text
+	}
+
+	// Handle legacy UseSentencePauses flag
+	if opts.UseSentencePauses && opts.SentenceBreakMs == 0 && opts.ParagraphBreakMs == 0 {
+		opts.SentenceBreakMs = 500
+		opts.ParagraphBreakMs = 800
+	}
+
+	// Choose the appropriate escape function based on options
+	escapeFunc := escapeXML
+	if opts.ConvertDashesToBreaks {
+		breakMs := opts.DashBreakDurationMs
+		if breakMs <= 0 {
+			breakMs = 300
+		}
+		escapeFunc = func(t string) string {
+			return escapeXMLWithPauseBreaks(t, breakMs)
+		}
+	}
+
+	// If no sentence/paragraph breaks needed, just escape and return
+	if opts.SentenceBreakMs == 0 && opts.ParagraphBreakMs == 0 {
+		return escapeFunc(text)
+	}
+
+	// Add break tags between sentences and paragraphs
+	paragraphs := splitIntoParagraphs(text)
+
+	var result strings.Builder
+
+	for paraIdx, para := range paragraphs {
+		para = strings.TrimSpace(para)
+		if para == "" {
+			continue
+		}
+
+		sentences := splitIntoSentences(para)
+		for sentIdx, sent := range sentences {
+			sent = strings.TrimSpace(sent)
+			if sent == "" {
+				continue
+			}
+
+			result.WriteString(escapeFunc(sent))
+
+			// Add sentence break after each sentence (except last in paragraph)
+			if opts.SentenceBreakMs > 0 && sentIdx < len(sentences)-1 {
+				result.WriteString(fmt.Sprintf(`<break time="%dms"/>`, opts.SentenceBreakMs))
+			}
+		}
+
+		// Add paragraph break after each paragraph (except last)
+		if opts.ParagraphBreakMs > 0 && paraIdx < len(paragraphs)-1 {
+			result.WriteString(fmt.Sprintf(`<break time="%dms"/>`, opts.ParagraphBreakMs))
+		}
+	}
+
+	return result.String()
 }
 
 // WrapTextInSSMLWithOptions converts plain text to SSML format with full options control.
