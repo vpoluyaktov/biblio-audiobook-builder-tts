@@ -90,13 +90,13 @@ func AddSSMLBreaks(text string, opts SSMLOptions) string {
 
 			// Add sentence break after each sentence (except last in paragraph)
 			if opts.SentenceBreakMs > 0 && sentIdx < len(sentences)-1 {
-				result.WriteString(fmt.Sprintf(`<break time="%dms"/>`, opts.SentenceBreakMs))
+				result.WriteString(fmt.Sprintf(` <break time="%dms"/> `, opts.SentenceBreakMs))
 			}
 		}
 
 		// Add paragraph break after each paragraph (except last)
 		if opts.ParagraphBreakMs > 0 && paraIdx < len(paragraphs)-1 {
-			result.WriteString(fmt.Sprintf(`<break time="%dms"/>`, opts.ParagraphBreakMs))
+			result.WriteString(fmt.Sprintf("\n\n<break time=\"%dms\"/>\n\n", opts.ParagraphBreakMs))
 		}
 	}
 
@@ -155,13 +155,13 @@ func WrapTextInSSMLWithOptions(text string, opts SSMLOptions) string {
 
 			// Add sentence break after each sentence (except last in paragraph)
 			if opts.SentenceBreakMs > 0 && sentIdx < len(sentences)-1 {
-				result.WriteString(fmt.Sprintf(`<break time="%dms"/>`, opts.SentenceBreakMs))
+				result.WriteString(fmt.Sprintf(` <break time="%dms"/> `, opts.SentenceBreakMs))
 			}
 		}
 
 		// Add paragraph break after each paragraph (except last)
 		if opts.ParagraphBreakMs > 0 && paraIdx < len(paragraphs)-1 {
-			result.WriteString(fmt.Sprintf(`<break time="%dms"/>`, opts.ParagraphBreakMs))
+			result.WriteString(fmt.Sprintf("\n\n<break time=\"%dms\"/>\n\n", opts.ParagraphBreakMs))
 		}
 	}
 
@@ -324,8 +324,8 @@ func escapeXMLWithPauseBreaks(text string, breakDurationMs int) string {
 	// Escape XML characters
 	text = escapeXML(text)
 
-	// Restore break tags (placeholders are not affected by XML escaping)
-	breakTag := fmt.Sprintf(`<break time="%dms"/>`, breakDurationMs)
+	// Restore break tags with spaces (placeholders are not affected by XML escaping)
+	breakTag := fmt.Sprintf(` <break time="%dms"/> `, breakDurationMs)
 	text = strings.ReplaceAll(text, breakPlaceholder, breakTag)
 
 	return text
