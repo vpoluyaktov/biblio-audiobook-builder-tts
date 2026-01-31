@@ -50,6 +50,11 @@ func AddSSMLBreaks(text string, opts SSMLOptions) string {
 		return text
 	}
 
+	// Replace colons with spaces as some TTS engines struggle with them
+	text = strings.ReplaceAll(text, ":", " ")
+	// Normalize multiple horizontal spaces to single space (preserve newlines)
+	text = regexp.MustCompile(`[ \t]+`).ReplaceAllString(text, " ")
+
 	// Handle legacy UseSentencePauses flag
 	if opts.UseSentencePauses && opts.SentenceBreakMs == 0 && opts.ParagraphBreakMs == 0 {
 		opts.SentenceBreakMs = 500
@@ -113,6 +118,11 @@ func WrapTextInSSMLWithOptions(text string, opts SSMLOptions) string {
 	if strings.TrimSpace(text) == "" {
 		return "<speak></speak>"
 	}
+
+	// Replace colons with spaces as some TTS engines struggle with them
+	text = strings.ReplaceAll(text, ":", " ")
+	// Normalize multiple horizontal spaces to single space (preserve newlines)
+	text = regexp.MustCompile(`[ \t]+`).ReplaceAllString(text, " ")
 
 	// Handle legacy UseSentencePauses flag
 	if opts.UseSentencePauses && opts.SentenceBreakMs == 0 && opts.ParagraphBreakMs == 0 {
