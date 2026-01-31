@@ -180,6 +180,8 @@ Flags:
 - SSML break tag support for sentence and paragraph pauses (configurable durations instead of `<p>`/`<s>` tags)
 - SSML-first chunking to preserve pauses across chunk boundaries
 - SSML-aware chunker that never splits SSML tags
+- Comprehensive sentence separator support (!!!, ???, ?!, ellipsis, Unicode punctuation)
+- SSML debug files for troubleshooting (`.ssml.txt` files show text with breaks before chunking)
 
 ### In Progress 🔄
 
@@ -551,6 +553,108 @@ abb-tts:
 | `ABB_TTS_LOG_FILE` | Log file path | `/logs/abb_tts.log` |
 | `ABB_TTS_SERVER_URL` | Silero TTS server URL | `http://tts-silero:80/tts-silero` |
 | `ABB_TTS_OPDS_SERVER_URL` | Biblio Catalog URL | `http://biblio-catalog:80/catalog` |
+
+---
+
+## Feature: Comprehensive Sentence Separator Support ✅ IMPLEMENTED
+
+### Problem Statement
+
+Ebooks often use varied punctuation styles for dramatic effect:
+- Multiple exclamation marks: `!!!`, `!!`
+- Multiple question marks: `???`, `??`
+- Combined punctuation: `?!`, `!?`
+- Ellipsis variations: `...`, `....`, `.....`
+- Unicode punctuation: Armenian `։`, Arabic `؟`, Interrobang `‽`
+
+The previous implementation only recognized single punctuation marks (`.`, `!`, `?`), causing these variations to be treated as mid-sentence punctuation, resulting in missing pauses.
+
+### Solution
+
+Updated the sentence separator regex pattern to recognize all common punctuation combinations found in ebooks.
+
+### Implementation
+
+**Status**: ✅ Implemented
+
+**Changes made:**
+
+1. **Updated sentence pattern** (`internal/ssml/ssml.go`):
+   - Changed from `([.!?։؟])` to `([.!?։؟‽]+)`
+   - The `+` quantifier matches one or more consecutive punctuation marks
+   - Now treats ellipsis as sentence boundaries for natural pauses
+
+2. **Supported separators:**
+   - Single: `.` `!` `?`
+   - Multiple: `!!` `!!!` `??` `???`
+   - Combined: `?!` `!?`
+   - Ellipsis: `...` `....` `.....`
+   - Unicode: `։` `؟` `‽`
+
+3. **Comprehensive test coverage:**
+   - Created `ssml_sentence_test.go` with 20+ test cases
+   - Tests all separator combinations
+   - Verifies edge cases
+
+**Example:**
+```
+Input: "What?! Really!!! Yes... Okay."
+Output: What?!<break time="500ms"/>Really!!!<break time="500ms"/>Yes...<break time="500ms"/>Okay.
+```
+
+**Benefits:**
+- ✅ Natural pauses after dramatic punctuation
+- ✅ Better handling of literary styles
+- ✅ Support for international ebooks
+- ✅ Improved audiobook listening experience
+
+---
+
+## Feature: SSML Debug Files ✅ IMPLEMENTED
+
+### Problem Statement
+
+When troubleshooting SSML-first chunking, it's difficult to verify that SSML break tags are being added correctly to the text before chunking occurs. The only way to see the SSML was to inspect the actual TTS requests.
+
+### Solution
+
+Save debug files showing the text with SSML break tags before chunking, alongside the regular chapter text files.
+
+### Implementation
+
+**Status**: ✅ Implemented
+
+**Changes made:**
+
+1. **Debug file output** (`internal/server/worker.go`):
+   - For each chapter, save two files:
+     - `01_Chapter_Title.txt` - Raw chapter text (sanitized/normalized)
+     - `01_Chapter_Title.ssml.txt` - Text with SSML break tags before chunking
+   - Only created when SSML is enabled for the provider
+   - Saved in the same temp directory as regular text files
+
+2. **File location:**
+   ```
+   /home/ubuntu/git/biblio-hub/data/abb_tts/temp/[BookName]/
+   ├── 01_Chapter_Title.txt
+   ├── 01_Chapter_Title.ssml.txt
+   ├── 02_Chapter_Title.txt
+   ├── 02_Chapter_Title.ssml.txt
+   └── ...
+   ```
+
+3. **Example SSML debug file content:**
+   ```
+   First sentence.<break time="500ms"/>Second sentence.<break time="500ms"/>
+   
+   <break time="800ms"/>New paragraph here.<break time="500ms"/>Another sentence.
+   ```
+
+**Benefits:**
+- ✅ Easy verification of SSML-first chunking
+- ✅ Visual confirmation that breaks are preserved
+- ✅ Helpful for debugging pause issues
+- ✅ No impact on production (debug files only)
 
 ---
 
