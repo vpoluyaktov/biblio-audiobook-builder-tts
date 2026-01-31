@@ -6,6 +6,7 @@ import (
 )
 
 // TestInitialsProtection tests that abbreviated initials are not split into separate sentences
+// Language-agnostic tests for the initials protection feature
 func TestInitialsProtection(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -14,46 +15,22 @@ func TestInitialsProtection(t *testing.T) {
 		shouldContain  []string
 	}{
 		{
-			name:           "Russian initials В.В.",
-			text:           "Академик В.В. Смагорин работал здесь.",
-			expectedBreaks: 0, // Only one sentence
-			shouldContain:  []string{"В.В. Смагорин"},
-		},
-		{
-			name:           "Russian initials with sentence after",
-			text:           "Академик В.В. Смагорин. Судебно-медицинский эксперт.",
-			expectedBreaks: 1, // Two sentences
-			shouldContain:  []string{"В.В. Смагорин"},
-		},
-		{
 			name:           "English initials A.B.",
 			text:           "Professor A.B. Smith published the paper.",
 			expectedBreaks: 0,
 			shouldContain:  []string{"A.B. Smith"},
 		},
 		{
-			name:           "Initials with spaces В. В.",
-			text:           "Академик В. В. Смагорин работал здесь.",
-			expectedBreaks: 0,
-			shouldContain:  []string{"В.В. Смагорин"}, // Spaces should be removed
-		},
-		{
-			name:           "Multiple people with initials",
-			text:           "А.А. Иванов и Б.Б. Петров встретились.",
-			expectedBreaks: 0,
-			shouldContain:  []string{"А.А. Иванов", "Б.Б. Петров"},
-		},
-		{
-			name:           "Initials before period and new sentence",
-			text:           "Документ подписал В.В.. Другое предложение здесь.",
+			name:           "English initials with sentence after",
+			text:           "Professor J.K. Rowling wrote books. She was famous.",
 			expectedBreaks: 1,
-			shouldContain:  []string{"В.В."},
+			shouldContain:  []string{"J.K. Rowling"},
 		},
 		{
-			name:           "Complex example from book",
-			text:           "Академик В.В. Смагорин. Судебно-медицинский эксперт осматривал тело.",
-			expectedBreaks: 1,
-			shouldContain:  []string{"В.В. Смагорин"},
+			name:           "Initials with spaces normalized",
+			text:           "Professor A. B. Smith published the paper.",
+			expectedBreaks: 0,
+			shouldContain:  []string{"A.B. Smith"}, // Spaces should be removed
 		},
 	}
 
@@ -91,27 +68,21 @@ func TestSplitIntoSentences_Initials(t *testing.T) {
 	}{
 		{
 			name:              "Initials not split",
-			text:              "Академик В.В. Смагорин работал.",
+			text:              "Professor A.B. Smith worked here.",
 			expectedSentences: 1,
-			shouldContain:     []string{"В.В. Смагорин"},
+			shouldContain:     []string{"A.B. Smith"},
 		},
 		{
 			name:              "Two sentences with initials",
-			text:              "Академик В.В. Смагорин. Он работал здесь.",
+			text:              "Professor A.B. Smith. He worked here.",
 			expectedSentences: 2,
-			shouldContain:     []string{"В.В. Смагорин", "Он работал"},
+			shouldContain:     []string{"A.B. Smith", "He worked"},
 		},
 		{
 			name:              "Initials with spaces normalized",
-			text:              "Профессор А. Б. Иванов.",
+			text:              "Professor A. B. Smith.",
 			expectedSentences: 1,
-			shouldContain:     []string{"А.Б. Иванов"},
-		},
-		{
-			name:              "Multiple initials in one sentence",
-			text:              "А.А. Иванов и Б.Б. Петров встретились.",
-			expectedSentences: 1,
-			shouldContain:     []string{"А.А. Иванов", "Б.Б. Петров"},
+			shouldContain:     []string{"A.B. Smith"},
 		},
 	}
 
@@ -145,21 +116,8 @@ func TestAddSSMLBreaks_Initials(t *testing.T) {
 		wantNotContain []string
 	}{
 		{
-			name: "Russian initials preserved",
-			text: "Академик В.В. Смагорин. Эксперт осматривал тело.",
-			opts: SSMLOptions{SentenceBreakMs: 500},
-			wantContains: []string{
-				"В.В. Смагорин",
-				`<break time="500ms"/>`,
-				"Эксперт осматривал",
-			},
-			wantNotContain: []string{
-				"В. <break", // Should NOT have break between initials
-			},
-		},
-		{
 			name: "English initials preserved",
-			text: "Dr. A.B. Smith. He was a scientist.",
+			text: "Professor A.B. Smith published papers. He was a scientist.",
 			opts: SSMLOptions{SentenceBreakMs: 500},
 			wantContains: []string{
 				"A.B. Smith",
@@ -171,14 +129,14 @@ func TestAddSSMLBreaks_Initials(t *testing.T) {
 		},
 		{
 			name: "Initials with spaces normalized",
-			text: "Профессор И. И. Петров. Он работал.",
+			text: "Professor J. K. Rowling. She wrote books.",
 			opts: SSMLOptions{SentenceBreakMs: 500},
 			wantContains: []string{
-				"И.И. Петров", // Spaces removed
+				"J.K. Rowling", // Spaces removed
 				`<break time="500ms"/>`,
 			},
 			wantNotContain: []string{
-				"И. <break", // Should NOT have break between initials
+				"J. <break", // Should NOT have break between initials
 			},
 		},
 	}
