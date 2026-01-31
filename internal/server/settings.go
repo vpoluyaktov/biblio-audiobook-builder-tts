@@ -26,14 +26,16 @@ type SettingsRequest struct {
 	DefaultPitch            float64 `json:"default_pitch"`
 	UseDefaultPronunciation bool    `json:"use_default_pronunciation"`
 	PronunciationDictFile   string  `json:"pronunciation_dict_file"`
+	SentenceBreakMs         int     `json:"sentence_break_ms"`
+	ParagraphBreakMs        int     `json:"paragraph_break_ms"`
+	ConvertDashesToBreaks   bool    `json:"convert_dashes_to_breaks"`
+	DashBreakDurationMs     int     `json:"dash_break_duration_ms"`
 
 	// Output
-	ChapterGapSeconds     int  `json:"chapter_gap_seconds"`
-	PartGapSeconds        int  `json:"part_gap_seconds"`
-	DetectPartSeparators  bool `json:"detect_part_separators"`
-	ConvertDashesToBreaks bool `json:"convert_dashes_to_breaks"`
-	DashBreakDurationMs   int  `json:"dash_break_duration_ms"`
-	MaxFileSizeMB         int  `json:"max_file_size_mb"`
+	ChapterGapSeconds    int  `json:"chapter_gap_seconds"`
+	PartGapSeconds       int  `json:"part_gap_seconds"`
+	DetectPartSeparators bool `json:"detect_part_separators"`
+	MaxFileSizeMB        int  `json:"max_file_size_mb"`
 
 	// Performance
 	ConcurrentEncoders int `json:"concurrent_encoders"`
@@ -79,14 +81,16 @@ func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
 		DefaultPitch:            s.cfg.DefaultPitch,
 		UseDefaultPronunciation: s.cfg.UseDefaultPronunciation,
 		PronunciationDictFile:   s.cfg.PronunciationDictFile,
+		SentenceBreakMs:         s.cfg.SentenceBreakMs,
+		ParagraphBreakMs:        s.cfg.ParagraphBreakMs,
+		ConvertDashesToBreaks:   s.cfg.ConvertDashesToBreaks,
+		DashBreakDurationMs:     s.cfg.DashBreakDurationMs,
 
 		// Output
-		ChapterGapSeconds:     s.cfg.ChapterGapSeconds,
-		PartGapSeconds:        s.cfg.PartGapSeconds,
-		DetectPartSeparators:  s.cfg.DetectPartSeparators,
-		ConvertDashesToBreaks: s.cfg.ConvertDashesToBreaks,
-		DashBreakDurationMs:   s.cfg.DashBreakDurationMs,
-		MaxFileSizeMB:         s.cfg.MaxFileSizeMB,
+		ChapterGapSeconds:    s.cfg.ChapterGapSeconds,
+		PartGapSeconds:       s.cfg.PartGapSeconds,
+		DetectPartSeparators: s.cfg.DetectPartSeparators,
+		MaxFileSizeMB:        s.cfg.MaxFileSizeMB,
 
 		// Performance
 		ConcurrentEncoders: s.cfg.ConcurrentEncoders,
@@ -168,6 +172,18 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 	if wasProvided("pronunciation_dict_file") {
 		s.cfg.PronunciationDictFile = req.PronunciationDictFile
 	}
+	if wasProvided("sentence_break_ms") {
+		s.cfg.SentenceBreakMs = req.SentenceBreakMs
+	}
+	if wasProvided("paragraph_break_ms") {
+		s.cfg.ParagraphBreakMs = req.ParagraphBreakMs
+	}
+	if wasProvided("convert_dashes_to_breaks") {
+		s.cfg.ConvertDashesToBreaks = req.ConvertDashesToBreaks
+	}
+	if wasProvided("dash_break_duration_ms") {
+		s.cfg.DashBreakDurationMs = req.DashBreakDurationMs
+	}
 
 	// Output
 	if wasProvided("chapter_gap_seconds") {
@@ -178,12 +194,6 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if wasProvided("detect_part_separators") {
 		s.cfg.DetectPartSeparators = req.DetectPartSeparators
-	}
-	if wasProvided("convert_dashes_to_breaks") {
-		s.cfg.ConvertDashesToBreaks = req.ConvertDashesToBreaks
-	}
-	if wasProvided("dash_break_duration_ms") {
-		s.cfg.DashBreakDurationMs = req.DashBreakDurationMs
 	}
 	if wasProvided("max_file_size_mb") {
 		s.cfg.MaxFileSizeMB = req.MaxFileSizeMB
@@ -230,6 +240,8 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 			"dash_break_duration_ms":    {fmt.Sprintf("%d", req.DashBreakDurationMs), wasProvided("dash_break_duration_ms")},
 			"pronunciation_dict_file":   {req.PronunciationDictFile, wasProvided("pronunciation_dict_file")},
 			"use_default_pronunciation": {fmt.Sprintf("%t", req.UseDefaultPronunciation), wasProvided("use_default_pronunciation")},
+			"sentence_break_ms":         {fmt.Sprintf("%d", req.SentenceBreakMs), wasProvided("sentence_break_ms")},
+			"paragraph_break_ms":        {fmt.Sprintf("%d", req.ParagraphBreakMs), wasProvided("paragraph_break_ms")},
 			"max_file_size_mb":          {fmt.Sprintf("%d", req.MaxFileSizeMB), wasProvided("max_file_size_mb")},
 			"concurrent_encoders":       {fmt.Sprintf("%d", req.ConcurrentEncoders), wasProvided("concurrent_encoders")},
 			"audiobookshelf_url":        {req.AudiobookshelfURL, wasProvided("audiobookshelf_url")},

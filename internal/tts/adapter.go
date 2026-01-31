@@ -136,11 +136,12 @@ func (a *Adapter) ConvertToSpeech(text string, voice string, options *Conversion
 		chunkToConvert := chunk
 		if options != nil && options.SSMLSupport {
 			chunkToConvert = ssml.WrapTextInSSMLWithOptions(chunk, ssml.SSMLOptions{
-				UseSentencePauses:     options.UseSentencePauses,
+				SentenceBreakMs:       options.SentenceBreakMs,
+				ParagraphBreakMs:      options.ParagraphBreakMs,
 				ConvertDashesToBreaks: options.ConvertDashesToBreaks,
 				DashBreakDurationMs:   options.DashBreakDurationMs,
 			})
-			logger.Debug("Applied SSML wrapping to chunk %d/%d (sentence pauses: %v, dash breaks: %v)", i+1, len(chunks), options.UseSentencePauses, options.ConvertDashesToBreaks)
+			logger.Debug("Applied SSML wrapping to chunk %d/%d (sentence break: %dms, paragraph break: %dms, dash breaks: %v)", i+1, len(chunks), options.SentenceBreakMs, options.ParagraphBreakMs, options.ConvertDashesToBreaks)
 		}
 
 		// Convert this chunk with retry logic for transient failures
@@ -235,11 +236,12 @@ func (a *Adapter) ConvertToSpeechWithChunks(text string, voice string, options *
 		chunkToConvert := chunk
 		if options != nil && options.SSMLSupport {
 			chunkToConvert = ssml.WrapTextInSSMLWithOptions(chunk, ssml.SSMLOptions{
-				UseSentencePauses:     options.UseSentencePauses,
+				SentenceBreakMs:       options.SentenceBreakMs,
+				ParagraphBreakMs:      options.ParagraphBreakMs,
 				ConvertDashesToBreaks: options.ConvertDashesToBreaks,
 				DashBreakDurationMs:   options.DashBreakDurationMs,
 			})
-			logger.Debug("Applied SSML wrapping to chunk %d/%d (sentence pauses: %v, dash breaks: %v)", i+1, len(chunks), options.UseSentencePauses, options.ConvertDashesToBreaks)
+			logger.Debug("Applied SSML wrapping to chunk %d/%d (sentence break: %dms, paragraph break: %dms, dash breaks: %v)", i+1, len(chunks), options.SentenceBreakMs, options.ParagraphBreakMs, options.ConvertDashesToBreaks)
 		}
 
 		// Convert this chunk with retry logic for transient failures

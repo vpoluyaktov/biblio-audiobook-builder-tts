@@ -17,9 +17,13 @@ var ellipsisPattern = regexp.MustCompile(`\.{2,}`)
 
 // SSMLOptions contains options for SSML text wrapping
 type SSMLOptions struct {
-	UseSentencePauses     bool // Add paragraph/sentence tags for natural pauses
+	SentenceBreakMs       int  // Duration of break between sentences in ms (0 = no breaks)
+	ParagraphBreakMs      int  // Duration of break between paragraphs in ms (0 = no breaks)
 	ConvertDashesToBreaks bool // Convert inline dashes to SSML break tags
 	DashBreakDurationMs   int  // Duration of break for dashes (default 300ms)
+
+	// Deprecated: Use SentenceBreakMs and ParagraphBreakMs instead
+	UseSentencePauses bool // Legacy: Add paragraph/sentence tags for natural pauses
 }
 
 // WrapTextInSSML converts plain text to SSML format.
@@ -38,6 +42,12 @@ func WrapTextInSSMLWithOptions(text string, opts SSMLOptions) string {
 		return "<speak></speak>"
 	}
 
+	// Handle legacy UseSentencePauses flag
+	if opts.UseSentencePauses && opts.SentenceBreakMs == 0 && opts.ParagraphBreakMs == 0 {
+		opts.SentenceBreakMs = 500
+		opts.ParagraphBreakMs = 800
+	}
+
 	// Choose the appropriate escape function based on options
 	escapeFunc := escapeXML
 	if opts.ConvertDashesToBreaks {
@@ -46,41 +56,46 @@ func WrapTextInSSMLWithOptions(text string, opts SSMLOptions) string {
 			breakMs = 300
 		}
 		escapeFunc = func(t string) string {
-			return escapeXMLWithDashBreaks(t, breakMs)
+			return escapeXMLWithPauseBreaks(t, breakMs)
 		}
 	}
 
-	// Simple wrapper without paragraph/sentence pauses
-	if !opts.UseSentencePauses {
+	// Simple wrapper without paragraph/sentence breaks
+	if opts.SentenceBreakMs == 0 && opts.ParagraphBreakMs == 0 {
 		return "<speak>" + escapeFunc(text) + "</speak>"
 	}
 
-	// Full SSML with paragraph and sentence tags
+	// SSML with break tags between sentences and paragraphs
 	paragraphs := splitIntoParagraphs(text)
 
 	var result strings.Builder
-	result.WriteString("<speak>\n")
+	result.WriteString("<speak>")
 
-	for _, para := range paragraphs {
+	for paraIdx, para := range paragraphs {
 		para = strings.TrimSpace(para)
 		if para == "" {
 			continue
 		}
 
-		result.WriteString("<p>\n")
-
 		sentences := splitIntoSentences(para)
-		for _, sent := range sentences {
+		for sentIdx, sent := range sentences {
 			sent = strings.TrimSpace(sent)
 			if sent == "" {
 				continue
 			}
-			result.WriteString("  <s>")
+
 			result.WriteString(escapeFunc(sent))
-			result.WriteString("</s>\n")
+
+			// Add sentence break after each sentence (except last in paragraph)
+			if opts.SentenceBreakMs > 0 && sentIdx < len(sentences)-1 {
+				result.WriteString(fmt.Sprintf(`<break time="%dms"/>`, opts.SentenceBreakMs))
+			}
 		}
 
-		result.WriteString("</p>\n")
+		// Add paragraph break after each paragraph (except last)
+		if opts.ParagraphBreakMs > 0 && paraIdx < len(paragraphs)-1 {
+			result.WriteString(fmt.Sprintf(`<break time="%dms"/>`, opts.ParagraphBreakMs))
+		}
 	}
 
 	result.WriteString("</speak>")
@@ -259,10 +274,4 @@ func escapeXMLWithPauseBreaks(text string, breakDurationMs int) string {
 	text = strings.ReplaceAll(text, breakPlaceholder, breakTag)
 
 	return text
-}
-
-// escapeXMLWithDashBreaks is kept for backward compatibility
-// Deprecated: Use escapeXMLWithPauseBreaks instead
-func escapeXMLWithDashBreaks(text string, breakDurationMs int) string {
-	return escapeXMLWithPauseBreaks(text, breakDurationMs)
 }

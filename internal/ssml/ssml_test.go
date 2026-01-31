@@ -20,33 +20,38 @@ func TestWrapTextInSSML_EmptyText(t *testing.T) {
 
 func TestWrapTextInSSML_SingleSentence(t *testing.T) {
 	result := WrapTextInSSML("Hello world.", true)
+
 	if !strings.Contains(result, "<speak>") {
 		t.Error("Missing <speak> tag")
 	}
 	if !strings.Contains(result, "</speak>") {
 		t.Error("Missing </speak> tag")
 	}
-	if !strings.Contains(result, "<p>") {
-		t.Error("Missing <p> tag")
+	// With new break tag implementation, single sentence has no breaks
+	if !strings.Contains(result, "Hello world.") {
+		t.Errorf("Missing text content, got: %s", result)
 	}
-	if !strings.Contains(result, "<s>Hello world.</s>") {
-		t.Errorf("Missing sentence tag, got: %s", result)
+	// Should use break tags with default 500ms/800ms durations
+	expected := "<speak>Hello world.</speak>"
+	if result != expected {
+		t.Errorf("Expected: %s, got: %s", expected, result)
 	}
 }
 
 func TestWrapTextInSSML_MultipleSentences(t *testing.T) {
 	result := WrapTextInSSML("First sentence. Second sentence! Third sentence?", true)
-
-	if strings.Count(result, "<s>") != 3 {
-		t.Errorf("Expected 3 sentence tags, got %d in: %s", strings.Count(result, "<s>"), result)
+	// With break tags, we expect 2 breaks between 3 sentences (500ms default)
+	if strings.Count(result, `<break time="500ms"/>`) != 2 {
+		t.Errorf("Expected 2 sentence break tags, got %d in: %s", strings.Count(result, `<break time="500ms"/>`), result)
 	}
-	if !strings.Contains(result, "<s>First sentence.</s>") {
+	// All sentences should be present
+	if !strings.Contains(result, "First sentence.") {
 		t.Error("Missing first sentence")
 	}
-	if !strings.Contains(result, "<s>Second sentence!</s>") {
+	if !strings.Contains(result, "Second sentence!") {
 		t.Error("Missing second sentence")
 	}
-	if !strings.Contains(result, "<s>Third sentence?</s>") {
+	if !strings.Contains(result, "Third sentence?") {
 		t.Error("Missing third sentence")
 	}
 }
@@ -55,8 +60,9 @@ func TestWrapTextInSSML_MultipleParagraphs(t *testing.T) {
 	input := "First paragraph.\n\nSecond paragraph."
 	result := WrapTextInSSML(input, true)
 
-	if strings.Count(result, "<p>") != 2 {
-		t.Errorf("Expected 2 paragraph tags, got %d in: %s", strings.Count(result, "<p>"), result)
+	// With break tags, we expect 1 paragraph break between 2 paragraphs (800ms default)
+	if strings.Count(result, `<break time="800ms"/>`) != 1 {
+		t.Errorf("Expected 1 paragraph break tag, got %d in: %s", strings.Count(result, `<break time="800ms"/>`), result)
 	}
 }
 
@@ -64,8 +70,9 @@ func TestWrapTextInSSML_SingleNewlineParagraphs(t *testing.T) {
 	input := "First paragraph.\nSecond paragraph."
 	result := WrapTextInSSML(input, true)
 
-	if strings.Count(result, "<p>") != 2 {
-		t.Errorf("Expected 2 paragraph tags for single newline, got %d in: %s", strings.Count(result, "<p>"), result)
+	// Single newline also creates paragraph break
+	if strings.Count(result, `<break time="800ms"/>`) != 1 {
+		t.Errorf("Expected 1 paragraph break tag for single newline, got %d in: %s", strings.Count(result, `<break time="800ms"/>`), result)
 	}
 }
 
@@ -92,16 +99,16 @@ func TestWrapTextInSSML_Ellipsis(t *testing.T) {
 	input := "Wait... what happened next?"
 	result := WrapTextInSSML(input, true)
 
-	// Ellipsis followed by lowercase should be one sentence
-	if strings.Count(result, "<s>") != 1 {
-		t.Errorf("Expected 1 sentence with ellipsis (lowercase continuation), got %d in: %s", strings.Count(result, "<s>"), result)
+	// Single sentence with ellipsis should have no breaks
+	if strings.Contains(result, "<break") {
+		t.Errorf("Single sentence should have no breaks, got: %s", result)
 	}
 
-	// Multiple sentences with ellipsis
+	// Multiple sentences with ellipsis - should have 1 sentence break
 	input2 := "First sentence. Wait... Second sentence."
 	result2 := WrapTextInSSML(input2, true)
-	if strings.Count(result2, "<s>") != 2 {
-		t.Errorf("Expected 2 sentences, got %d in: %s", strings.Count(result2, "<s>"), result2)
+	if strings.Count(result2, `<break time="500ms"/>`) != 1 {
+		t.Errorf("Expected 1 sentence break, got %d in: %s", strings.Count(result2, `<break time="500ms"/>`), result2)
 	}
 }
 
@@ -109,8 +116,9 @@ func TestWrapTextInSSML_RussianText(t *testing.T) {
 	input := "Привет мир. Как дела? Отлично!"
 	result := WrapTextInSSML(input, true)
 
-	if strings.Count(result, "<s>") != 3 {
-		t.Errorf("Expected 3 Russian sentences, got %d in: %s", strings.Count(result, "<s>"), result)
+	// 3 sentences = 2 sentence breaks
+	if strings.Count(result, `<break time="500ms"/>`) != 2 {
+		t.Errorf("Expected 2 sentence breaks for 3 Russian sentences, got %d in: %s", strings.Count(result, `<break time="500ms"/>`), result)
 	}
 }
 
@@ -123,11 +131,16 @@ Third paragraph is short.`
 
 	result := WrapTextInSSML(input, true)
 
-	if strings.Count(result, "<p>") != 3 {
-		t.Errorf("Expected 3 paragraphs, got %d", strings.Count(result, "<p>"))
+	// 3 paragraphs = 2 paragraph breaks
+	if strings.Count(result, `<break time="800ms"/>`) != 2 {
+		t.Errorf("Expected 2 paragraph breaks, got %d", strings.Count(result, `<break time="800ms"/>`))
 	}
-	if strings.Count(result, "<s>") != 5 {
-		t.Errorf("Expected 5 sentences, got %d in: %s", strings.Count(result, "<s>"), result)
+	// 5 sentences total, but some are at paragraph ends, so we have sentence breaks within paragraphs
+	// Para 1: 2 sentences (1 break), Para 2: 2 sentences (1 break), Para 3: 1 sentence (0 breaks)
+	// Total: 2 sentence breaks + 2 paragraph breaks = 4 breaks total
+	totalBreaks := strings.Count(result, "<break")
+	if totalBreaks != 4 {
+		t.Errorf("Expected 4 total breaks (2 sentence + 2 paragraph), got %d in: %s", totalBreaks, result)
 	}
 }
 

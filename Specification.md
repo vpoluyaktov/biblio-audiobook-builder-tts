@@ -177,11 +177,60 @@ Flags:
 - Roman numeral normalization for chapter/part titles (I, II, III, IV, etc.)
 - Part separator silence detection (detects `***`, `---`, `• • •`, etc. and inserts silence between parts)
 - SSML pause patterns for dashes and ellipsis (converts ` - ` and `...` to `<break>` tags for TTS)
+- SSML break tag support for sentence and paragraph pauses (configurable durations instead of `<p>`/`<s>` tags)
 
 ### In Progress 🔄
 
 - Parallel chapter processing
 - Test voice UI improvements
+
+---
+
+## Feature: SSML Break Tag Refactoring ✅ IMPLEMENTED
+
+### Problem Statement
+
+The current implementation uses SSML `<p>` (paragraph) and `<s>` (sentence) tags to add natural pauses between paragraphs and sentences. However, some TTS providers don't support these tags properly, while they do support `<break time="Xms"/>` tags correctly.
+
+### Goal
+
+Replace `<p>` and `<s>` SSML tags with explicit `<break>` tags with configurable durations based on average human speech patterns.
+
+### Implementation Plan
+
+**Recommended break durations** (based on speech research):
+- **Sentence break**: 500ms (typical pause between sentences)
+- **Paragraph break**: 800ms (longer pause for paragraph transitions)
+- **Inline dash/ellipsis**: 300ms (already implemented)
+
+**Implementation**:
+
+**Status**: ✅ Implemented
+
+**Files modified**:
+- `internal/ssml/ssml.go` - Refactored SSML generation to use `<break>` tags instead of `<p>`/`<s>` wrapper tags
+- `internal/config/config.go` - Added `SentenceBreakMs` and `ParagraphBreakMs` config fields
+- `internal/storage/db.go` - Added storage support for new config fields
+- `internal/tts/service.go` - Updated `ConversionOptions` struct
+- `internal/tts/adapter.go` - Updated to pass new break durations to SSML generation
+- `internal/server/worker.go` - Updated TTS conversion calls with new options
+- `internal/server/settings.go` - Moved pause settings to TTS section, added new fields
+- `internal/server/templates/index.html` - Moved pause settings to TTS Settings tab, added new UI controls
+- `internal/server/assets/app.js` - Updated form population and collection for new fields
+
+**Configuration**:
+```go
+SentenceBreakMs   int  `mapstructure:"sentence_break_ms"`   // Default: 500ms
+ParagraphBreakMs  int  `mapstructure:"paragraph_break_ms"`  // Default: 800ms
+```
+
+**How it works**:
+1. Instead of wrapping text in `<p>` and `<s>` tags, the SSML generator now inserts `<break time="Xms"/>` tags
+2. Sentence breaks are inserted between sentences within a paragraph
+3. Paragraph breaks are inserted between paragraphs
+4. Setting a value to 0 disables that type of break
+5. All pause settings (sentence, paragraph, dash, ellipsis) are now consolidated in the TTS Settings tab
+6. Maintains backward compatibility with legacy `UseSentencePauses` flag
 
 ---
 

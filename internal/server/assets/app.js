@@ -1275,14 +1275,18 @@ class App {
         document.getElementById('cfg-use-default-pronunciation').checked = s.use_default_pronunciation !== false;
         document.getElementById('cfg-pronunciation-dict').value = s.pronunciation_dict_file || '';
         
+        // TTS tab - SSML Pauses
+        document.getElementById('cfg-sentence-break').value = s.sentence_break_ms || 500;
+        document.getElementById('cfg-paragraph-break').value = s.paragraph_break_ms || 800;
+        document.getElementById('cfg-convert-dashes').checked = s.convert_dashes_to_breaks !== false;
+        document.getElementById('cfg-dash-break-duration').value = s.dash_break_duration_ms || 300;
+        
         // Output tab
         document.getElementById('cfg-chapter-gap').value = s.chapter_gap_seconds || 2;
         document.getElementById('cfg-max-file-size').value = s.max_file_size_mb || 250;
         document.getElementById('cfg-concurrent-encoders').value = s.concurrent_encoders || 2;
         document.getElementById('cfg-detect-part-separators').checked = s.detect_part_separators !== false;
         document.getElementById('cfg-part-gap').value = s.part_gap_seconds || 2;
-        document.getElementById('cfg-convert-dashes-to-breaks').checked = s.convert_dashes_to_breaks !== false;
-        document.getElementById('cfg-dash-break-duration').value = s.dash_break_duration_ms || 300;
         
         // Audiobookshelf tab
         document.getElementById('cfg-abs-url').value = s.audiobookshelf_url || '';
@@ -1505,6 +1509,10 @@ class App {
             default_pitch: parseFloat(document.getElementById('cfg-default-pitch').value),
             use_default_pronunciation: document.getElementById('cfg-use-default-pronunciation').checked,
             pronunciation_dict_file: document.getElementById('cfg-pronunciation-dict').value,
+            sentence_break_ms: parseInt(document.getElementById('cfg-sentence-break').value),
+            paragraph_break_ms: parseInt(document.getElementById('cfg-paragraph-break').value),
+            convert_dashes_to_breaks: document.getElementById('cfg-convert-dashes').checked,
+            dash_break_duration_ms: parseInt(document.getElementById('cfg-dash-break-duration').value),
             
             // Output
             chapter_gap_seconds: parseInt(document.getElementById('cfg-chapter-gap').value),
@@ -1512,8 +1520,6 @@ class App {
             concurrent_encoders: parseInt(document.getElementById('cfg-concurrent-encoders').value),
             detect_part_separators: document.getElementById('cfg-detect-part-separators').checked,
             part_gap_seconds: parseInt(document.getElementById('cfg-part-gap').value),
-            convert_dashes_to_breaks: document.getElementById('cfg-convert-dashes-to-breaks').checked,
-            dash_break_duration_ms: parseInt(document.getElementById('cfg-dash-break-duration').value),
             
             // Audiobookshelf
             audiobookshelf_url: document.getElementById('cfg-abs-url').value,

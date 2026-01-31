@@ -47,7 +47,8 @@ type ConversionOptions struct {
 	Pitch                 float64
 	Language              string // ISO 639-1 language code (e.g., "en", "ru")
 	SSMLSupport           bool   // Whether to wrap chunks in SSML tags
-	UseSentencePauses     bool   // Whether to add paragraph/sentence pauses (requires SSMLSupport)
+	SentenceBreakMs       int    // Duration of break between sentences in ms (0 = no breaks)
+	ParagraphBreakMs      int    // Duration of break between paragraphs in ms (0 = no breaks)
 	ConvertDashesToBreaks bool   // Convert inline dashes to SSML break tags (requires SSMLSupport)
 	DashBreakDurationMs   int    // Duration of break for dashes in milliseconds (default 300)
 }

@@ -486,7 +486,8 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		Pitch:                 job.Pitch,
 		Language:              job.Language,
 		SSMLSupport:           ssmlSupport,
-		UseSentencePauses:     job.UseSentencePauses,
+		SentenceBreakMs:       w.cfg.SentenceBreakMs,
+		ParagraphBreakMs:      w.cfg.ParagraphBreakMs,
 		ConvertDashesToBreaks: w.cfg.ConvertDashesToBreaks,
 		DashBreakDurationMs:   w.cfg.DashBreakDurationMs,
 	}, progressCb)
@@ -599,7 +600,8 @@ func (w *Worker) convertChapterWithParts(job *Job, chapter parser.Chapter, conte
 			Pitch:                 job.Pitch,
 			Language:              job.Language,
 			SSMLSupport:           ssmlSupport,
-			UseSentencePauses:     job.UseSentencePauses,
+			SentenceBreakMs:       w.cfg.SentenceBreakMs,
+			ParagraphBreakMs:      w.cfg.ParagraphBreakMs,
 			ConvertDashesToBreaks: w.cfg.ConvertDashesToBreaks,
 			DashBreakDurationMs:   w.cfg.DashBreakDurationMs,
 		}, progressCb)
