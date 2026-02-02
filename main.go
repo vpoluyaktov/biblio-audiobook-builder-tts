@@ -49,11 +49,11 @@ func main() {
 	host := flag.String("host", "", "Host to bind the server to (overrides config)")
 	noBrowser := flag.Bool("no-browser", false, "Don't automatically open browser")
 	restart := flag.Bool("restart", false, "Kill any existing process on the port before starting")
-	logLevel := flag.String("log-level", "INFO", "Log level: DEBUG, INFO, WARN, ERROR")
+	logLevel := flag.String("log-level", getEnvOrDefault("ABB_TTS_LOG_LEVEL", "INFO"), "Log level: DEBUG, INFO, WARN, ERROR")
 	headless := flag.Bool("headless", false, "Run without TUI (headless mode)")
 	flag.Parse()
 
-	// Set log level
+	// Set log level (environment variable or flag)
 	logger.SetLevelFromString(*logLevel)
 
 	// Initialize database

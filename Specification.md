@@ -138,6 +138,7 @@ Each provider is stored in the `providers` table with:
 | `ABB_TTS_HOST` | Server host | `0.0.0.0` |
 | `ABB_TTS_PORT` | Server port | `80` |
 | `ABB_TTS_BASE_PATH` | URL base path for path-based routing | `/abb-tts` |
+| `ABB_TTS_LOG_LEVEL` | Log level (DEBUG, INFO, WARN, ERROR) | `INFO` |
 | `ABB_TTS_SERVER_URL` | Silero TTS URL | `http://tts-silero:80/tts-silero` |
 | `ABB_TTS_OPDS_SERVER_URL` | Biblio Catalog URL | `http://biblio-catalog:80/catalog` |
 
@@ -226,6 +227,45 @@ if r.Header.Get("Upgrade") != "websocket" {
 - ✅ Proper HTTP response for non-WebSocket requests
 - ✅ Actual WebSocket errors still logged for debugging
 - ✅ No impact on WebSocket functionality
+
+---
+
+## Bug Fix: ABB_TTS_LOG_LEVEL Environment Variable Support ✅ FIXED
+
+### Problem Statement
+
+The `ABB_TTS_LOG_LEVEL` environment variable was not being read by the application. The log level was only configurable via the `--log-level` command-line flag, which defaulted to "INFO". This made it impossible to enable DEBUG logging in Docker deployments without modifying the container command.
+
+### Solution
+
+Modified `main.go` to read the `ABB_TTS_LOG_LEVEL` environment variable as the default value for the `--log-level` flag. Updated `stack.yaml` to pass the environment variable from `.env` file to the container.
+
+**Status**: ✅ Fixed
+
+**Files modified**:
+- `main.go` - Changed log-level flag default from hardcoded "INFO" to `getEnvOrDefault("ABB_TTS_LOG_LEVEL", "INFO")`
+- `stack.yaml` (biblio-hub) - Added `ABB_TTS_LOG_LEVEL=${ABB_TTS_LOG_LEVEL:-INFO}` to environment variables
+- `Specification.md` - Documented the environment variable in both Configuration and Docker sections
+
+**Implementation**:
+```go
+// Before:
+logLevel := flag.String("log-level", "INFO", "Log level: DEBUG, INFO, WARN, ERROR")
+
+// After:
+logLevel := flag.String("log-level", getEnvOrDefault("ABB_TTS_LOG_LEVEL", "INFO"), "Log level: DEBUG, INFO, WARN, ERROR")
+```
+
+**Usage**:
+1. Set in `.env` file: `ABB_TTS_LOG_LEVEL=DEBUG`
+2. Restart the service: `docker stack deploy -c stack.yaml bibliohub`
+3. DEBUG logs will now appear in `/logs/abb_tts.log`
+
+**Benefits**:
+- ✅ DEBUG logging can be enabled via environment variable
+- ✅ No need to modify Docker commands or rebuild images
+- ✅ Consistent with other environment variable patterns
+- ✅ Command-line flag still works and takes precedence
 
 ---
 
@@ -590,6 +630,7 @@ abb-tts:
 | `ABB_TTS_BASE_PATH` | URL base path for path-based routing | `/abb-tts` |
 | `ABB_TTS_TEMP_DIR` | Working directory for ebook downloads, chapter files, and audiobooks | `/data` |
 | `ABB_TTS_LOG_FILE` | Log file path | `/logs/abb_tts.log` |
+| `ABB_TTS_LOG_LEVEL` | Log level (DEBUG, INFO, WARN, ERROR) | `INFO` |
 | `ABB_TTS_SERVER_URL` | Silero TTS server URL | `http://tts-silero:80/tts-silero` |
 | `ABB_TTS_OPDS_SERVER_URL` | Biblio Catalog URL | `http://biblio-catalog:80/catalog` |
 
