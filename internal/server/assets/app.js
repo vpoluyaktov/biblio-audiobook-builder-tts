@@ -85,7 +85,7 @@ async function logout() {
 // Show login dialog for internal mode
 function showLoginDialog() {
     const dialog = document.createElement('div');
-    dialog.className = 'modal-overlay';
+    dialog.className = 'auth-modal-overlay';
     dialog.innerHTML = `
         <div class="modal login-modal">
             <h2>Login</h2>
@@ -136,7 +136,7 @@ function showLoginDialog() {
 // Show setup dialog for initial admin creation
 function showSetupDialog() {
     const dialog = document.createElement('div');
-    dialog.className = 'modal-overlay';
+    dialog.className = 'auth-modal-overlay';
     dialog.innerHTML = `
         <div class="modal setup-modal">
             <h2>Initial Setup</h2>

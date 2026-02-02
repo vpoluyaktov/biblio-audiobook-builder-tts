@@ -2042,7 +2042,7 @@ h1 .icon {
 }
 
 /* Authentication Modals */
-.modal-overlay {
+.auth-modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
