@@ -1477,6 +1477,7 @@ class App {
         document.getElementById('cfg-paragraph-break').value = s.paragraph_break_ms || 800;
         document.getElementById('cfg-convert-dashes').checked = s.convert_dashes_to_breaks !== false;
         document.getElementById('cfg-dash-break-duration').value = s.dash_break_duration_ms || 300;
+        document.getElementById('cfg-title-break').value = s.title_break_ms || 500;
         
         // Output tab
         document.getElementById('cfg-chapter-gap').value = s.chapter_gap_seconds || 2;
@@ -1710,6 +1711,7 @@ class App {
             paragraph_break_ms: parseInt(document.getElementById('cfg-paragraph-break').value),
             convert_dashes_to_breaks: document.getElementById('cfg-convert-dashes').checked,
             dash_break_duration_ms: parseInt(document.getElementById('cfg-dash-break-duration').value),
+            title_break_ms: parseInt(document.getElementById('cfg-title-break').value),
             
             // Output
             chapter_gap_seconds: parseInt(document.getElementById('cfg-chapter-gap').value),
