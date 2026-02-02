@@ -51,6 +51,7 @@ type ConversionOptions struct {
 	ParagraphBreakMs      int    // Duration of break between paragraphs in ms (0 = no breaks)
 	ConvertDashesToBreaks bool   // Convert inline dashes to SSML break tags (requires SSMLSupport)
 	DashBreakDurationMs   int    // Duration of break for dashes in milliseconds (default 300)
+	TitleBreakMs          int    // Duration of break after titles in ms (0 = no breaks)
 }
 
 // Voice represents a TTS voice

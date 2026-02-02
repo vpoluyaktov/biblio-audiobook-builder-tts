@@ -9,6 +9,10 @@ import (
 // This marker is used by the TTS processing to split content and insert silence
 const PartSeparatorMarker = "\n{{PART_SEPARATOR}}\n"
 
+// TitleBreakMarker is inserted after title tags in parsed content
+// This marker is converted to SSML break tags for natural pauses after titles
+const TitleBreakMarker = "\n{{TITLE_BREAK}}\n"
+
 // DefaultPartSeparatorPatterns contains common scene/part separator patterns
 var DefaultPartSeparatorPatterns = []string{
 	`^\s*\*\s*\*\s*\*\s*$`, // * * *

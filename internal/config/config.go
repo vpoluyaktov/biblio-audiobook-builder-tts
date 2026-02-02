@@ -35,6 +35,7 @@ type Config struct {
 	ParagraphBreakMs        int     `mapstructure:"paragraph_break_ms"`        // SSML break duration between paragraphs (default 350ms)
 	ConvertDashesToBreaks   bool    `mapstructure:"convert_dashes_to_breaks"`  // Convert inline dashes to SSML breaks
 	DashBreakDurationMs     int     `mapstructure:"dash_break_duration_ms"`    // Duration of dash break in ms (default 250)
+	TitleBreakMs            int     `mapstructure:"title_break_ms"`            // SSML break duration after titles (default 500ms)
 	PronunciationDictFile   string  `mapstructure:"pronunciation_dict_file"`   // Path to pronunciation dictionary
 	UseDefaultPronunciation bool    `mapstructure:"use_default_pronunciation"` // Use built-in pronunciation rules
 	MaxFileSizeMB           int     `mapstructure:"max_file_size_mb"`          // Max M4B file size before splitting
@@ -88,6 +89,7 @@ func Load(configFile string) (*Config, error) {
 	viper.SetDefault("paragraph_break_ms", 350)         // 350ms pause between paragraphs
 	viper.SetDefault("convert_dashes_to_breaks", true)  // Convert inline dashes to SSML breaks by default
 	viper.SetDefault("dash_break_duration_ms", 250)     // 250ms pause for dashes
+	viper.SetDefault("title_break_ms", 500)             // 500ms pause after titles
 	viper.SetDefault("pronunciation_dict_file", "")     // Custom pronunciation dictionary
 	viper.SetDefault("use_default_pronunciation", true) // Use built-in pronunciation rules
 	viper.SetDefault("max_file_size_mb", 250)           // 250MB max file size before splitting
@@ -178,6 +180,11 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 		cfg.DashBreakDurationMs = int(v)
 	} else if v, ok := dbConfig["dash_break_duration_ms"].(int); ok {
 		cfg.DashBreakDurationMs = v
+	}
+	if v, ok := dbConfig["title_break_ms"].(float64); ok {
+		cfg.TitleBreakMs = int(v)
+	} else if v, ok := dbConfig["title_break_ms"].(int); ok {
+		cfg.TitleBreakMs = v
 	}
 	if v, ok := dbConfig["pronunciation_dict_file"].(string); ok {
 		cfg.PronunciationDictFile = v

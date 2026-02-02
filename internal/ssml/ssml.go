@@ -3,6 +3,7 @@
 package ssml
 
 import (
+	"biblio-audiobook-builder-tts/internal/normalize"
 	"fmt"
 	"regexp"
 	"strings"
@@ -30,6 +31,7 @@ type SSMLOptions struct {
 	ParagraphBreakMs      int  // Duration of break between paragraphs in ms (0 = no breaks)
 	ConvertDashesToBreaks bool // Convert inline dashes to SSML break tags
 	DashBreakDurationMs   int  // Duration of break for dashes (default 300ms)
+	TitleBreakMs          int  // Duration of break after titles in ms (0 = no breaks)
 
 	// Deprecated: Use SentenceBreakMs and ParagraphBreakMs instead
 	UseSentencePauses bool // Legacy: Add paragraph/sentence tags for natural pauses
@@ -48,6 +50,15 @@ func WrapTextInSSML(text string, useSentencePauses bool) string {
 func AddSSMLBreaks(text string, opts SSMLOptions) string {
 	if strings.TrimSpace(text) == "" {
 		return text
+	}
+
+	// Convert title break markers to SSML break tags (before other processing)
+	if opts.TitleBreakMs > 0 {
+		titleBreak := fmt.Sprintf("<break time=\"%dms\"/>", opts.TitleBreakMs)
+		text = strings.ReplaceAll(text, normalize.TitleBreakMarker, "\n"+titleBreak+"\n")
+	} else {
+		// Remove title markers if no break duration specified
+		text = strings.ReplaceAll(text, normalize.TitleBreakMarker, "\n")
 	}
 
 	// Replace colons with spaces as some TTS engines struggle with them
@@ -117,6 +128,15 @@ func AddSSMLBreaks(text string, opts SSMLOptions) string {
 func WrapTextInSSMLWithOptions(text string, opts SSMLOptions) string {
 	if strings.TrimSpace(text) == "" {
 		return "<speak></speak>"
+	}
+
+	// Convert title break markers to SSML break tags (before other processing)
+	if opts.TitleBreakMs > 0 {
+		titleBreak := fmt.Sprintf("<break time=\"%dms\"/>", opts.TitleBreakMs)
+		text = strings.ReplaceAll(text, normalize.TitleBreakMarker, "\n"+titleBreak+"\n")
+	} else {
+		// Remove title markers if no break duration specified
+		text = strings.ReplaceAll(text, normalize.TitleBreakMarker, "\n")
 	}
 
 	// Replace colons with spaces as some TTS engines struggle with them

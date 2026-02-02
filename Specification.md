@@ -191,6 +191,94 @@ Flags:
 
 ---
 
+## Feature: Title Break SSML Support 🔄 IN PROGRESS
+
+### Problem Statement
+
+In FB2 books, `<title>` tags mark chapter titles and section headings within the content. Currently, these titles are converted to plain text with simple newlines, resulting in no extra pause after the title is spoken. This makes the transition from title to content feel rushed and unnatural.
+
+Example FB2 structure:
+```xml
+<section>
+  <title>
+    <p>Глава 1</p>
+  </title>
+  <p>Мертвяк неловко перевалился через высокий забор...</p>
+</section>
+```
+
+Currently outputs:
+```
+Глава 1
+Мертвяк неловко перевалился через высокий забор...
+```
+
+The TTS reads "Глава 1" and immediately continues with the content, with only a standard paragraph pause.
+
+### Goal
+
+Add an extra SSML pause after `<title>` tags to create a more natural listening experience, similar to how a human narrator would pause after announcing a chapter or section title.
+
+### Solution: Hybrid Marker Approach
+
+**Architecture**:
+1. **FB2 Parser**: Insert `{{TITLE_BREAK}}` marker after `</title>` tags
+2. **SSML Processor**: Convert marker to `<break time="Xms"/>` tag for SSML-capable providers
+3. **Configuration**: Add `TitleBreakMs` setting (default: 500ms)
+
+**Implementation**:
+
+1. **Add TitleBreakMarker constant** (`internal/normalize/separator.go`):
+   ```go
+   const TitleBreakMarker = "\n{{TITLE_BREAK}}\n"
+   ```
+
+2. **Modify FB2 parser** (`internal/parser/fb2.go`):
+   ```go
+   text = reFB2TitleClose.ReplaceAllString(text, TitleBreakMarker)
+   ```
+
+3. **Add config option** (`internal/config/config.go`):
+   ```go
+   TitleBreakMs int `mapstructure:"title_break_ms"` // Default: 500ms
+   ```
+
+4. **Update SSML processor** (`internal/ssml/ssml.go`):
+   - Add `TitleBreakMs` to `SSMLOptions`
+   - Convert `{{TITLE_BREAK}}` marker to `<break time="Xms"/>` tag
+
+**Output with feature**:
+```
+Глава 1 <break time="500ms"/>
+Мертвяк неловко перевалился через высокий забор...
+```
+
+### Benefits
+
+- ✅ Natural pause after chapter/section titles
+- ✅ Configurable pause duration
+- ✅ Works with all SSML-capable TTS providers (Silero, Google, Azure, RHVoice)
+- ✅ Consistent with existing marker pattern (like `{{PART_SEPARATOR}}`)
+- ✅ Extensible to EPUB parser in the future
+
+### Configuration
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `title_break_ms` | 500 | Pause duration after titles in milliseconds |
+
+### Files Modified
+
+- `internal/normalize/separator.go` - Add `TitleBreakMarker` constant
+- `internal/parser/fb2.go` - Insert marker after `</title>` tags
+- `internal/config/config.go` - Add `TitleBreakMs` config option
+- `internal/ssml/ssml.go` - Convert marker to SSML break tag
+- `internal/tts/service.go` - Pass `TitleBreakMs` in conversion options
+
+**Date:** 2026-02-02
+
+---
+
 ## Configuration Update: TTS Break Duration Defaults ✅ UPDATED
 
 ### Change Summary
