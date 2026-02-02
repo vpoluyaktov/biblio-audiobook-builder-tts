@@ -19,24 +19,20 @@ type SettingsRequest struct {
 	TempDir     string `json:"temp_dir"`
 	LogFile     string `json:"log_file"`
 
-	// TTS
-	DefaultProvider         string  `json:"default_provider"`
-	DefaultVoice            string  `json:"default_voice"`
-	DefaultSpeed            float64 `json:"default_speed"`
-	DefaultPitch            float64 `json:"default_pitch"`
-	UseDefaultPronunciation bool    `json:"use_default_pronunciation"`
-	PronunciationDictFile   string  `json:"pronunciation_dict_file"`
-	SentenceBreakMs         int     `json:"sentence_break_ms"`
-	ParagraphBreakMs        int     `json:"paragraph_break_ms"`
-	ConvertDashesToBreaks   bool    `json:"convert_dashes_to_breaks"`
-	DashBreakDurationMs     int     `json:"dash_break_duration_ms"`
-	TitleBreakMs            int     `json:"title_break_ms"`
+	// TTS - Pronunciation
+	UseDefaultPronunciation bool   `json:"use_default_pronunciation"`
+	PronunciationDictFile   string `json:"pronunciation_dict_file"`
+
+	// TTS - Pauses & Gaps
+	SentenceBreakMs     int `json:"sentence_break_ms"`
+	ParagraphBreakMs    int `json:"paragraph_break_ms"`
+	DashBreakDurationMs int `json:"dash_break_duration_ms"`
+	TitleBreakMs        int `json:"title_break_ms"`
+	ChapterGapSeconds   int `json:"chapter_gap_seconds"`
+	PartGapSeconds      int `json:"part_gap_seconds"`
 
 	// Output
-	ChapterGapSeconds    int  `json:"chapter_gap_seconds"`
-	PartGapSeconds       int  `json:"part_gap_seconds"`
-	DetectPartSeparators bool `json:"detect_part_separators"`
-	MaxFileSizeMB        int  `json:"max_file_size_mb"`
+	MaxFileSizeMB int `json:"max_file_size_mb"`
 
 	// Performance
 	ConcurrentEncoders int `json:"concurrent_encoders"`
@@ -75,24 +71,20 @@ func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
 		TempDir:     s.cfg.TempDir,
 		LogFile:     s.cfg.LogFile,
 
-		// TTS
-		DefaultProvider:         s.cfg.DefaultProvider,
-		DefaultVoice:            s.cfg.DefaultVoice,
-		DefaultSpeed:            s.cfg.DefaultSpeed,
-		DefaultPitch:            s.cfg.DefaultPitch,
+		// TTS - Pronunciation
 		UseDefaultPronunciation: s.cfg.UseDefaultPronunciation,
 		PronunciationDictFile:   s.cfg.PronunciationDictFile,
-		SentenceBreakMs:         s.cfg.SentenceBreakMs,
-		ParagraphBreakMs:        s.cfg.ParagraphBreakMs,
-		ConvertDashesToBreaks:   s.cfg.ConvertDashesToBreaks,
-		DashBreakDurationMs:     s.cfg.DashBreakDurationMs,
-		TitleBreakMs:            s.cfg.TitleBreakMs,
+
+		// TTS - Pauses & Gaps
+		SentenceBreakMs:     s.cfg.SentenceBreakMs,
+		ParagraphBreakMs:    s.cfg.ParagraphBreakMs,
+		DashBreakDurationMs: s.cfg.DashBreakDurationMs,
+		TitleBreakMs:        s.cfg.TitleBreakMs,
+		ChapterGapSeconds:   s.cfg.ChapterGapSeconds,
+		PartGapSeconds:      s.cfg.PartGapSeconds,
 
 		// Output
-		ChapterGapSeconds:    s.cfg.ChapterGapSeconds,
-		PartGapSeconds:       s.cfg.PartGapSeconds,
-		DetectPartSeparators: s.cfg.DetectPartSeparators,
-		MaxFileSizeMB:        s.cfg.MaxFileSizeMB,
+		MaxFileSizeMB: s.cfg.MaxFileSizeMB,
 
 		// Performance
 		ConcurrentEncoders: s.cfg.ConcurrentEncoders,
@@ -155,33 +147,20 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 		s.cfg.LogFile = req.LogFile
 	}
 
-	// TTS
-	if wasProvided("default_provider") {
-		s.cfg.DefaultProvider = req.DefaultProvider
-	}
-	if wasProvided("default_voice") {
-		s.cfg.DefaultVoice = req.DefaultVoice
-	}
-	if wasProvided("default_speed") {
-		s.cfg.DefaultSpeed = req.DefaultSpeed
-	}
-	if wasProvided("default_pitch") {
-		s.cfg.DefaultPitch = req.DefaultPitch
-	}
+	// TTS - Pronunciation
 	if wasProvided("use_default_pronunciation") {
 		s.cfg.UseDefaultPronunciation = req.UseDefaultPronunciation
 	}
 	if wasProvided("pronunciation_dict_file") {
 		s.cfg.PronunciationDictFile = req.PronunciationDictFile
 	}
+
+	// TTS - Pauses & Gaps
 	if wasProvided("sentence_break_ms") {
 		s.cfg.SentenceBreakMs = req.SentenceBreakMs
 	}
 	if wasProvided("paragraph_break_ms") {
 		s.cfg.ParagraphBreakMs = req.ParagraphBreakMs
-	}
-	if wasProvided("convert_dashes_to_breaks") {
-		s.cfg.ConvertDashesToBreaks = req.ConvertDashesToBreaks
 	}
 	if wasProvided("dash_break_duration_ms") {
 		s.cfg.DashBreakDurationMs = req.DashBreakDurationMs
@@ -189,17 +168,14 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 	if wasProvided("title_break_ms") {
 		s.cfg.TitleBreakMs = req.TitleBreakMs
 	}
-
-	// Output
 	if wasProvided("chapter_gap_seconds") {
 		s.cfg.ChapterGapSeconds = req.ChapterGapSeconds
 	}
 	if wasProvided("part_gap_seconds") {
 		s.cfg.PartGapSeconds = req.PartGapSeconds
 	}
-	if wasProvided("detect_part_separators") {
-		s.cfg.DetectPartSeparators = req.DetectPartSeparators
-	}
+
+	// Output
 	if wasProvided("max_file_size_mb") {
 		s.cfg.MaxFileSizeMB = req.MaxFileSizeMB
 	}
@@ -231,23 +207,17 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 		}{
 			"log_file":                  {req.LogFile, wasProvided("log_file")},
 			"temp_dir":                  {req.TempDir, wasProvided("temp_dir")},
-			"default_voice":             {req.DefaultVoice, wasProvided("default_voice")},
-			"default_provider":          {req.DefaultProvider, wasProvided("default_provider")},
 			"server_port":               {req.ServerPort, wasProvided("server_port")},
 			"server_host":               {req.ServerHost, wasProvided("server_host")},
 			"open_browser":              {fmt.Sprintf("%t", req.OpenBrowser), wasProvided("open_browser")},
-			"default_speed":             {fmt.Sprintf("%.2f", req.DefaultSpeed), wasProvided("default_speed")},
-			"default_pitch":             {fmt.Sprintf("%.2f", req.DefaultPitch), wasProvided("default_pitch")},
-			"chapter_gap_seconds":       {fmt.Sprintf("%d", req.ChapterGapSeconds), wasProvided("chapter_gap_seconds")},
-			"part_gap_seconds":          {fmt.Sprintf("%d", req.PartGapSeconds), wasProvided("part_gap_seconds")},
-			"detect_part_separators":    {fmt.Sprintf("%t", req.DetectPartSeparators), wasProvided("detect_part_separators")},
-			"convert_dashes_to_breaks":  {fmt.Sprintf("%t", req.ConvertDashesToBreaks), wasProvided("convert_dashes_to_breaks")},
-			"dash_break_duration_ms":    {fmt.Sprintf("%d", req.DashBreakDurationMs), wasProvided("dash_break_duration_ms")},
-			"title_break_ms":            {fmt.Sprintf("%d", req.TitleBreakMs), wasProvided("title_break_ms")},
-			"pronunciation_dict_file":   {req.PronunciationDictFile, wasProvided("pronunciation_dict_file")},
 			"use_default_pronunciation": {fmt.Sprintf("%t", req.UseDefaultPronunciation), wasProvided("use_default_pronunciation")},
+			"pronunciation_dict_file":   {req.PronunciationDictFile, wasProvided("pronunciation_dict_file")},
 			"sentence_break_ms":         {fmt.Sprintf("%d", req.SentenceBreakMs), wasProvided("sentence_break_ms")},
 			"paragraph_break_ms":        {fmt.Sprintf("%d", req.ParagraphBreakMs), wasProvided("paragraph_break_ms")},
+			"dash_break_duration_ms":    {fmt.Sprintf("%d", req.DashBreakDurationMs), wasProvided("dash_break_duration_ms")},
+			"title_break_ms":            {fmt.Sprintf("%d", req.TitleBreakMs), wasProvided("title_break_ms")},
+			"chapter_gap_seconds":       {fmt.Sprintf("%d", req.ChapterGapSeconds), wasProvided("chapter_gap_seconds")},
+			"part_gap_seconds":          {fmt.Sprintf("%d", req.PartGapSeconds), wasProvided("part_gap_seconds")},
 			"max_file_size_mb":          {fmt.Sprintf("%d", req.MaxFileSizeMB), wasProvided("max_file_size_mb")},
 			"concurrent_encoders":       {fmt.Sprintf("%d", req.ConcurrentEncoders), wasProvided("concurrent_encoders")},
 			"audiobookshelf_url":        {req.AudiobookshelfURL, wasProvided("audiobookshelf_url")},
