@@ -20,10 +20,12 @@ async function checkAuth() {
         
         if (!authInfo.authenticated) {
             // Not authenticated - redirect to login
-            if (authInfo.mode === 'biblio-auth' && authInfo.login_url) {
+            if (authInfo.mode === 'biblio-auth') {
                 // Biblio Auth mode - redirect to Biblio Auth login
+                // Construct the login URL using the browser's origin (not the internal Docker URL)
                 const returnUrl = encodeURIComponent(window.location.href);
-                window.location.href = authInfo.login_url + (authInfo.login_url.includes('?') ? '&' : '?') + 'returnUrl=' + returnUrl;
+                const biblioAuthLoginUrl = window.location.origin + '/auth/login?returnUrl=' + returnUrl;
+                window.location.href = biblioAuthLoginUrl;
             } else if (authInfo.mode === 'internal') {
                 // Internal mode - check if setup is required
                 const setupResponse = await fetch(apiUrl('/api/auth/setup/check'));
@@ -61,9 +63,9 @@ function updateUserInfo(user) {
 // Logout function
 async function logout() {
     try {
-        if (authInfo && authInfo.mode === 'biblio-auth' && authInfo.logout_url) {
-            // Biblio Auth mode - redirect to Biblio Auth logout
-            window.location.href = authInfo.logout_url;
+        if (authInfo && authInfo.mode === 'biblio-auth') {
+            // Biblio Auth mode - redirect to Biblio Auth logout using browser origin
+            window.location.href = window.location.origin + '/auth/api/logout';
         } else {
             // Internal mode - call logout API
             await fetch(apiUrl('/api/auth/logout'), { method: 'POST' });
