@@ -191,6 +191,42 @@ Flags:
 
 ---
 
+## Configuration Update: TTS Break Duration Defaults ✅ UPDATED
+
+### Change Summary
+
+Updated default SSML break durations to provide faster, more natural-sounding speech pacing:
+
+**Previous defaults:**
+- Sentence break: 500ms
+- Paragraph break: 800ms
+- Dash/ellipsis break: 300ms
+
+**New defaults:**
+- Sentence break: 300ms
+- Paragraph break: 350ms
+- Dash/ellipsis break: 250ms
+
+### Rationale
+
+The original defaults were based on general speech research but resulted in overly long pauses that slowed down audiobook playback. The new defaults provide:
+- Faster pacing while maintaining natural speech rhythm
+- Better alignment with professional audiobook narration speeds
+- Reduced total audiobook duration without sacrificing clarity
+
+### Impact
+
+- New installations will use the updated defaults automatically
+- Existing deployments retain their current settings (stored in database)
+- Users can still customize all pause durations via the web UI
+
+**Files modified:**
+- `internal/config/config.go` - Updated default values and comments
+
+**Date:** 2026-02-02
+
+---
+
 ## Feature: SSML Break Tag Refactoring ✅ IMPLEMENTED
 
 ### Problem Statement
