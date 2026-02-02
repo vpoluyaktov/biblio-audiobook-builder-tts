@@ -64,8 +64,13 @@ function updateUserInfo(user) {
 async function logout() {
     try {
         if (authInfo && authInfo.mode === 'biblio-auth') {
-            // Biblio Auth mode - redirect to Biblio Auth logout using browser origin
-            window.location.href = window.location.origin + '/auth/api/logout';
+            // Biblio Auth mode - call logout API with POST, then redirect
+            await fetch(window.location.origin + '/auth/api/logout', { 
+                method: 'POST',
+                credentials: 'include'
+            });
+            // Redirect to login page after logout
+            window.location.href = window.location.origin + '/auth/login?returnUrl=' + encodeURIComponent(window.location.href);
         } else {
             // Internal mode - call logout API
             await fetch(apiUrl('/api/auth/logout'), { method: 'POST' });
