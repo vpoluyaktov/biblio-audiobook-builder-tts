@@ -100,6 +100,13 @@ func AddSSMLBreaks(text string, opts SSMLOptions) string {
 			continue
 		}
 
+		// If paragraph is just an SSML break tag (e.g., from title break), pass it through
+		// without escaping and without adding additional paragraph breaks
+		if strings.HasPrefix(para, "<break ") && strings.HasSuffix(para, "/>") {
+			result.WriteString("\n\n" + para + "\n\n")
+			continue
+		}
+
 		sentences := splitIntoSentences(para)
 		for sentIdx, sent := range sentences {
 			sent = strings.TrimSpace(sent)
@@ -176,6 +183,13 @@ func WrapTextInSSMLWithOptions(text string, opts SSMLOptions) string {
 	for paraIdx, para := range paragraphs {
 		para = strings.TrimSpace(para)
 		if para == "" {
+			continue
+		}
+
+		// If paragraph is just an SSML break tag (e.g., from title break), pass it through
+		// without escaping and without adding additional paragraph breaks
+		if strings.HasPrefix(para, "<break ") && strings.HasSuffix(para, "/>") {
+			result.WriteString("\n\n" + para + "\n\n")
 			continue
 		}
 
