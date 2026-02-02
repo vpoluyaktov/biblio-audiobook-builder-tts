@@ -456,6 +456,11 @@ func addPeriodToText(text string) string {
 			result = append(result, "")
 			continue
 		}
+		// Skip marker lines (TITLE_BREAK, PART_SEPARATOR) - they should not get periods
+		if strings.Contains(line, "{{") && strings.Contains(line, "}}") {
+			result = append(result, line)
+			continue
+		}
 		// Get last rune to handle multi-byte characters
 		runes := []rune(line)
 		lastRune := runes[len(runes)-1]
