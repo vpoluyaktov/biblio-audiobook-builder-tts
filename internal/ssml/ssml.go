@@ -3,7 +3,6 @@
 package ssml
 
 import (
-	"biblio-audiobook-builder-tts/internal/normalize"
 	"fmt"
 	"regexp"
 	"strings"
@@ -53,12 +52,15 @@ func AddSSMLBreaks(text string, opts SSMLOptions) string {
 	}
 
 	// Convert title break markers to SSML break tags (before other processing)
+	// Note: We match just "{{TITLE_BREAK}}" since the surrounding newlines may be collapsed
+	// during text cleanup in the parser
+	titleMarkerText := "{{TITLE_BREAK}}"
 	if opts.TitleBreakMs > 0 {
 		titleBreak := fmt.Sprintf("<break time=\"%dms\"/>", opts.TitleBreakMs)
-		text = strings.ReplaceAll(text, normalize.TitleBreakMarker, "\n"+titleBreak+"\n")
+		text = strings.ReplaceAll(text, titleMarkerText, titleBreak)
 	} else {
 		// Remove title markers if no break duration specified
-		text = strings.ReplaceAll(text, normalize.TitleBreakMarker, "\n")
+		text = strings.ReplaceAll(text, titleMarkerText, "")
 	}
 
 	// Replace colons with spaces as some TTS engines struggle with them
@@ -138,12 +140,15 @@ func WrapTextInSSMLWithOptions(text string, opts SSMLOptions) string {
 	}
 
 	// Convert title break markers to SSML break tags (before other processing)
+	// Note: We match just "{{TITLE_BREAK}}" since the surrounding newlines may be collapsed
+	// during text cleanup in the parser
+	titleMarkerText := "{{TITLE_BREAK}}"
 	if opts.TitleBreakMs > 0 {
 		titleBreak := fmt.Sprintf("<break time=\"%dms\"/>", opts.TitleBreakMs)
-		text = strings.ReplaceAll(text, normalize.TitleBreakMarker, "\n"+titleBreak+"\n")
+		text = strings.ReplaceAll(text, titleMarkerText, titleBreak)
 	} else {
 		// Remove title markers if no break duration specified
-		text = strings.ReplaceAll(text, normalize.TitleBreakMarker, "\n")
+		text = strings.ReplaceAll(text, titleMarkerText, "")
 	}
 
 	// Replace colons with spaces as some TTS engines struggle with them
