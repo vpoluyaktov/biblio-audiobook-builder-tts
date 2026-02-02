@@ -125,8 +125,12 @@ func AddSSMLBreaks(text string, opts SSMLOptions) string {
 		}
 
 		// Add paragraph break after each paragraph (except last)
+		// Skip if next paragraph is an SSML break tag (e.g., title break) to avoid double breaks
 		if opts.ParagraphBreakMs > 0 && paraIdx < len(paragraphs)-1 {
-			result.WriteString(fmt.Sprintf("\n\n<break time=\"%dms\"/>\n\n", opts.ParagraphBreakMs))
+			nextPara := strings.TrimSpace(paragraphs[paraIdx+1])
+			if !(strings.HasPrefix(nextPara, "<break ") && strings.HasSuffix(nextPara, "/>")) {
+				result.WriteString(fmt.Sprintf("\n\n<break time=\"%dms\"/>\n\n", opts.ParagraphBreakMs))
+			}
 		}
 	}
 
@@ -214,8 +218,12 @@ func WrapTextInSSMLWithOptions(text string, opts SSMLOptions) string {
 		}
 
 		// Add paragraph break after each paragraph (except last)
+		// Skip if next paragraph is an SSML break tag (e.g., title break) to avoid double breaks
 		if opts.ParagraphBreakMs > 0 && paraIdx < len(paragraphs)-1 {
-			result.WriteString(fmt.Sprintf("\n\n<break time=\"%dms\"/>\n\n", opts.ParagraphBreakMs))
+			nextPara := strings.TrimSpace(paragraphs[paraIdx+1])
+			if !(strings.HasPrefix(nextPara, "<break ") && strings.HasSuffix(nextPara, "/>")) {
+				result.WriteString(fmt.Sprintf("\n\n<break time=\"%dms\"/>\n\n", opts.ParagraphBreakMs))
+			}
 		}
 	}
 
