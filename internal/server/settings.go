@@ -30,6 +30,7 @@ type SettingsRequest struct {
 	ParagraphBreakMs        int     `json:"paragraph_break_ms"`
 	ConvertDashesToBreaks   bool    `json:"convert_dashes_to_breaks"`
 	DashBreakDurationMs     int     `json:"dash_break_duration_ms"`
+	TitleBreakMs            int     `json:"title_break_ms"`
 
 	// Output
 	ChapterGapSeconds    int  `json:"chapter_gap_seconds"`
@@ -85,6 +86,7 @@ func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
 		ParagraphBreakMs:        s.cfg.ParagraphBreakMs,
 		ConvertDashesToBreaks:   s.cfg.ConvertDashesToBreaks,
 		DashBreakDurationMs:     s.cfg.DashBreakDurationMs,
+		TitleBreakMs:            s.cfg.TitleBreakMs,
 
 		// Output
 		ChapterGapSeconds:    s.cfg.ChapterGapSeconds,
@@ -184,6 +186,9 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 	if wasProvided("dash_break_duration_ms") {
 		s.cfg.DashBreakDurationMs = req.DashBreakDurationMs
 	}
+	if wasProvided("title_break_ms") {
+		s.cfg.TitleBreakMs = req.TitleBreakMs
+	}
 
 	// Output
 	if wasProvided("chapter_gap_seconds") {
@@ -238,6 +243,7 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 			"detect_part_separators":    {fmt.Sprintf("%t", req.DetectPartSeparators), wasProvided("detect_part_separators")},
 			"convert_dashes_to_breaks":  {fmt.Sprintf("%t", req.ConvertDashesToBreaks), wasProvided("convert_dashes_to_breaks")},
 			"dash_break_duration_ms":    {fmt.Sprintf("%d", req.DashBreakDurationMs), wasProvided("dash_break_duration_ms")},
+			"title_break_ms":            {fmt.Sprintf("%d", req.TitleBreakMs), wasProvided("title_break_ms")},
 			"pronunciation_dict_file":   {req.PronunciationDictFile, wasProvided("pronunciation_dict_file")},
 			"use_default_pronunciation": {fmt.Sprintf("%t", req.UseDefaultPronunciation), wasProvided("use_default_pronunciation")},
 			"sentence_break_ms":         {fmt.Sprintf("%d", req.SentenceBreakMs), wasProvided("sentence_break_ms")},
