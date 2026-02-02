@@ -207,6 +207,13 @@ func (c *Client) writePump() {
 
 // ServeWS handles WebSocket requests from clients
 func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
+	// Check if this is a WebSocket upgrade request
+	// If not, return 400 Bad Request silently (common for health checks, probes, etc.)
+	if r.Header.Get("Upgrade") != "websocket" {
+		http.Error(w, "WebSocket endpoint - use WebSocket protocol", http.StatusBadRequest)
+		return
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logger.Error("WebSocket upgrade error: %v", err)

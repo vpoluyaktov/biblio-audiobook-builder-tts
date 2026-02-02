@@ -191,6 +191,44 @@ Flags:
 
 ---
 
+## Bug Fix: WebSocket Error Logging ✅ FIXED
+
+### Problem Statement
+
+The WebSocket endpoint (`/api/ws`) was logging ERROR messages when receiving regular HTTP requests instead of WebSocket upgrade requests. This commonly occurs from:
+- Health checks and monitoring tools
+- Load balancer probes
+- Initial browser requests before WebSocket connection
+
+These errors filled the logs but were not actual problems - the WebSocket functionality was working correctly.
+
+### Solution
+
+Added a pre-check in the `ServeWS` handler to detect non-WebSocket requests and return a proper HTTP 400 Bad Request response silently, without logging an error.
+
+**Status**: ✅ Fixed
+
+**Files modified**:
+- `internal/server/websocket.go` - Added check for `Upgrade: websocket` header before attempting WebSocket upgrade
+
+**Implementation**:
+```go
+// Check if this is a WebSocket upgrade request
+// If not, return 400 Bad Request silently (common for health checks, probes, etc.)
+if r.Header.Get("Upgrade") != "websocket" {
+    http.Error(w, "WebSocket endpoint - use WebSocket protocol", http.StatusBadRequest)
+    return
+}
+```
+
+**Benefits**:
+- ✅ Cleaner logs - no more spurious ERROR messages
+- ✅ Proper HTTP response for non-WebSocket requests
+- ✅ Actual WebSocket errors still logged for debugging
+- ✅ No impact on WebSocket functionality
+
+---
+
 ## Feature: SSML Break Tag Refactoring ✅ IMPLEMENTED
 
 ### Problem Statement
