@@ -43,6 +43,7 @@ type Config struct {
 	ParagraphBreakMs        int     `json:"paragraph_break_ms"`
 	ConvertDashesToBreaks   bool    `json:"convert_dashes_to_breaks"`
 	DashBreakDurationMs     int     `json:"dash_break_duration_ms"`
+	TitleBreakMs            int     `json:"title_break_ms"`
 	PronunciationDictFile   string  `json:"pronunciation_dict_file"`
 	UseDefaultPronunciation bool    `json:"use_default_pronunciation"`
 	MaxFileSizeMB           int     `json:"max_file_size_mb"`
@@ -356,6 +357,9 @@ func (db *DB) GetAllConfig() (*Config, error) {
 	if v, ok := configMap["dash_break_duration_ms"]; ok {
 		fmt.Sscanf(v, "%d", &cfg.DashBreakDurationMs)
 	}
+	if v, ok := configMap["title_break_ms"]; ok {
+		fmt.Sscanf(v, "%d", &cfg.TitleBreakMs)
+	}
 	if v, ok := configMap["pronunciation_dict_file"]; ok {
 		cfg.PronunciationDictFile = v
 	}
@@ -453,6 +457,7 @@ func DefaultConfig() *Config {
 		ParagraphBreakMs:        800,
 		ConvertDashesToBreaks:   true,
 		DashBreakDurationMs:     300,
+		TitleBreakMs:            500,
 		PronunciationDictFile:   "",
 		UseDefaultPronunciation: true,
 		MaxFileSizeMB:           250,
@@ -1436,6 +1441,7 @@ func (c *Config) ToAppConfig() map[string]interface{} {
 		"paragraph_break_ms":        c.ParagraphBreakMs,
 		"convert_dashes_to_breaks":  c.ConvertDashesToBreaks,
 		"dash_break_duration_ms":    c.DashBreakDurationMs,
+		"title_break_ms":            c.TitleBreakMs,
 		"pronunciation_dict_file":   c.PronunciationDictFile,
 		"use_default_pronunciation": c.UseDefaultPronunciation,
 		"max_file_size_mb":          c.MaxFileSizeMB,
