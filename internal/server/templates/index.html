@@ -398,32 +398,6 @@
                 <!-- TTS Settings Tab -->
                 <div class="tab-content" id="tab-tts">
                     <div class="settings-section">
-                        <h3>🎤 Default TTS Settings</h3>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="cfg-default-provider">Default Provider</label>
-                                <select id="cfg-default-provider">
-                                    <option value="espeak">eSpeak</option>
-                                    <option value="piper">Piper</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="cfg-default-voice">Default Voice</label>
-                                <input type="text" id="cfg-default-voice" placeholder="en-US">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="cfg-default-speed">Default Speed</label>
-                                <input type="number" id="cfg-default-speed" min="0.5" max="2.0" step="0.1" value="1.0">
-                            </div>
-                            <div class="form-group">
-                                <label for="cfg-default-pitch">Default Pitch</label>
-                                <input type="number" id="cfg-default-pitch" min="0.5" max="2.0" step="0.1" value="1.0">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="settings-section">
                         <h3>📖 Pronunciation</h3>
                         <div class="form-group">
                             <label class="checkbox-label">
@@ -438,38 +412,36 @@
                         </div>
                     </div>
                     <div class="settings-section">
-                        <h3>⏸️ SSML Pauses</h3>
-                        <p class="section-description">
-                            Configure pause durations using SSML break tags (for TTS providers that support SSML).
-                        </p>
+                        <h3>⏸️ Pauses &amp; Gaps</h3>
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="cfg-sentence-break">Sentence Break (ms)</label>
-                                <input type="number" id="cfg-sentence-break" min="0" max="2000" step="50" value="500">
-                                <small>Pause between sentences (0 = no pauses, default: 500ms)</small>
+                                <input type="number" id="cfg-sentence-break" min="0" max="2000" step="50" value="300">
                             </div>
                             <div class="form-group">
                                 <label for="cfg-paragraph-break">Paragraph Break (ms)</label>
-                                <input type="number" id="cfg-paragraph-break" min="0" max="3000" step="50" value="800">
-                                <small>Pause between paragraphs (0 = no pauses, default: 800ms)</small>
+                                <input type="number" id="cfg-paragraph-break" min="0" max="3000" step="50" value="350">
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="cfg-convert-dashes" checked>
-                                Convert dashes to pauses
-                            </label>
-                            <small>Insert pauses at inline dashes like "goal — target"</small>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="cfg-dash-break-duration">Dash Break (ms)</label>
+                                <input type="number" id="cfg-dash-break-duration" min="0" max="2000" step="50" value="250">
+                            </div>
+                            <div class="form-group">
+                                <label for="cfg-title-break">Title Break (ms)</label>
+                                <input type="number" id="cfg-title-break" min="0" max="3000" step="50" value="500">
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="cfg-dash-break-duration">Dash Pause Duration (ms)</label>
-                            <input type="number" id="cfg-dash-break-duration" min="100" max="2000" step="50" value="300">
-                            <small>Duration of pause at dashes (default: 300ms)</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="cfg-title-break">Title Break (ms)</label>
-                            <input type="number" id="cfg-title-break" min="0" max="3000" step="50" value="500">
-                            <small>Pause after chapter/section titles in FB2 books (0 = no pause, default: 500ms)</small>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="cfg-chapter-gap">Chapter Gap (sec)</label>
+                                <input type="number" id="cfg-chapter-gap" min="0" max="10" value="2">
+                            </div>
+                            <div class="form-group">
+                                <label for="cfg-part-gap">Part/Scene Gap (sec)</label>
+                                <input type="number" id="cfg-part-gap" min="0" max="10" value="2">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -477,12 +449,7 @@
                 <!-- Output Tab -->
                 <div class="tab-content" id="tab-output">
                     <div class="settings-section">
-                        <h3>📚 M4B Settings</h3>
-                        <div class="form-group">
-                            <label for="cfg-chapter-gap">Gap Between Chapters (seconds)</label>
-                            <input type="number" id="cfg-chapter-gap" min="0" max="10" value="2">
-                            <small>Silence duration inserted between chapters</small>
-                        </div>
+                        <h3>� M4B Settings</h3>
                         <div class="form-group">
                             <label for="cfg-max-file-size">Max File Size (MB)</label>
                             <input type="number" id="cfg-max-file-size" min="100" max="4000" value="250">
@@ -492,22 +459,6 @@
                             <label for="cfg-concurrent-encoders">Concurrent Encoders</label>
                             <input type="number" id="cfg-concurrent-encoders" min="1" max="16" value="2">
                             <small>Number of parallel M4B encoders</small>
-                        </div>
-                    </div>
-                    <div class="settings-section">
-                        <h3>📖 Part Separator Detection</h3>
-                        <p class="section-description">
-                            Detect scene breaks (*** --- etc.) within chapters and insert silence between parts.
-                        </p>
-                        <div class="form-group checkbox-group">
-                            <input type="checkbox" id="cfg-detect-part-separators" checked>
-                            <label for="cfg-detect-part-separators">Enable Part Separator Detection</label>
-                            <small>Automatically detect and add pauses at scene breaks like *** or ---</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="cfg-part-gap">Gap Between Parts (seconds)</label>
-                            <input type="number" id="cfg-part-gap" min="0" max="10" value="2">
-                            <small>Silence duration inserted between detected parts/scenes</small>
                         </div>
                     </div>
                 </div>
