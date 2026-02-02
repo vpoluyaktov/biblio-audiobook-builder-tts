@@ -95,6 +95,12 @@ func main() {
 	if envLogFile := os.Getenv("ABB_TTS_LOG_FILE"); envLogFile != "" {
 		cfg.LogFile = envLogFile
 	}
+	if envAuthMode := os.Getenv("ABB_TTS_AUTH_MODE"); envAuthMode != "" {
+		cfg.AuthMode = envAuthMode
+	}
+	if envBiblioAuthURL := os.Getenv("ABB_TTS_BIBLIO_AUTH_URL"); envBiblioAuthURL != "" {
+		cfg.BiblioAuthURL = envBiblioAuthURL
+	}
 
 	// Override config with command line flags (highest priority)
 	if *port != "" {
@@ -153,6 +159,11 @@ func main() {
 	addr := fmt.Sprintf("%s:%s", cfg.ServerHost, cfg.ServerPort)
 	srv := server.New(addr, cfg, ttsService)
 	srv.SetDB(db) // Enable config persistence to database
+
+	// Initialize authentication
+	if err := srv.SetAuthDB(db); err != nil {
+		logger.Fatal("Failed to initialize authentication: %v", err)
+	}
 
 	// Start server in goroutine
 	errChan := make(chan error, 1)

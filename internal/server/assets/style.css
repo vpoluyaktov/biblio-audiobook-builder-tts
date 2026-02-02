@@ -2040,3 +2040,104 @@ h1 .icon {
     gap: 0.5rem;
     cursor: pointer;
 }
+
+/* Authentication Modals */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.login-modal,
+.setup-modal {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 20px 60px var(--shadow);
+}
+
+.login-modal h2,
+.setup-modal h2 {
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+    text-align: center;
+}
+
+.setup-modal p {
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.login-modal .form-group,
+.setup-modal .form-group {
+    margin-bottom: 1rem;
+}
+
+.login-modal .form-group label,
+.setup-modal .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.login-modal .form-group input,
+.setup-modal .form-group input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.login-modal .form-group input:focus,
+.setup-modal .form-group input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.login-modal .error-message,
+.setup-modal .error-message {
+    color: var(--error);
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: rgba(239, 68, 68, 0.1);
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.login-modal button[type="submit"],
+.setup-modal button[type="submit"] {
+    width: 100%;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+/* User Info in Header */
+#user-info {
+    display: none;
+    align-items: center;
+    gap: 1rem;
+}
+
+#user-info .user-name {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+#user-info .btn-sm {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+}

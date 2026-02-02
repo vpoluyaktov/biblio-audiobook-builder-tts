@@ -10,12 +10,14 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 	"unicode/utf8"
 
+	"biblio-audiobook-builder-tts/internal/auth"
 	"biblio-audiobook-builder-tts/internal/config"
 	"biblio-audiobook-builder-tts/internal/logger"
 	"biblio-audiobook-builder-tts/internal/parser"
@@ -34,6 +36,8 @@ type Server struct {
 	addr         string
 	cfg          *config.Config
 	db           ConfigDB
+	authDB       storage.AuthDB
+	authManager  *auth.Manager
 	previewStore *PreviewStore
 	hub          *Hub
 	worker       *Worker
@@ -80,6 +84,21 @@ func (s *Server) SetDB(db ConfigDB) {
 	s.db = db
 	// Initialize worker with database access
 	s.worker = NewWorker(db, s.hub, s.ttsService, s.cfg)
+}
+
+// SetAuthDB sets the auth database and initializes the auth manager
+func (s *Server) SetAuthDB(authDB storage.AuthDB) error {
+	s.authDB = authDB
+
+	// Initialize auth manager
+	manager, err := auth.NewManager(s.cfg.AuthMode, authDB, s.cfg.BiblioAuthURL)
+	if err != nil {
+		return fmt.Errorf("failed to create auth manager: %w", err)
+	}
+	s.authManager = manager
+
+	logger.Info("Authentication mode: %s", s.cfg.AuthMode)
+	return nil
 }
 
 // apiURL generates an API URL with the configured base path
@@ -193,48 +212,55 @@ func (s *Server) Start() error {
 		mux.Handle(assetsPath, http.StripPrefix(basePath+"/assets", http.FileServer(http.FS(assetsSubFS))))
 	}
 
-	// API endpoints
-	mux.HandleFunc(basePath+"/api/jobs", s.handleJobs)
-	mux.HandleFunc(basePath+"/api/jobs/", s.handleJob)
-	mux.HandleFunc(basePath+"/api/upload", s.handleUpload)
-	mux.HandleFunc(basePath+"/api/preview", s.handlePreview)
-	mux.HandleFunc(basePath+"/api/preview/", s.handlePreviewByID)
-	mux.HandleFunc(basePath+"/api/providers", s.handleProviders)
-	mux.HandleFunc(basePath+"/api/providers/", s.handleProviderByID)
-	mux.HandleFunc(basePath+"/api/voices", s.handleVoices)
-	mux.HandleFunc(basePath+"/api/languages", s.handleLanguages)
-	mux.HandleFunc(basePath+"/api/models", s.handleModels)
-	mux.HandleFunc(basePath+"/api/pricing", s.handlePricing)
-	mux.HandleFunc(basePath+"/api/config", s.handleConfig)
-	mux.HandleFunc(basePath+"/api/settings", s.handleSettings)
-	mux.HandleFunc(basePath+"/api/settings/test-audiobookshelf", s.handleTestAudiobookshelf)
-	mux.HandleFunc(basePath+"/api/settings/test-opentts", s.handleTestOpenTTS)
-	mux.HandleFunc(basePath+"/api/settings/test-rhvoice", s.handleTestRHVoice)
-	mux.HandleFunc(basePath+"/api/settings/test-silero", s.handleTestSilero)
-	mux.HandleFunc(basePath+"/api/test-voice", s.handleTestVoice)
+	// Auth endpoints (public - no auth required)
+	mux.HandleFunc(basePath+"/api/auth/info", s.handleAuthInfo)
+	mux.HandleFunc(basePath+"/api/auth/login", s.handleAuthLogin)
+	mux.HandleFunc(basePath+"/api/auth/logout", s.handleAuthLogout)
+	mux.HandleFunc(basePath+"/api/auth/setup/check", s.handleSetupCheck)
+	mux.HandleFunc(basePath+"/api/auth/setup", s.handleSetup)
+
+	// API endpoints (protected)
+	mux.HandleFunc(basePath+"/api/jobs", s.requireAuth(s.handleJobs))
+	mux.HandleFunc(basePath+"/api/jobs/", s.requireAuth(s.handleJob))
+	mux.HandleFunc(basePath+"/api/upload", s.requireAuth(s.handleUpload))
+	mux.HandleFunc(basePath+"/api/preview", s.requireAuth(s.handlePreview))
+	mux.HandleFunc(basePath+"/api/preview/", s.requireAuth(s.handlePreviewByID))
+	mux.HandleFunc(basePath+"/api/providers", s.requireAuth(s.handleProviders))
+	mux.HandleFunc(basePath+"/api/providers/", s.requireAuth(s.handleProviderByID))
+	mux.HandleFunc(basePath+"/api/voices", s.requireAuth(s.handleVoices))
+	mux.HandleFunc(basePath+"/api/languages", s.requireAuth(s.handleLanguages))
+	mux.HandleFunc(basePath+"/api/models", s.requireAuth(s.handleModels))
+	mux.HandleFunc(basePath+"/api/pricing", s.requireAuth(s.handlePricing))
+	mux.HandleFunc(basePath+"/api/config", s.requireAuth(s.handleConfig))
+	mux.HandleFunc(basePath+"/api/settings", s.requireAuth(s.handleSettings))
+	mux.HandleFunc(basePath+"/api/settings/test-audiobookshelf", s.requireAuth(s.handleTestAudiobookshelf))
+	mux.HandleFunc(basePath+"/api/settings/test-opentts", s.requireAuth(s.handleTestOpenTTS))
+	mux.HandleFunc(basePath+"/api/settings/test-rhvoice", s.requireAuth(s.handleTestRHVoice))
+	mux.HandleFunc(basePath+"/api/settings/test-silero", s.requireAuth(s.handleTestSilero))
+	mux.HandleFunc(basePath+"/api/test-voice", s.requireAuth(s.handleTestVoice))
 	mux.HandleFunc(basePath+"/api/ws", func(w http.ResponseWriter, r *http.Request) {
 		ServeWS(s.hub, w, r)
 	})
 
-	// Noun endpoints (for text normalization)
-	mux.HandleFunc(basePath+"/api/nouns", s.handleNouns)
-	mux.HandleFunc(basePath+"/api/nouns/", s.handleNoun)
-	mux.HandleFunc(basePath+"/api/nouns/languages", s.handleNounLanguages)
+	// Noun endpoints (for text normalization) - protected
+	mux.HandleFunc(basePath+"/api/nouns", s.requireAuth(s.handleNouns))
+	mux.HandleFunc(basePath+"/api/nouns/", s.requireAuth(s.handleNoun))
+	mux.HandleFunc(basePath+"/api/nouns/languages", s.requireAuth(s.handleNounLanguages))
 
-	// OPDS endpoints
-	mux.HandleFunc(basePath+"/api/opds/sources", s.handleOPDSSources)
-	mux.HandleFunc(basePath+"/api/opds/sources/", s.handleOPDSSource)
-	mux.HandleFunc(basePath+"/api/opds/test", s.handleOPDSTest)
-	mux.HandleFunc(basePath+"/api/opds/browse", s.handleOPDSBrowse)
-	mux.HandleFunc(basePath+"/api/opds/search", s.handleOPDSSearch)
-	mux.HandleFunc(basePath+"/api/opds/download", s.handleOPDSDownload)
-	mux.HandleFunc(basePath+"/api/opds/convert", s.handleOPDSConvert)
-	mux.HandleFunc(basePath+"/api/opds/proxy", s.handleOPDSProxy)
+	// OPDS endpoints - protected
+	mux.HandleFunc(basePath+"/api/opds/sources", s.requireAuth(s.handleOPDSSources))
+	mux.HandleFunc(basePath+"/api/opds/sources/", s.requireAuth(s.handleOPDSSource))
+	mux.HandleFunc(basePath+"/api/opds/test", s.requireAuth(s.handleOPDSTest))
+	mux.HandleFunc(basePath+"/api/opds/browse", s.requireAuth(s.handleOPDSBrowse))
+	mux.HandleFunc(basePath+"/api/opds/search", s.requireAuth(s.handleOPDSSearch))
+	mux.HandleFunc(basePath+"/api/opds/download", s.requireAuth(s.handleOPDSDownload))
+	mux.HandleFunc(basePath+"/api/opds/convert", s.requireAuth(s.handleOPDSConvert))
+	mux.HandleFunc(basePath+"/api/opds/proxy", s.requireAuth(s.handleOPDSProxy))
 
-	// Health check endpoint
+	// Health check endpoint (public)
 	mux.HandleFunc(basePath+"/health", s.handleHealth)
 
-	// Serve main page at base path
+	// Serve main page at base path (protected - will redirect to login if not authenticated)
 	if basePath == "" {
 		mux.HandleFunc("/", s.handleIndex)
 	} else {
@@ -249,6 +275,46 @@ func (s *Server) Start() error {
 
 	logger.Info("Server starting on %s", s.addr)
 	return s.httpServer.ListenAndServe()
+}
+
+// requireAuth wraps a handler function with authentication check
+func (s *Server) requireAuth(handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if s.authManager == nil {
+			// No auth configured, allow access
+			handler(w, r)
+			return
+		}
+
+		if !s.authManager.CheckAuth(w, r) {
+			// For API requests, return 401
+			if strings.HasPrefix(r.URL.Path, s.cfg.BasePath+"/api/") {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte(`{"error":"Authentication required"}`))
+				return
+			}
+			// For page requests, redirect to login
+			s.redirectToLogin(w, r)
+			return
+		}
+
+		handler(w, r)
+	}
+}
+
+// redirectToLogin redirects the user to the appropriate login page
+func (s *Server) redirectToLogin(w http.ResponseWriter, r *http.Request) {
+	if s.authManager.IsBiblioAuthMode() {
+		// Redirect to Biblio Auth login
+		returnURL := url.QueryEscape(r.URL.String())
+		loginURL := s.authManager.GetLoginURL(returnURL)
+		http.Redirect(w, r, loginURL, http.StatusFound)
+	} else {
+		// For internal mode, redirect to local login page
+		returnURL := url.QueryEscape(r.URL.String())
+		http.Redirect(w, r, s.cfg.BasePath+"/login?returnUrl="+returnURL, http.StatusFound)
+	}
 }
 
 // handleHealth returns a simple health check response

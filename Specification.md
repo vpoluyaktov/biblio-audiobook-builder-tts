@@ -187,6 +187,7 @@ Flags:
 
 - Parallel chapter processing
 - Test voice UI improvements
+- User authentication (internal + biblio-auth modes)
 
 ---
 
@@ -658,4 +659,66 @@ Save debug files showing the text with SSML break tags before chunking, alongsid
 
 ---
 
-*Last updated: 2026-01-30*
+## Feature: User Authentication 🔄 IN PROGRESS
+
+### Problem Statement
+
+ABB-TTS currently has no authentication, allowing anyone with network access to use the service. For standalone deployment and integration with BiblioHub stack, user authentication is required.
+
+### Goal
+
+Implement user authentication supporting two modes:
+1. **Internal Mode** (`AUTH_MODE=internal`): Standalone deployment with local SQLite user database
+2. **Biblio Auth Mode** (`AUTH_MODE=biblio-auth`): Integration with Biblio Auth for centralized authentication in BiblioHub stack
+
+### Implementation Plan
+
+**Phase 1: Core Authentication Infrastructure**
+1. ✅ Create `internal/auth/` package with:
+   - `biblioauth.go` - Biblio Auth client for JWT validation
+   - `manager.go` - Auth manager supporting both modes
+   - `middleware.go` - HTTP middleware for route protection
+2. ✅ Add auth configuration to `internal/config/config.go`
+3. ✅ Add user/session tables to database schema (`internal/storage/auth.go`)
+
+**Phase 2: Server Integration**
+4. ✅ Update `internal/server/server.go` to integrate auth middleware
+5. ✅ Add auth API endpoints (login, logout, user info) - `internal/server/handlers_auth.go`
+6. ✅ Protect all routes except health check and auth endpoints
+
+**Phase 3: Frontend Integration**
+7. ✅ Update frontend to handle authentication (`internal/server/assets/app.js`)
+8. ✅ Add login UI for internal mode
+9. ✅ Add redirect to Biblio Auth login for biblio-auth mode
+10. ✅ Display current user info and logout button
+
+**Configuration**:
+```go
+// Auth settings
+AuthMode       string `mapstructure:"auth_mode"`        // "internal" or "biblio-auth"
+BiblioAuthURL  string `mapstructure:"biblio_auth_url"`  // Biblio Auth service URL
+```
+
+**Environment Variables**:
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ABB_TTS_AUTH_MODE` | Authentication mode (`internal` or `biblio-auth`) | `biblio-auth` |
+| `ABB_TTS_BIBLIO_AUTH_URL` | Biblio Auth service URL | `http://biblio-auth:80/auth` |
+
+**Authentication Flow (Biblio Auth Mode)**:
+1. User accesses ABB-TTS → Check for `auth_token` cookie
+2. No valid token → Redirect to `/auth/login?returnUrl=<current_url>`
+3. User logs in at Biblio Auth → JWT token set as `auth_token` cookie
+4. Redirect back to ABB-TTS → Validate token via `/auth/api/validate`
+5. Token valid → Access granted
+
+**Authentication Flow (Internal Mode)**:
+1. User accesses ABB-TTS → Check for session cookie
+2. No valid session → Show login form
+3. User submits credentials → Validate against local database
+4. Valid credentials → Create session, set cookie
+5. Access granted
+
+---
+
+*Last updated: 2026-02-01*

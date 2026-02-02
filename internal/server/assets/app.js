@@ -6,6 +6,189 @@ function apiUrl(path) {
     return basePath + path;
 }
 
+// Authentication state
+let authInfo = null;
+
+// Check authentication status
+async function checkAuth() {
+    try {
+        const response = await fetch(apiUrl('/api/auth/info'));
+        if (!response.ok) {
+            throw new Error('Auth check failed');
+        }
+        authInfo = await response.json();
+        
+        if (!authInfo.authenticated) {
+            // Not authenticated - redirect to login
+            if (authInfo.mode === 'biblio-auth' && authInfo.login_url) {
+                // Biblio Auth mode - redirect to Biblio Auth login
+                const returnUrl = encodeURIComponent(window.location.href);
+                window.location.href = authInfo.login_url + (authInfo.login_url.includes('?') ? '&' : '?') + 'returnUrl=' + returnUrl;
+            } else if (authInfo.mode === 'internal') {
+                // Internal mode - check if setup is required
+                const setupResponse = await fetch(apiUrl('/api/auth/setup/check'));
+                const setupInfo = await setupResponse.json();
+                if (setupInfo.setup_required) {
+                    showSetupDialog();
+                } else {
+                    showLoginDialog();
+                }
+            }
+            return false;
+        }
+        
+        // Update UI with user info
+        updateUserInfo(authInfo.user);
+        return true;
+    } catch (error) {
+        console.error('Auth check error:', error);
+        return false;
+    }
+}
+
+// Update UI with user info
+function updateUserInfo(user) {
+    const userInfoEl = document.getElementById('user-info');
+    if (userInfoEl && user) {
+        userInfoEl.innerHTML = `
+            <span class="user-name">${user.username}</span>
+            <button class="btn btn-sm btn-secondary" onclick="logout()">Logout</button>
+        `;
+        userInfoEl.style.display = 'flex';
+    }
+}
+
+// Logout function
+async function logout() {
+    try {
+        if (authInfo && authInfo.mode === 'biblio-auth' && authInfo.logout_url) {
+            // Biblio Auth mode - redirect to Biblio Auth logout
+            window.location.href = authInfo.logout_url;
+        } else {
+            // Internal mode - call logout API
+            await fetch(apiUrl('/api/auth/logout'), { method: 'POST' });
+            window.location.reload();
+        }
+    } catch (error) {
+        console.error('Logout error:', error);
+        window.location.reload();
+    }
+}
+
+// Show login dialog for internal mode
+function showLoginDialog() {
+    const dialog = document.createElement('div');
+    dialog.className = 'modal-overlay';
+    dialog.innerHTML = `
+        <div class="modal login-modal">
+            <h2>Login</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="login-username">Username</label>
+                    <input type="text" id="login-username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" required autocomplete="current-password">
+                </div>
+                <div id="login-error" class="error-message" style="display: none;"></div>
+                <button type="submit" class="btn btn-primary">Login</button>
+            </form>
+        </div>
+    `;
+    document.body.appendChild(dialog);
+    
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('login-username').value;
+        const password = document.getElementById('login-password').value;
+        const errorEl = document.getElementById('login-error');
+        
+        try {
+            const response = await fetch(apiUrl('/api/auth/login'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const result = await response.json();
+            
+            if (result.success) {
+                dialog.remove();
+                window.location.reload();
+            } else {
+                errorEl.textContent = result.error || 'Login failed';
+                errorEl.style.display = 'block';
+            }
+        } catch (error) {
+            errorEl.textContent = 'Login failed: ' + error.message;
+            errorEl.style.display = 'block';
+        }
+    });
+}
+
+// Show setup dialog for initial admin creation
+function showSetupDialog() {
+    const dialog = document.createElement('div');
+    dialog.className = 'modal-overlay';
+    dialog.innerHTML = `
+        <div class="modal setup-modal">
+            <h2>Initial Setup</h2>
+            <p>Create an admin account to get started.</p>
+            <form id="setup-form">
+                <div class="form-group">
+                    <label for="setup-username">Admin Username</label>
+                    <input type="text" id="setup-username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="setup-password">Password</label>
+                    <input type="password" id="setup-password" required autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label for="setup-password-confirm">Confirm Password</label>
+                    <input type="password" id="setup-password-confirm" required autocomplete="new-password">
+                </div>
+                <div id="setup-error" class="error-message" style="display: none;"></div>
+                <button type="submit" class="btn btn-primary">Create Admin Account</button>
+            </form>
+        </div>
+    `;
+    document.body.appendChild(dialog);
+    
+    document.getElementById('setup-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('setup-username').value;
+        const password = document.getElementById('setup-password').value;
+        const passwordConfirm = document.getElementById('setup-password-confirm').value;
+        const errorEl = document.getElementById('setup-error');
+        
+        if (password !== passwordConfirm) {
+            errorEl.textContent = 'Passwords do not match';
+            errorEl.style.display = 'block';
+            return;
+        }
+        
+        try {
+            const response = await fetch(apiUrl('/api/auth/setup'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const result = await response.json();
+            
+            if (result.success) {
+                dialog.remove();
+                window.location.reload();
+            } else {
+                errorEl.textContent = result.error || 'Setup failed';
+                errorEl.style.display = 'block';
+            }
+        } catch (error) {
+            errorEl.textContent = 'Setup failed: ' + error.message;
+            errorEl.style.display = 'block';
+        }
+    });
+}
+
 // localStorage key for TTS settings
 const TTS_SETTINGS_KEY = 'biblio_audiobook_builder_tts_settings';
 
@@ -72,6 +255,13 @@ class App {
     }
 
     async init() {
+        // Check authentication first
+        const isAuthenticated = await checkAuth();
+        if (!isAuthenticated) {
+            // Auth check will handle redirect/dialog
+            return;
+        }
+        
         this.bindElements();
         this.bindEvents();
         await this.loadConfig();

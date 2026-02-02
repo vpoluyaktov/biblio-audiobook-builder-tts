@@ -21,6 +21,10 @@ type Config struct {
 	BasePath    string `mapstructure:"base_path"`
 	OpenBrowser bool   `mapstructure:"open_browser"`
 
+	// Authentication settings
+	AuthMode      string `mapstructure:"auth_mode"`       // "internal" or "biblio-auth"
+	BiblioAuthURL string `mapstructure:"biblio_auth_url"` // Biblio Auth service URL
+
 	// TTS settings
 	DefaultSpeed            float64 `mapstructure:"default_speed"`
 	DefaultPitch            float64 `mapstructure:"default_pitch"`
@@ -55,6 +59,8 @@ func Load(configFile string) (*Config, error) {
 	viper.BindEnv("base_path")
 	viper.BindEnv("server_port")
 	viper.BindEnv("server_host")
+	viper.BindEnv("auth_mode")
+	viper.BindEnv("biblio_auth_url")
 
 	// Basic settings
 	viper.SetDefault("log_file", "biblio-audiobook-builder-tts.log")
@@ -67,6 +73,10 @@ func Load(configFile string) (*Config, error) {
 	viper.SetDefault("server_host", "0.0.0.0")
 	viper.SetDefault("base_path", "")
 	viper.SetDefault("open_browser", true)
+
+	// Authentication settings
+	viper.SetDefault("auth_mode", "biblio-auth")
+	viper.SetDefault("biblio_auth_url", "http://biblio-auth:80/auth")
 
 	// TTS settings
 	viper.SetDefault("default_speed", 1.0)

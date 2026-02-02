@@ -224,6 +224,11 @@ func (db *DB) migrate() error {
 		return err
 	}
 
+	// Migrate auth tables
+	if err := db.MigrateAuth(); err != nil {
+		return fmt.Errorf("failed to migrate auth tables: %w", err)
+	}
+
 	// Add worker_progress and num_workers columns if they don't exist (migration for existing DBs)
 	db.conn.Exec("ALTER TABLE jobs ADD COLUMN worker_progress TEXT")
 	db.conn.Exec("ALTER TABLE jobs ADD COLUMN num_workers INTEGER DEFAULT 0")
