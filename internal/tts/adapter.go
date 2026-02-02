@@ -102,9 +102,10 @@ func (a *Adapter) ConvertToSpeech(text string, voice string, options *Conversion
 			ParagraphBreakMs:      options.ParagraphBreakMs,
 			ConvertDashesToBreaks: options.ConvertDashesToBreaks,
 			DashBreakDurationMs:   options.DashBreakDurationMs,
+			TitleBreakMs:          options.TitleBreakMs,
 		})
-		logger.Debug("Added SSML breaks to text before chunking (sentence: %dms, paragraph: %dms, dashes: %v)",
-			options.SentenceBreakMs, options.ParagraphBreakMs, options.ConvertDashesToBreaks)
+		logger.Debug("Added SSML breaks to text before chunking (sentence: %dms, paragraph: %dms, title: %dms, dashes: %v)",
+			options.SentenceBreakMs, options.ParagraphBreakMs, options.TitleBreakMs, options.ConvertDashesToBreaks)
 	}
 
 	// Split text into chunks (now with SSML breaks already embedded)
@@ -216,9 +217,10 @@ func (a *Adapter) ConvertToSpeechWithChunks(text string, voice string, options *
 			ParagraphBreakMs:      options.ParagraphBreakMs,
 			ConvertDashesToBreaks: options.ConvertDashesToBreaks,
 			DashBreakDurationMs:   options.DashBreakDurationMs,
+			TitleBreakMs:          options.TitleBreakMs,
 		})
-		logger.Debug("Added SSML breaks to text before chunking (sentence: %dms, paragraph: %dms, dashes: %v)",
-			options.SentenceBreakMs, options.ParagraphBreakMs, options.ConvertDashesToBreaks)
+		logger.Debug("Added SSML breaks to text before chunking (sentence: %dms, paragraph: %dms, title: %dms, dashes: %v)",
+			options.SentenceBreakMs, options.ParagraphBreakMs, options.TitleBreakMs, options.ConvertDashesToBreaks)
 	}
 
 	chunks := a.chunker.Chunk(textToChunk)

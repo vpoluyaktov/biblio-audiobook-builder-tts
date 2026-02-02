@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"biblio-audiobook-builder-tts/internal/normalize"
 	"bytes"
 	"encoding/base64"
 	"encoding/xml"
@@ -262,8 +263,8 @@ func fb2TreeToText(xmlContent string) string {
 	text = reFB2PClose.ReplaceAllString(text, "\n")
 	text = reFB2POpen.ReplaceAllString(text, "")
 
-	// Handle titles (single newline for tighter spacing)
-	text = reFB2TitleClose.ReplaceAllString(text, "\n")
+	// Handle titles - insert title break marker for SSML pause after titles
+	text = reFB2TitleClose.ReplaceAllString(text, normalize.TitleBreakMarker)
 	text = reFB2TitleOpen.ReplaceAllString(text, "\n")
 	text = reFB2SubClose.ReplaceAllString(text, "\n")
 	text = reFB2SubOpen.ReplaceAllString(text, "\n")

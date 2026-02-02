@@ -474,6 +474,7 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 			ParagraphBreakMs:      w.cfg.ParagraphBreakMs,
 			ConvertDashesToBreaks: w.cfg.ConvertDashesToBreaks,
 			DashBreakDurationMs:   w.cfg.DashBreakDurationMs,
+			TitleBreakMs:          w.cfg.TitleBreakMs,
 		})
 		ssmlFileName := fmt.Sprintf("%02d_%s.ssml.txt", index+1, sanitizeFileName(chapter.Title))
 		ssmlFilePath := filepath.Join(outputDir, ssmlFileName)
@@ -506,6 +507,7 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		ParagraphBreakMs:      w.cfg.ParagraphBreakMs,
 		ConvertDashesToBreaks: w.cfg.ConvertDashesToBreaks,
 		DashBreakDurationMs:   w.cfg.DashBreakDurationMs,
+		TitleBreakMs:          w.cfg.TitleBreakMs,
 	}, progressCb)
 	if err != nil {
 		result.Error = fmt.Errorf("TTS conversion failed: %v", err)
@@ -554,6 +556,7 @@ func (w *Worker) convertChapterWithParts(job *Job, chapter parser.Chapter, conte
 			ParagraphBreakMs:      w.cfg.ParagraphBreakMs,
 			ConvertDashesToBreaks: w.cfg.ConvertDashesToBreaks,
 			DashBreakDurationMs:   w.cfg.DashBreakDurationMs,
+			TitleBreakMs:          w.cfg.TitleBreakMs,
 		})
 		ssmlFileName := fmt.Sprintf("%02d_%s.ssml.txt", index+1, sanitizeFileName(chapter.Title))
 		ssmlFilePath := filepath.Join(outputDir, ssmlFileName)
@@ -635,6 +638,7 @@ func (w *Worker) convertChapterWithParts(job *Job, chapter parser.Chapter, conte
 			ParagraphBreakMs:      w.cfg.ParagraphBreakMs,
 			ConvertDashesToBreaks: w.cfg.ConvertDashesToBreaks,
 			DashBreakDurationMs:   w.cfg.DashBreakDurationMs,
+			TitleBreakMs:          w.cfg.TitleBreakMs,
 		}, progressCb)
 		if err != nil {
 			result.Error = fmt.Errorf("TTS conversion failed for part %d: %v", partIdx+1, err)
