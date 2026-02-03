@@ -866,7 +866,7 @@ Add a stress marking step in the text processing pipeline between normalization 
 
 ### Integration Point
 
-The stress marking should be applied **after text normalization but before SSML processing and chunking**:
+The stress marking should be applied **after text normalization but before SSML processing**. ABB-TTS handles sentence splitting (reusing existing chunking logic) and calls the stress server's batch API.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -877,10 +877,11 @@ The stress marking should be applied **after text normalization but before SSML 
 │   2. Normalize text (numbers → words, cleanup)                  │
 │      ↓                                                           │
 │   3. ★ STRESS MARKING (if Russian + enabled) ★                  │
-│      │   POST /stress-silero/api/stress                         │
-│      │   Send: full chapter text                                │
-│      │   Server: splits → stresses → rejoins                    │
-│      │   Receive: stressed chapter text                         │
+│      │   a. Split chapter into sentences (reuse chunker logic)  │
+│      │   b. POST /stress-silero/api/stress/batch                │
+│      │      Send: ["sentence1", "sentence2", ...]               │
+│      │      Receive: ["stressed1", "stressed2", ...]            │
+│      │   c. Rejoin sentences into chapter text                  │
 │      ↓                                                           │
 │   4. Add SSML break tags (sentence/paragraph pauses)            │
 │      ↓                                                           │
@@ -893,7 +894,11 @@ The stress marking should be applied **after text normalization but before SSML 
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Note**: The stress server handles sentence splitting internally. ABB-TTS sends the full normalized chapter text and receives stressed text back. This keeps the integration simple while allowing the stress server to optimize sentence-level processing.
+**Key points:**
+- ABB-TTS reuses existing sentence splitting logic from the chunker
+- Batch API reduces HTTP overhead (one request per chapter)
+- Stress server stays simple and stateless
+- Avoids sending large chapter texts over REST
 
 ### Implementation Plan
 
