@@ -901,6 +901,27 @@ The stress marking should be applied **after text normalization but before SSML 
 - Stress server stays simple and stateless
 - Scales horizontally via Docker Swarm
 
+### Configuration
+
+Stress marking is configured **per TTS provider** in the ABB-TTS web UI (Config → TTS Providers tab). This allows enabling stress marking only for providers that benefit from it (e.g., Silero TTS for Russian).
+
+**Provider-level settings (in TTS Providers tab):**
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `stress_enabled` | `false` | Enable stress marking for this provider |
+
+**Global settings (environment variables):**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ABB_TTS_STRESS_SERVER_URL` | `http://stress-silero:80/stress-silero` | Stress server URL |
+
+**When stress marking is applied:**
+1. Provider has `stress_enabled = true`
+2. Selected voice language is Russian (`ru`)
+3. Stress server is available (health check passes)
+
 ### Implementation Plan
 
 **Phase 1: Stress Client**
@@ -915,30 +936,8 @@ The stress marking should be applied **after text normalization but before SSML 
 5. ⏳ Add stress marking toggle to provider settings
 
 **Phase 3: UI Integration**
-6. ⏳ Add stress marking toggle to TTS Settings tab
-7. ⏳ Add stress server URL configuration
-8. ⏳ Display stress server status in provider list
-
-### Configuration
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `stress_marking_enabled` | `true` | Enable stress marking for Russian text |
-| `stress_server_url` | `http://stress-silero:80/stress-silero` | Stress server URL |
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `ABB_TTS_STRESS_ENABLED` | Enable stress marking | `true` |
-| `ABB_TTS_STRESS_SERVER_URL` | Stress server URL | `http://stress-silero:80/stress-silero` |
-
-### Language Detection
-
-Stress marking is automatically applied when:
-1. `stress_marking_enabled` is `true`
-2. The selected TTS voice language is Russian (`ru`)
-3. The stress server is available (health check passes)
+6. ⏳ Add stress marking toggle to TTS Providers tab (per-provider setting)
+7. ⏳ Display stress server status in provider list
 
 ### Files to Modify
 
