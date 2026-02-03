@@ -44,6 +44,88 @@
    └─────────────┘     └─────────────┘     └─────────────┘
 ```
 
+## Text-to-Audio Processing Pipeline
+
+The following diagram shows the complete flow from raw chapter text to final audio output:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  1. RAW CHAPTER CONTENT                                         │
+│     chapter.Content (from EPUB/FB2 parser)                      │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  2. NUMBER NORMALIZATION (if provider.NormalizeNumbers=true)    │
+│     w.normalizer.Process(content, lang)                         │
+│     "в 1984 году" → "в тысяча девятьсот восемьдесят четвёртом   │
+│     году"                                                       │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  3. STRESS MARKING (if provider.StressEnabled=true && lang=ru)  │
+│     w.stressClient.AddStressToSentences(content, lang)          │
+│     "Замок на двери" → "Зам+ок н+а дв+ери"                      │
+│     (processed sentence by sentence for homograph accuracy)     │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  4. TEXT SANITIZATION (pronunciation rules)                     │
+│     w.sanitizer.Sanitize(content)                               │
+│     Applies pronunciation dictionary replacements               │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  5. PART SEPARATOR DETECTION (if cfg.DetectPartSeparators)      │
+│     w.separatorDetector.DetectAndMark(content)                  │
+│     Detects "* * *" scene breaks for silence insertion          │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  6. SPEAKABLE CONTENT CHECK                                     │
+│     sanitize.HasSpeakableContentForLanguage(content, lang)      │
+│     If no speakable content → generate 1s silent WAV            │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  7. SSML WRAPPING (if provider.SSMLSupport=true)                │
+│     ssml.AddSSMLBreaks(content, options)                        │
+│     Adds <break> tags for sentences, paragraphs, dashes         │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  8. TTS CONVERSION                                              │
+│     w.ttsService.ConvertToSpeechWithProgress(content, options)  │
+│     - Chunks text if needed (max_chunk_size)                    │
+│     - Sends to TTS provider (Silero, OpenVoice, etc.)           │
+│     - Concatenates audio chunks                                 │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  9. AUDIO FILE OUTPUT                                           │
+│     Saves as WAV: "01_Chapter_Title.wav"                        │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  10. POST-PROCESSING (in convertBook)                           │
+│      - Concatenate all chapter WAVs                             │
+│      - Encode to M4B with chapters metadata                     │
+│      - Upload to Audiobookshelf (if configured)                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Code Locations
+
+| Step | File | Function/Method |
+|------|------|-----------------|
+| Job queue | `internal/server/worker.go` | `processLoop()` |
+| Chapter conversion | `internal/server/worker.go` | `convertSingleChapter()` |
+| Number normalization | `internal/normalize/processor.go` | `Process()` |
+| Stress marking | `internal/stress/client.go` | `AddStressToSentences()` |
+| Text sanitization | `internal/sanitize/sanitizer.go` | `Sanitize()` |
+| SSML wrapping | `internal/ssml/ssml.go` | `AddSSMLBreaks()` |
+| TTS API call | `internal/tts/service.go` | `ConvertToSpeechWithProgress()` |
+| Audio encoding | `internal/audio/encoder.go` | M4B encoding |
+
 ## Project Structure
 
 ```
