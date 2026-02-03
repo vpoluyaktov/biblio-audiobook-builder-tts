@@ -101,6 +101,9 @@ func main() {
 	if envBiblioAuthURL := os.Getenv("ABB_TTS_BIBLIO_AUTH_URL"); envBiblioAuthURL != "" {
 		cfg.BiblioAuthURL = envBiblioAuthURL
 	}
+	if envStressServerURL := os.Getenv("ABB_TTS_STRESS_SERVER_URL"); envStressServerURL != "" {
+		cfg.StressServerURL = envStressServerURL
+	}
 
 	// Override config with command line flags (highest priority)
 	if *port != "" {
