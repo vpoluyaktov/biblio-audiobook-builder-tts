@@ -107,6 +107,10 @@ var RussianOrdinalSuffixPattern = regexp.MustCompile(`(\d+)-([мгйяеыо][о
 // RussianYearAbbrevPattern matches "гг." abbreviation for "годов" (years)
 var RussianYearAbbrevPattern = regexp.MustCompile(`гг\.`)
 
+// RussianYearOfBirthPattern matches "<number> г.р." or "<number> г. р." abbreviation for "года рождения" (year of birth)
+// The year should be converted to genitive ordinal case
+var RussianYearOfBirthPattern = regexp.MustCompile(`(\d+)\s*г\.\s*р\.`)
+
 // GenderFromSuffix determines grammatical gender from Russian ordinal suffix
 func GenderFromSuffix(suffix string) Gender {
 	suffix = strings.ToLower(suffix)
@@ -777,6 +781,47 @@ func (r *RussianConverter) ordinalWithScale(n int64, gender Gender) string {
 	return strings.Join(parts, " ")
 }
 
+// processYearOfBirth handles the "г.р." (года рождения - year of birth) abbreviation.
+// It converts the year to genitive ordinal case and expands "г.р." to "года рождения".
+// Example: "1968 г. р." → "одна тысяча девятьсот шестьдесят восьмого года рождения"
+func (p *RussianProcessor) processYearOfBirth(text string, converter NumberConverter) string {
+	matches := RussianYearOfBirthPattern.FindAllStringSubmatchIndex(text, -1)
+	if len(matches) == 0 {
+		return text
+	}
+
+	result := text
+	// Process from end to start to preserve indices
+	for i := len(matches) - 1; i >= 0; i-- {
+		match := matches[i]
+		fullStart, fullEnd := match[0], match[1]
+		numStart, numEnd := match[2], match[3]
+
+		numStr := result[numStart:numEnd]
+		n, err := strconv.ParseInt(numStr, 10, 64)
+		if err != nil {
+			continue
+		}
+
+		// Convert year to ordinal masculine (for "год")
+		ctx := Context{
+			Form:   Ordinal,
+			Gender: Masculine,
+			Case:   Nominative,
+		}
+		words := converter.ToWords(n, ctx)
+
+		// Transform to genitive case (восьмой → восьмого)
+		words = TransformOrdinalCase(words, Genitive, Masculine)
+
+		// Replace the entire match with ordinal year + "года рождения"
+		replacement := words + " года рождения"
+		result = result[:fullStart] + replacement + result[fullEnd:]
+	}
+
+	return result
+}
+
 // PreProcess handles Russian-specific preprocessing before number replacement.
 // It processes Roman numerals, ordinal suffixes like "1996-м году" and abbreviations like "гг." before general number processing.
 func (p *RussianProcessor) PreProcess(text string, converter NumberConverter) string {
@@ -787,6 +832,9 @@ func (p *RussianProcessor) PreProcess(text string, converter NumberConverter) st
 
 	// Expand "гг." abbreviation to "годов"
 	result = RussianYearAbbrevPattern.ReplaceAllString(result, "годов")
+
+	// Process "<number> г.р." pattern (year of birth) - convert year to genitive ordinal + "года рождения"
+	result = p.processYearOfBirth(result, converter)
 
 	// Find all ordinal suffix matches from end to start
 	matches := RussianOrdinalSuffixPattern.FindAllStringSubmatchIndex(result, -1)
