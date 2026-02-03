@@ -845,4 +845,109 @@ BiblioAuthURL  string `mapstructure:"biblio_auth_url"`  // Biblio Auth service U
 
 ---
 
-*Last updated: 2026-02-01*
+## Feature: Stress Marking Integration (Silero Stress) ⏳ PLANNED
+
+### Problem Statement
+
+Russian is a stress-timed language where word stress is not marked in standard orthography. Incorrect stress can:
+- Change word meaning (e.g., "замок" - castle vs lock, "готов" - Goths vs ready)
+- Make speech sound unnatural
+- Reduce TTS intelligibility
+
+While Silero TTS produces high-quality Russian speech, it relies on correct stress placement. Without explicit stress markers, homographs and uncommon words may be mispronounced.
+
+### Goal
+
+Integrate the [Silero Stress](https://github.com/snakers4/silero-stress) library via a new REST service (`biblio-stress-server-silero`) to automatically add stress markers (`+`) to Russian text before TTS synthesis.
+
+### Solution
+
+Add a stress marking step in the text processing pipeline between normalization and SSML processing.
+
+### Integration Point
+
+The stress marking should be applied **after text normalization but before SSML processing and chunking**:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    ABB-TTS Text Processing                       │
+│                                                                  │
+│   1. Parse eBook (EPUB/FB2)                                     │
+│      ↓                                                           │
+│   2. Normalize text (numbers → words, cleanup)                  │
+│      ↓                                                           │
+│   3. ★ STRESS MARKING (if Russian + enabled) ★                  │
+│      │   POST /stress-silero/api/stress                         │
+│      │   Input: "Я готов открыть замок"                         │
+│      │   Output: "+Я гот+ов откр+ыть зам+ок"                    │
+│      ↓                                                           │
+│   4. Add SSML break tags (sentence/paragraph pauses)            │
+│      ↓                                                           │
+│   5. Chunk text (respecting max chunk size)                     │
+│      ↓                                                           │
+│   6. Send to TTS (Silero TTS)                                   │
+│      ↓                                                           │
+│   7. Generate audio                                              │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Implementation Plan
+
+**Phase 1: Stress Client**
+1. ⏳ Create `internal/stress/` package with:
+   - `client.go` - HTTP client for stress server
+   - `models.go` - Request/response models
+2. ⏳ Add stress configuration to `internal/config/config.go`
+
+**Phase 2: Pipeline Integration**
+3. ⏳ Integrate stress client into `internal/tts/adapter.go`
+4. ⏳ Add language detection for automatic Russian text handling
+5. ⏳ Add stress marking toggle to provider settings
+
+**Phase 3: UI Integration**
+6. ⏳ Add stress marking toggle to TTS Settings tab
+7. ⏳ Add stress server URL configuration
+8. ⏳ Display stress server status in provider list
+
+### Configuration
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `stress_marking_enabled` | `true` | Enable stress marking for Russian text |
+| `stress_server_url` | `http://stress-silero:80/stress-silero` | Stress server URL |
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ABB_TTS_STRESS_ENABLED` | Enable stress marking | `true` |
+| `ABB_TTS_STRESS_SERVER_URL` | Stress server URL | `http://stress-silero:80/stress-silero` |
+
+### Language Detection
+
+Stress marking is automatically applied when:
+1. `stress_marking_enabled` is `true`
+2. The selected TTS voice language is Russian (`ru`)
+3. The stress server is available (health check passes)
+
+### Files to Modify
+
+- `internal/config/config.go` - Add stress configuration
+- `internal/stress/client.go` - New stress client package
+- `internal/stress/models.go` - Request/response models
+- `internal/tts/adapter.go` - Integrate stress marking into pipeline
+- `internal/server/settings.go` - Add UI settings
+- `internal/server/templates/index.html` - Add stress toggle to UI
+- `internal/server/assets/app.js` - Handle stress settings
+
+### Related Components
+
+- **Stress Server**: [biblio-stress-server-silero](https://github.com/vpoluyaktov/biblio-stress-server-silero)
+- **TTS Server**: [biblio-tts-server-silero](https://github.com/vpoluyaktov/biblio-tts-server-silero)
+
+**Date:** 2026-02-02
+
+---
+
+*Last updated: 2026-02-02*
