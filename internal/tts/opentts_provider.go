@@ -45,6 +45,9 @@ func NewOpenTTSProvider(serverURL string) *OpenTTSProvider {
 		serverURL:    serverURL,
 		httpClient: &http.Client{
 			Timeout: 120 * time.Second, // Timeout for TTS conversion
+			Transport: &http.Transport{
+				DisableKeepAlives: true, // Disable keep-alive to force new connection per request for load balancing
+			},
 		},
 		voicesMap: make(map[string]openTTSVoice),
 	}

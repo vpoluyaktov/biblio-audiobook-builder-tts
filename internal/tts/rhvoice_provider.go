@@ -50,6 +50,9 @@ func NewRHVoiceProvider(serverURL string) *RHVoiceProvider {
 		serverURL:    serverURL,
 		httpClient: &http.Client{
 			Timeout: 120 * time.Second, // TTS can take a while for long text
+			Transport: &http.Transport{
+				DisableKeepAlives: true, // Disable keep-alive to force new connection per request for load balancing
+			},
 		},
 		voicesMap: make(map[string]rhVoiceInfo),
 	}

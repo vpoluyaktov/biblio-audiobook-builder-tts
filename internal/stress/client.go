@@ -60,6 +60,9 @@ func NewClient(baseURL string) *Client {
 		baseURL: baseURL,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
+			Transport: &http.Transport{
+				DisableKeepAlives: true, // Disable keep-alive to force new connection per request for load balancing
+			},
 		},
 		available: false,
 	}
