@@ -761,6 +761,7 @@ type ProviderResponse struct {
 	TTSWorkers       int    `json:"tts_workers"`
 	NormalizeNumbers bool   `json:"normalize_numbers"`
 	SSMLSupport      bool   `json:"ssml_support"`
+	StressEnabled    bool   `json:"stress_enabled"`
 	VoiceCount       int    `json:"voice_count"`
 	URL              string `json:"url,omitempty"`
 	APIKey           string `json:"api_key,omitempty"`
@@ -809,6 +810,7 @@ func (s *Server) handleProviders(w http.ResponseWriter, r *http.Request) {
 					TTSWorkers:       dbProv.TTSWorkers,
 					NormalizeNumbers: dbProv.NormalizeNumbers,
 					SSMLSupport:      dbProv.SSMLSupport,
+					StressEnabled:    dbProv.StressEnabled,
 					VoiceCount:       voiceCount,
 					URL:              dbProv.URL,
 					APIKey:           dbProv.APIKey,
@@ -941,6 +943,7 @@ func (s *Server) getProvider(w http.ResponseWriter, _ *http.Request, id string) 
 		TTSWorkers:       dbProv.TTSWorkers,
 		NormalizeNumbers: dbProv.NormalizeNumbers,
 		SSMLSupport:      dbProv.SSMLSupport,
+		StressEnabled:    dbProv.StressEnabled,
 		VoiceCount:       voiceCount,
 		URL:              dbProv.URL,
 		APIKey:           dbProv.APIKey,
