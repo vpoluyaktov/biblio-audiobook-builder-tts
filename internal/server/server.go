@@ -960,6 +960,7 @@ type ProviderUpdateRequest struct {
 	MaxChunkSize     *int    `json:"max_chunk_size,omitempty"`
 	NormalizeNumbers *bool   `json:"normalize_numbers,omitempty"`
 	SSMLSupport      *bool   `json:"ssml_support,omitempty"`
+	StressEnabled    *bool   `json:"stress_enabled,omitempty"`
 	IsDefault        *bool   `json:"is_default,omitempty"`
 }
 
@@ -1010,6 +1011,9 @@ func (s *Server) updateProvider(w http.ResponseWriter, r *http.Request, id strin
 	}
 	if req.SSMLSupport != nil {
 		dbProv.SSMLSupport = *req.SSMLSupport
+	}
+	if req.StressEnabled != nil {
+		dbProv.StressEnabled = *req.StressEnabled
 	}
 
 	// Handle default provider change
