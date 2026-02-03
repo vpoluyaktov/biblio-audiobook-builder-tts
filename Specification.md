@@ -258,6 +258,7 @@ Flags:
 - Chapter gap silence insertion (configurable via `chapter_gap_seconds` setting)
 - Roman numeral normalization for chapter/part titles (I, II, III, IV, etc.)
 - Russian "г.р." (year of birth) abbreviation normalization ("1968 г.р." → "одна тысяча девятьсот шестьдесят восьмого года рождения")
+- Russian date range normalization ("6-16 августа" → "шестое, тире, шестнадцатое августа")
 - Part separator silence detection (detects `***`, `---`, `• • •`, etc. and inserts silence between parts)
 - SSML pause patterns for dashes and ellipsis (converts ` - ` and `...` to `<break>` tags for TTS)
 - SSML break tag support for sentence and paragraph pauses (configurable durations instead of `<p>`/`<s>` tags)

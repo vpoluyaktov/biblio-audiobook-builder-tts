@@ -668,6 +668,46 @@ func TestProcessorRussian(t *testing.T) {
 	}
 }
 
+func TestRussianDateRanges(t *testing.T) {
+	p := NewProcessor()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "date range with month",
+			input:    "6-16 августа 1991 года",
+			expected: "шестое, тире, шестнадцатое августа одна тысяча девятьсот девяносто первого года",
+		},
+		{
+			name:     "date range January",
+			input:    "1-5 января",
+			expected: "первое, тире, пятое января",
+		},
+		{
+			name:     "date range March",
+			input:    "10-20 марта",
+			expected: "десятое, тире, двадцатое марта",
+		},
+		{
+			name:     "date range December",
+			input:    "25-31 декабря",
+			expected: "двадцать пятое, тире, тридцать первое декабря",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := p.Process(tt.input, "ru")
+			if result != tt.expected {
+				t.Errorf("Process(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestRussianYearOfBirth(t *testing.T) {
 	p := NewProcessor()
 

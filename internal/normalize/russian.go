@@ -111,6 +111,11 @@ var RussianYearAbbrevPattern = regexp.MustCompile(`гг\.`)
 // The year should be converted to genitive ordinal case
 var RussianYearOfBirthPattern = regexp.MustCompile(`(\d+)\s*г\.\s*р\.`)
 
+// RussianDateRangePattern matches date ranges like "6-16 августа" or "1-5 марта"
+// Both numbers should be converted to ordinal neuter (for dates)
+// Example: "6-16 августа" → "шестое, тире, шестнадцатое августа"
+var RussianDateRangePattern = regexp.MustCompile(`(\d+)-(\d+)\s+(января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)`)
+
 // GenderFromSuffix determines grammatical gender from Russian ordinal suffix
 func GenderFromSuffix(suffix string) Gender {
 	suffix = strings.ToLower(suffix)
@@ -781,6 +786,52 @@ func (r *RussianConverter) ordinalWithScale(n int64, gender Gender) string {
 	return strings.Join(parts, " ")
 }
 
+// processDateRanges handles date range patterns like "6-16 августа".
+// Both numbers are converted to ordinal neuter (for dates) with comma and "тире" between them.
+// Example: "6-16 августа" → "шестое, тире, шестнадцатое августа"
+func (p *RussianProcessor) processDateRanges(text string, converter NumberConverter) string {
+	matches := RussianDateRangePattern.FindAllStringSubmatchIndex(text, -1)
+	if len(matches) == 0 {
+		return text
+	}
+
+	result := text
+	// Process from end to start to preserve indices
+	for i := len(matches) - 1; i >= 0; i-- {
+		match := matches[i]
+		fullStart, fullEnd := match[0], match[1]
+		num1Start, num1End := match[2], match[3]
+		num2Start, num2End := match[4], match[5]
+		monthStart, monthEnd := match[6], match[7]
+
+		num1Str := result[num1Start:num1End]
+		num2Str := result[num2Start:num2End]
+		month := result[monthStart:monthEnd]
+
+		n1, err1 := strconv.ParseInt(num1Str, 10, 64)
+		n2, err2 := strconv.ParseInt(num2Str, 10, 64)
+		if err1 != nil || err2 != nil {
+			continue
+		}
+
+		// Convert both numbers to ordinal neuter (for dates like "шестое", "шестнадцатое")
+		ctx := Context{
+			Form:   Ordinal,
+			Gender: Neuter,
+			Case:   Nominative,
+		}
+
+		words1 := converter.ToWords(n1, ctx)
+		words2 := converter.ToWords(n2, ctx)
+
+		// Build replacement: "шестое, тире, шестнадцатое августа"
+		replacement := words1 + ", тире, " + words2 + " " + month
+		result = result[:fullStart] + replacement + result[fullEnd:]
+	}
+
+	return result
+}
+
 // processYearOfBirth handles the "г.р." (года рождения - year of birth) abbreviation.
 // It converts the year to genitive ordinal case and expands "г.р." to "года рождения".
 // Example: "1968 г. р." → "одна тысяча девятьсот шестьдесят восьмого года рождения"
@@ -835,6 +886,9 @@ func (p *RussianProcessor) PreProcess(text string, converter NumberConverter) st
 
 	// Process "<number> г.р." pattern (year of birth) - convert year to genitive ordinal + "года рождения"
 	result = p.processYearOfBirth(result, converter)
+
+	// Process date ranges like "6-16 августа" → "шестое, тире, шестнадцатое августа"
+	result = p.processDateRanges(result, converter)
 
 	// Find all ordinal suffix matches from end to start
 	matches := RussianOrdinalSuffixPattern.FindAllStringSubmatchIndex(result, -1)
