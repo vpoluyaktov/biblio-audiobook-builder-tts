@@ -44,6 +44,88 @@
    └─────────────┘     └─────────────┘     └─────────────┘
 ```
 
+## Text-to-Audio Processing Pipeline
+
+The following diagram shows the complete flow from raw chapter text to final audio output:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  1. RAW CHAPTER CONTENT                                         │
+│     chapter.Content (from EPUB/FB2 parser)                      │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  2. NUMBER NORMALIZATION (if provider.NormalizeNumbers=true)    │
+│     w.normalizer.Process(content, lang)                         │
+│     "в 1984 году" → "в тысяча девятьсот восемьдесят четвёртом   │
+│     году"                                                       │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  3. STRESS MARKING (if provider.StressEnabled=true && lang=ru)  │
+│     w.stressClient.AddStressToSentences(content, lang)          │
+│     "Замок на двери" → "Зам+ок н+а дв+ери"                      │
+│     (processed sentence by sentence for homograph accuracy)     │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  4. TEXT SANITIZATION (pronunciation rules)                     │
+│     w.sanitizer.Sanitize(content)                               │
+│     Applies pronunciation dictionary replacements               │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  5. PART SEPARATOR DETECTION (if cfg.DetectPartSeparators)      │
+│     w.separatorDetector.DetectAndMark(content)                  │
+│     Detects "* * *" scene breaks for silence insertion          │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  6. SPEAKABLE CONTENT CHECK                                     │
+│     sanitize.HasSpeakableContentForLanguage(content, lang)      │
+│     If no speakable content → generate 1s silent WAV            │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  7. SSML WRAPPING (if provider.SSMLSupport=true)                │
+│     ssml.AddSSMLBreaks(content, options)                        │
+│     Adds <break> tags for sentences, paragraphs, dashes         │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  8. TTS CONVERSION                                              │
+│     w.ttsService.ConvertToSpeechWithProgress(content, options)  │
+│     - Chunks text if needed (max_chunk_size)                    │
+│     - Sends to TTS provider (Silero, OpenVoice, etc.)           │
+│     - Concatenates audio chunks                                 │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  9. AUDIO FILE OUTPUT                                           │
+│     Saves as WAV: "01_Chapter_Title.wav"                        │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  10. POST-PROCESSING (in convertBook)                           │
+│      - Concatenate all chapter WAVs                             │
+│      - Encode to M4B with chapters metadata                     │
+│      - Upload to Audiobookshelf (if configured)                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Code Locations
+
+| Step | File | Function/Method |
+|------|------|-----------------|
+| Job queue | `internal/server/worker.go` | `processLoop()` |
+| Chapter conversion | `internal/server/worker.go` | `convertSingleChapter()` |
+| Number normalization | `internal/normalize/processor.go` | `Process()` |
+| Stress marking | `internal/stress/client.go` | `AddStressToSentences()` |
+| Text sanitization | `internal/sanitize/sanitizer.go` | `Sanitize()` |
+| SSML wrapping | `internal/ssml/ssml.go` | `AddSSMLBreaks()` |
+| TTS API call | `internal/tts/service.go` | `ConvertToSpeechWithProgress()` |
+| Audio encoding | `internal/audio/encoder.go` | M4B encoding |
+
 ## Project Structure
 
 ```
@@ -845,4 +927,117 @@ BiblioAuthURL  string `mapstructure:"biblio_auth_url"`  // Biblio Auth service U
 
 ---
 
-*Last updated: 2026-02-01*
+## Feature: Stress Marking Integration (Silero Stress) ⏳ PLANNED
+
+### Problem Statement
+
+Russian is a stress-timed language where word stress is not marked in standard orthography. Incorrect stress can:
+- Change word meaning (e.g., "замок" - castle vs lock, "готов" - Goths vs ready)
+- Make speech sound unnatural
+- Reduce TTS intelligibility
+
+While Silero TTS produces high-quality Russian speech, it relies on correct stress placement. Without explicit stress markers, homographs and uncommon words may be mispronounced.
+
+### Goal
+
+Integrate the [Silero Stress](https://github.com/snakers4/silero-stress) library via a new REST service (`biblio-stress-server-silero`) to automatically add stress markers (`+`) to Russian text before TTS synthesis.
+
+### Solution
+
+Add a stress marking step in the text processing pipeline between normalization and SSML processing.
+
+### Integration Point
+
+The stress marking should be applied **after text normalization but before SSML processing**. ABB-TTS handles sentence splitting and sends parallel requests to stress server replicas.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    ABB-TTS Text Processing                       │
+│                                                                  │
+│   1. Parse eBook (EPUB/FB2)                                     │
+│      ↓                                                           │
+│   2. Normalize text (numbers → words, cleanup)                  │
+│      ↓                                                           │
+│   3. ★ STRESS MARKING (if Russian + enabled) ★                  │
+│      │   a. Split chapter into sentences (reuse chunker logic)  │
+│      │   b. For each sentence (parallel, via worker pool):      │
+│      │      POST /stress-silero/api/stress                      │
+│      │      Send: {"text": "sentence"}                          │
+│      │      Receive: {"text": "str+essed sent+ence"}            │
+│      │   c. Rejoin stressed sentences into chapter text         │
+│      ↓                                                           │
+│   4. Add SSML break tags (sentence/paragraph pauses)            │
+│      ↓                                                           │
+│   5. Chunk text (respecting max TTS chunk size)                 │
+│      ↓                                                           │
+│   6. Send chunks to TTS (Silero TTS)                            │
+│      ↓                                                           │
+│   7. Generate audio                                              │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key points:**
+- ABB-TTS reuses existing sentence splitting logic from the chunker
+- Parallel requests distributed across stress server replicas (same pattern as tts-silero)
+- Stress server stays simple and stateless
+- Scales horizontally via Docker Swarm
+
+### Configuration
+
+Stress marking is configured **per TTS provider** in the ABB-TTS web UI (Config → TTS Providers tab). This allows enabling stress marking only for providers that benefit from it (e.g., Silero TTS for Russian).
+
+**Provider-level settings (in TTS Providers tab):**
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `stress_enabled` | `false` | Enable stress marking for this provider |
+
+**Global settings (environment variables):**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ABB_TTS_STRESS_SERVER_URL` | `http://stress-silero:80/stress-silero` | Stress server URL |
+
+**When stress marking is applied:**
+1. Provider has `stress_enabled = true`
+2. Selected voice language is Russian (`ru`)
+3. Stress server is available (health check passes)
+
+### Implementation Plan
+
+**Phase 1: Stress Client**
+1. ⏳ Create `internal/stress/` package with:
+   - `client.go` - HTTP client for stress server
+   - `models.go` - Request/response models
+2. ⏳ Add stress configuration to `internal/config/config.go`
+
+**Phase 2: Pipeline Integration**
+3. ⏳ Integrate stress client into `internal/tts/adapter.go`
+4. ⏳ Add language detection for automatic Russian text handling
+5. ⏳ Add stress marking toggle to provider settings
+
+**Phase 3: UI Integration**
+6. ⏳ Add stress marking toggle to TTS Providers tab (per-provider setting)
+7. ⏳ Display stress server status in provider list
+
+### Files to Modify
+
+- `internal/config/config.go` - Add stress configuration
+- `internal/stress/client.go` - New stress client package
+- `internal/stress/models.go` - Request/response models
+- `internal/tts/adapter.go` - Integrate stress marking into pipeline
+- `internal/server/settings.go` - Add UI settings
+- `internal/server/templates/index.html` - Add stress toggle to UI
+- `internal/server/assets/app.js` - Handle stress settings
+
+### Related Components
+
+- **Stress Server**: [biblio-stress-server-silero](https://github.com/vpoluyaktov/biblio-stress-server-silero)
+- **TTS Server**: [biblio-tts-server-silero](https://github.com/vpoluyaktov/biblio-tts-server-silero)
+
+**Date:** 2026-02-02
+
+---
+
+*Last updated: 2026-02-02*

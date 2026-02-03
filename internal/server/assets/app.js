@@ -1485,6 +1485,7 @@ class App {
                         <td>${p.tts_workers}</td>
                         <td>${p.normalize_numbers ? '✓' : '—'}</td>
                         <td>${p.ssml_support ? '✓' : '—'}</td>
+                        <td>${p.stress_enabled ? '✓' : '—'}</td>
                         <td>${p.is_default ? '<span class="default-badge">Default</span>' : ''}</td>
                     </tr>
                 `;
@@ -1496,7 +1497,7 @@ class App {
             });
         } catch (error) {
             console.error('Failed to load providers:', error);
-            tbody.innerHTML = '<tr><td colspan="7">Failed to load providers</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8">Failed to load providers</td></tr>';
         }
     }
     
@@ -1529,6 +1530,7 @@ class App {
         document.getElementById('provider-edit-chunk-size').value = provider.max_chunk_size || 900;
         document.getElementById('provider-edit-normalize').checked = provider.normalize_numbers;
         document.getElementById('provider-edit-ssml').checked = provider.ssml_support;
+        document.getElementById('provider-edit-stress').checked = provider.stress_enabled;
         
         // Show/hide fields based on provider type
         const urlGroup = document.getElementById('provider-edit-url-group');
@@ -1584,7 +1586,8 @@ class App {
             tts_workers: parseInt(document.getElementById('provider-edit-workers').value),
             max_chunk_size: parseInt(document.getElementById('provider-edit-chunk-size').value),
             normalize_numbers: document.getElementById('provider-edit-normalize').checked,
-            ssml_support: document.getElementById('provider-edit-ssml').checked
+            ssml_support: document.getElementById('provider-edit-ssml').checked,
+            stress_enabled: document.getElementById('provider-edit-stress').checked
         };
         
         // Add URL or API key based on provider type

@@ -46,6 +46,9 @@ type Config struct {
 	AudiobookshelfUser     string `mapstructure:"audiobookshelf_user"`
 	AudiobookshelfPassword string `mapstructure:"audiobookshelf_password"`
 	AudiobookshelfLibrary  string `mapstructure:"audiobookshelf_library"`
+
+	// Stress server integration (Russian text stress marking)
+	StressServerURL string `mapstructure:"stress_server_url"`
 }
 
 // Load reads configuration from file and environment variables
@@ -62,6 +65,7 @@ func Load(configFile string) (*Config, error) {
 	viper.BindEnv("server_host")
 	viper.BindEnv("auth_mode")
 	viper.BindEnv("biblio_auth_url")
+	viper.BindEnv("stress_server_url")
 
 	// Basic settings
 	viper.SetDefault("log_file", "biblio-audiobook-builder-tts.log")
@@ -100,6 +104,9 @@ func Load(configFile string) (*Config, error) {
 	viper.SetDefault("audiobookshelf_user", "admin")
 	viper.SetDefault("audiobookshelf_password", "")
 	viper.SetDefault("audiobookshelf_library", "TTS books")
+
+	// Stress server settings
+	viper.SetDefault("stress_server_url", "http://stress-silero:80/stress-silero")
 
 	if configFile != "" {
 		viper.SetConfigFile(configFile)
@@ -213,6 +220,9 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 	}
 	if v, ok := dbConfig["audiobookshelf_library"].(string); ok {
 		cfg.AudiobookshelfLibrary = v
+	}
+	if v, ok := dbConfig["stress_server_url"].(string); ok {
+		cfg.StressServerURL = v
 	}
 
 	return cfg

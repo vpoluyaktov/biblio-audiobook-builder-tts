@@ -209,6 +209,7 @@ func (db *DB) migrate() error {
 		max_chunk_size INTEGER DEFAULT 900,
 		normalize_numbers BOOLEAN DEFAULT 1,
 		ssml_support BOOLEAN DEFAULT 0,
+		stress_enabled BOOLEAN DEFAULT 0,
 		sample_rate INTEGER DEFAULT 48000,
 		is_default BOOLEAN DEFAULT 0,
 		display_order INTEGER DEFAULT 0,
@@ -257,6 +258,9 @@ func (db *DB) migrate() error {
 	db.conn.Exec("UPDATE providers SET sample_rate = 44100 WHERE id = 'google'")
 	db.conn.Exec("UPDATE providers SET sample_rate = 24000 WHERE id IN ('azure', 'openai', 'rhvoice')")
 	db.conn.Exec("UPDATE providers SET sample_rate = 22050 WHERE id IN ('espeak', 'opentts')")
+
+	// Add stress_enabled column if it doesn't exist (migration for existing DBs)
+	db.conn.Exec("ALTER TABLE providers ADD COLUMN stress_enabled BOOLEAN DEFAULT 0")
 
 	return nil
 }
@@ -1007,7 +1011,8 @@ type TTSProvider struct {
 	MaxChunkSize     int       `json:"max_chunk_size"` // Maximum characters per TTS request
 	NormalizeNumbers bool      `json:"normalize_numbers"`
 	SSMLSupport      bool      `json:"ssml_support"`
-	SampleRate       int       `json:"sample_rate"` // Output sample rate in Hz (e.g., 48000, 44100, 24000)
+	StressEnabled    bool      `json:"stress_enabled"` // Enable Russian stress marking via stress server
+	SampleRate       int       `json:"sample_rate"`    // Output sample rate in Hz (e.g., 48000, 44100, 24000)
 	IsDefault        bool      `json:"is_default"`
 	DisplayOrder     int       `json:"display_order"`
 	CreatedAt        time.Time `json:"created_at"`
@@ -1020,8 +1025,8 @@ func (db *DB) CreateProvider(provider *TTSProvider) error {
 	defer db.mu.Unlock()
 
 	_, err := db.conn.Exec(`
-		INSERT INTO providers (id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, ssml_support, sample_rate, is_default, display_order, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO providers (id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, ssml_support, stress_enabled, sample_rate, is_default, display_order, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			name = excluded.name,
 			type = excluded.type,
@@ -1033,12 +1038,13 @@ func (db *DB) CreateProvider(provider *TTSProvider) error {
 			max_chunk_size = excluded.max_chunk_size,
 			normalize_numbers = excluded.normalize_numbers,
 			ssml_support = excluded.ssml_support,
+			stress_enabled = excluded.stress_enabled,
 			sample_rate = excluded.sample_rate,
 			is_default = excluded.is_default,
 			display_order = excluded.display_order,
 			updated_at = excluded.updated_at
 	`, provider.ID, provider.Name, provider.Type, provider.Enabled, provider.URL, provider.APIKey, provider.Region,
-		provider.TTSWorkers, provider.MaxChunkSize, provider.NormalizeNumbers, provider.SSMLSupport, provider.SampleRate, provider.IsDefault, provider.DisplayOrder,
+		provider.TTSWorkers, provider.MaxChunkSize, provider.NormalizeNumbers, provider.SSMLSupport, provider.StressEnabled, provider.SampleRate, provider.IsDefault, provider.DisplayOrder,
 		provider.CreatedAt, provider.UpdatedAt)
 
 	return err
@@ -1051,10 +1057,10 @@ func (db *DB) UpdateProvider(provider *TTSProvider) error {
 
 	_, err := db.conn.Exec(`
 		UPDATE providers SET name = ?, type = ?, enabled = ?, url = ?, api_key = ?, region = ?, tts_workers = ?,
-			max_chunk_size = ?, normalize_numbers = ?, ssml_support = ?, sample_rate = ?, is_default = ?, display_order = ?, updated_at = ?
+			max_chunk_size = ?, normalize_numbers = ?, ssml_support = ?, stress_enabled = ?, sample_rate = ?, is_default = ?, display_order = ?, updated_at = ?
 		WHERE id = ?
 	`, provider.Name, provider.Type, provider.Enabled, provider.URL, provider.APIKey, provider.Region, provider.TTSWorkers,
-		provider.MaxChunkSize, provider.NormalizeNumbers, provider.SSMLSupport, provider.SampleRate, provider.IsDefault, provider.DisplayOrder, time.Now(), provider.ID)
+		provider.MaxChunkSize, provider.NormalizeNumbers, provider.SSMLSupport, provider.StressEnabled, provider.SampleRate, provider.IsDefault, provider.DisplayOrder, time.Now(), provider.ID)
 
 	return err
 }
@@ -1066,10 +1072,10 @@ func (db *DB) GetProvider(id string) (*TTSProvider, error) {
 
 	provider := &TTSProvider{}
 	err := db.conn.QueryRow(`
-		SELECT id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, ssml_support, sample_rate, is_default, display_order, created_at, updated_at
+		SELECT id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, ssml_support, stress_enabled, sample_rate, is_default, display_order, created_at, updated_at
 		FROM providers WHERE id = ?
 	`, id).Scan(&provider.ID, &provider.Name, &provider.Type, &provider.Enabled, &provider.URL, &provider.APIKey, &provider.Region,
-		&provider.TTSWorkers, &provider.MaxChunkSize, &provider.NormalizeNumbers, &provider.SSMLSupport, &provider.SampleRate, &provider.IsDefault, &provider.DisplayOrder,
+		&provider.TTSWorkers, &provider.MaxChunkSize, &provider.NormalizeNumbers, &provider.SSMLSupport, &provider.StressEnabled, &provider.SampleRate, &provider.IsDefault, &provider.DisplayOrder,
 		&provider.CreatedAt, &provider.UpdatedAt)
 
 	if err == sql.ErrNoRows {
@@ -1087,7 +1093,7 @@ func (db *DB) ListProviders(enabledOnly bool) ([]*TTSProvider, error) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 
-	query := `SELECT id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, ssml_support, sample_rate, is_default, display_order, created_at, updated_at FROM providers`
+	query := `SELECT id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, ssml_support, stress_enabled, sample_rate, is_default, display_order, created_at, updated_at FROM providers`
 	if enabledOnly {
 		query += " WHERE enabled = 1"
 	}
@@ -1103,7 +1109,7 @@ func (db *DB) ListProviders(enabledOnly bool) ([]*TTSProvider, error) {
 	for rows.Next() {
 		provider := &TTSProvider{}
 		err := rows.Scan(&provider.ID, &provider.Name, &provider.Type, &provider.Enabled, &provider.URL, &provider.APIKey, &provider.Region,
-			&provider.TTSWorkers, &provider.MaxChunkSize, &provider.NormalizeNumbers, &provider.SSMLSupport, &provider.SampleRate, &provider.IsDefault, &provider.DisplayOrder,
+			&provider.TTSWorkers, &provider.MaxChunkSize, &provider.NormalizeNumbers, &provider.SSMLSupport, &provider.StressEnabled, &provider.SampleRate, &provider.IsDefault, &provider.DisplayOrder,
 			&provider.CreatedAt, &provider.UpdatedAt)
 		if err != nil {
 			return nil, err

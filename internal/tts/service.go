@@ -34,6 +34,7 @@ type ProviderInfo struct {
 	TTSWorkers       int    `json:"tts_workers"`
 	NormalizeNumbers bool   `json:"normalize_numbers"`
 	SSMLSupport      bool   `json:"ssml_support"`
+	StressEnabled    bool   `json:"stress_enabled"`
 	IsDefault        bool   `json:"is_default"`
 	VoiceCount       int    `json:"voice_count"`
 	Error            string `json:"error,omitempty"`
@@ -317,6 +318,7 @@ func (s *service) GetProviderInfo(providerID string) *ProviderInfo {
 		info.TTSWorkers = dbProv.TTSWorkers
 		info.NormalizeNumbers = dbProv.NormalizeNumbers
 		info.SSMLSupport = dbProv.SSMLSupport
+		info.StressEnabled = dbProv.StressEnabled
 		info.IsDefault = dbProv.IsDefault
 	}
 
@@ -349,6 +351,7 @@ func (s *service) GetAllProviderInfos() []*ProviderInfo {
 					TTSWorkers:       dbProv.TTSWorkers,
 					NormalizeNumbers: dbProv.NormalizeNumbers,
 					SSMLSupport:      dbProv.SSMLSupport,
+					StressEnabled:    dbProv.StressEnabled,
 					IsDefault:        dbProv.IsDefault,
 					Available:        false,
 				}
