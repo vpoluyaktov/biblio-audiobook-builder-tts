@@ -97,10 +97,19 @@ func (c *Client) CheckHealth() error {
 }
 
 // IsAvailable returns whether the stress server is available
+// If not currently available, it will retry the health check once
 func (c *Client) IsAvailable() bool {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.available
+	available := c.available
+	c.mu.RUnlock()
+
+	if !available {
+		// Retry health check if not available
+		if err := c.CheckHealth(); err == nil {
+			return true
+		}
+	}
+	return available
 }
 
 func (c *Client) setAvailable(available bool) {
