@@ -65,6 +65,7 @@ func Load(configFile string) (*Config, error) {
 	viper.BindEnv("server_host")
 	viper.BindEnv("auth_mode")
 	viper.BindEnv("biblio_auth_url")
+	viper.BindEnv("stress_server_url")
 
 	// Basic settings
 	viper.SetDefault("log_file", "biblio-audiobook-builder-tts.log")
