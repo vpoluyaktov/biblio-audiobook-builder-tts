@@ -668,6 +668,46 @@ func TestProcessorRussian(t *testing.T) {
 	}
 }
 
+func TestRussianYearOfBirth(t *testing.T) {
+	p := NewProcessor()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "year of birth with г.р.",
+			input:    "Кто ты, Костенко Тимофей Сергеевич, 1968 г. р.",
+			expected: "Кто ты, Костенко Тимофей Сергеевич, одна тысяча девятьсот шестьдесят восьмого года рождения",
+		},
+		{
+			name:     "year of birth with г.р. no space",
+			input:    "Иванов, 1985 г.р.",
+			expected: "Иванов, одна тысяча девятьсот восемьдесят пятого года рождения",
+		},
+		{
+			name:     "year of birth 2000",
+			input:    "Петров, 2000 г. р.",
+			expected: "Петров, две тысячного года рождения",
+		},
+		{
+			name:     "year of birth 1990",
+			input:    "Сидоров, 1990 г.р.",
+			expected: "Сидоров, одна тысяча девятьсот девяностого года рождения",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := p.Process(tt.input, "ru")
+			if result != tt.expected {
+				t.Errorf("Process(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestRussianOrdinalSuffixes(t *testing.T) {
 	p := NewProcessor()
 
