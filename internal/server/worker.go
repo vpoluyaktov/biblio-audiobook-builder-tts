@@ -431,8 +431,9 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 			lang = "en"
 		}
 		// Only apply stress marking for Russian language
+		// Process sentence by sentence to ensure correct homograph disambiguation
 		if lang == "ru" && w.stressClient.SupportsLanguage(lang) {
-			stressedContent, err := w.stressClient.AddStress(content, lang)
+			stressedContent, err := w.stressClient.AddStressToSentences(content, lang)
 			if err != nil {
 				logger.Warn("Failed to add stress markers: %v (continuing without stress)", err)
 			} else {
