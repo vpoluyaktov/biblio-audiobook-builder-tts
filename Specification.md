@@ -878,19 +878,22 @@ The stress marking should be applied **after text normalization but before SSML 
 │      ↓                                                           │
 │   3. ★ STRESS MARKING (if Russian + enabled) ★                  │
 │      │   POST /stress-silero/api/stress                         │
-│      │   Input: "Я готов открыть замок"                         │
-│      │   Output: "+Я гот+ов откр+ыть зам+ок"                    │
+│      │   Send: full chapter text                                │
+│      │   Server: splits → stresses → rejoins                    │
+│      │   Receive: stressed chapter text                         │
 │      ↓                                                           │
 │   4. Add SSML break tags (sentence/paragraph pauses)            │
 │      ↓                                                           │
-│   5. Chunk text (respecting max chunk size)                     │
+│   5. Chunk text (respecting max TTS chunk size)                 │
 │      ↓                                                           │
-│   6. Send to TTS (Silero TTS)                                   │
+│   6. Send chunks to TTS (Silero TTS)                            │
 │      ↓                                                           │
 │   7. Generate audio                                              │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+**Note**: The stress server handles sentence splitting internally. ABB-TTS sends the full normalized chapter text and receives stressed text back. This keeps the integration simple while allowing the stress server to optimize sentence-level processing.
 
 ### Implementation Plan
 
