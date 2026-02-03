@@ -20,6 +20,7 @@ import (
 	"biblio-audiobook-builder-tts/internal/sanitize"
 	"biblio-audiobook-builder-tts/internal/ssml"
 	"biblio-audiobook-builder-tts/internal/storage"
+	"biblio-audiobook-builder-tts/internal/stress"
 	"biblio-audiobook-builder-tts/internal/tts"
 	"biblio-audiobook-builder-tts/internal/utils"
 )
@@ -42,6 +43,7 @@ type Worker struct {
 	sanitizer         *sanitize.TextSanitizer
 	normalizer        *normalize.Processor
 	separatorDetector *normalize.PartSeparatorDetector
+	stressClient      *stress.Client
 	ctx               context.Context
 	cancel            context.CancelFunc
 	wg                sync.WaitGroup
@@ -76,6 +78,17 @@ func NewWorker(db JobDB, hub *Hub, ttsService tts.Service, cfg *config.Config) *
 		logger.Info("Part separator detection enabled")
 	}
 
+	// Initialize stress client if URL is configured
+	var stressClient *stress.Client
+	if cfg.StressServerURL != "" {
+		stressClient = stress.NewClient(cfg.StressServerURL)
+		if err := stressClient.CheckHealth(); err != nil {
+			logger.Warn("Stress server not available at %s: %v", cfg.StressServerURL, err)
+		} else {
+			logger.Info("Stress server connected at %s", cfg.StressServerURL)
+		}
+	}
+
 	return &Worker{
 		db:                db,
 		hub:               hub,
@@ -84,6 +97,7 @@ func NewWorker(db JobDB, hub *Hub, ttsService tts.Service, cfg *config.Config) *
 		sanitizer:         textSanitizer,
 		normalizer:        normalize.NewProcessor(),
 		separatorDetector: separatorDetector,
+		stressClient:      stressClient,
 		ctx:               ctx,
 		cancel:            cancel,
 	}
@@ -396,8 +410,10 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 
 	// Apply number normalization if provider needs it
 	needsNormalization := true // Default to true for safety
+	stressEnabled := false
 	if providerInfo := w.ttsService.GetProviderInfo(job.Provider); providerInfo != nil {
 		needsNormalization = providerInfo.NormalizeNumbers
+		stressEnabled = providerInfo.StressEnabled
 	}
 	if needsNormalization {
 		lang := job.Language
@@ -406,6 +422,24 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		}
 		content = w.normalizer.Process(content, lang)
 		logger.Debug("Applied number normalization for provider %s (lang: %s)", job.Provider, lang)
+	}
+
+	// Apply stress marking for Russian text if enabled for this provider
+	if stressEnabled && w.stressClient != nil && w.stressClient.IsAvailable() {
+		lang := job.Language
+		if lang == "" {
+			lang = "en"
+		}
+		// Only apply stress marking for Russian language
+		if lang == "ru" && w.stressClient.SupportsLanguage(lang) {
+			stressedContent, err := w.stressClient.AddStress(content, lang)
+			if err != nil {
+				logger.Warn("Failed to add stress markers: %v (continuing without stress)", err)
+			} else {
+				content = stressedContent
+				logger.Debug("Applied stress marking for provider %s (lang: %s)", job.Provider, lang)
+			}
+		}
 	}
 
 	// Apply text sanitization (pronunciation rules) to chapter content
