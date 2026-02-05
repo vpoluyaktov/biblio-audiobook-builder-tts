@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+README*
+LICENSE
+
+# IDE
+.vscode
+.idea
+
+# Docker files
+docker/
+Dockerfile
+docker-compose*.yml
+docker-compose*.yaml
+
+# Build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+biblio-audiobook-builder-tts
+
+# Test files
+*_test.go
+tests/
+test/
+scripts/test_data/
+
+# Go build cache
+.go/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Temporary files
+*.tmp
+*.log
+tmp/
