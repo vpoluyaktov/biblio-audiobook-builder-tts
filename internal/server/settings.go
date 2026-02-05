@@ -24,12 +24,12 @@ type SettingsRequest struct {
 	PronunciationDictFile   string `json:"pronunciation_dict_file"`
 
 	// TTS - Pauses & Gaps
-	SentenceBreakMs     int `json:"sentence_break_ms"`
-	ParagraphBreakMs    int `json:"paragraph_break_ms"`
-	DashBreakDurationMs int `json:"dash_break_duration_ms"`
-	TitleBreakMs        int `json:"title_break_ms"`
-	ChapterGapSeconds   int `json:"chapter_gap_seconds"`
-	PartGapSeconds      int `json:"part_gap_seconds"`
+	SentenceBreakMs     int     `json:"sentence_break_ms"`
+	ParagraphBreakMs    int     `json:"paragraph_break_ms"`
+	DashBreakDurationMs int     `json:"dash_break_duration_ms"`
+	TitleBreakMs        int     `json:"title_break_ms"`
+	ChapterGapSeconds   float64 `json:"chapter_gap_seconds"`
+	PartGapSeconds      float64 `json:"part_gap_seconds"`
 
 	// Output
 	MaxFileSizeMB int `json:"max_file_size_mb"`
@@ -216,8 +216,8 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 			"paragraph_break_ms":        {fmt.Sprintf("%d", req.ParagraphBreakMs), wasProvided("paragraph_break_ms")},
 			"dash_break_duration_ms":    {fmt.Sprintf("%d", req.DashBreakDurationMs), wasProvided("dash_break_duration_ms")},
 			"title_break_ms":            {fmt.Sprintf("%d", req.TitleBreakMs), wasProvided("title_break_ms")},
-			"chapter_gap_seconds":       {fmt.Sprintf("%d", req.ChapterGapSeconds), wasProvided("chapter_gap_seconds")},
-			"part_gap_seconds":          {fmt.Sprintf("%d", req.PartGapSeconds), wasProvided("part_gap_seconds")},
+			"chapter_gap_seconds":       {fmt.Sprintf("%.2f", req.ChapterGapSeconds), wasProvided("chapter_gap_seconds")},
+			"part_gap_seconds":          {fmt.Sprintf("%.2f", req.PartGapSeconds), wasProvided("part_gap_seconds")},
 			"max_file_size_mb":          {fmt.Sprintf("%d", req.MaxFileSizeMB), wasProvided("max_file_size_mb")},
 			"concurrent_encoders":       {fmt.Sprintf("%d", req.ConcurrentEncoders), wasProvided("concurrent_encoders")},
 			"audiobookshelf_url":        {req.AudiobookshelfURL, wasProvided("audiobookshelf_url")},

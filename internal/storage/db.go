@@ -36,8 +36,8 @@ type Config struct {
 	// TTS settings
 	DefaultSpeed            float64 `json:"default_speed"`
 	DefaultPitch            float64 `json:"default_pitch"`
-	ChapterGapSeconds       int     `json:"chapter_gap_seconds"`
-	PartGapSeconds          int     `json:"part_gap_seconds"`
+	ChapterGapSeconds       float64 `json:"chapter_gap_seconds"`
+	PartGapSeconds          float64 `json:"part_gap_seconds"`
 	DetectPartSeparators    bool    `json:"detect_part_separators"`
 	SentenceBreakMs         int     `json:"sentence_break_ms"`
 	ParagraphBreakMs        int     `json:"paragraph_break_ms"`
@@ -341,10 +341,10 @@ func (db *DB) GetAllConfig() (*Config, error) {
 		fmt.Sscanf(v, "%f", &cfg.DefaultPitch)
 	}
 	if v, ok := configMap["chapter_gap_seconds"]; ok {
-		fmt.Sscanf(v, "%d", &cfg.ChapterGapSeconds)
+		fmt.Sscanf(v, "%f", &cfg.ChapterGapSeconds)
 	}
 	if v, ok := configMap["part_gap_seconds"]; ok {
-		fmt.Sscanf(v, "%d", &cfg.PartGapSeconds)
+		fmt.Sscanf(v, "%f", &cfg.PartGapSeconds)
 	}
 	if v, ok := configMap["detect_part_separators"]; ok {
 		cfg.DetectPartSeparators = v == "true"
@@ -422,7 +422,7 @@ func (db *DB) SaveAllConfig(cfg *Config) error {
 		"open_browser":              fmt.Sprintf("%t", cfg.OpenBrowser),
 		"default_speed":             fmt.Sprintf("%.2f", cfg.DefaultSpeed),
 		"default_pitch":             fmt.Sprintf("%.2f", cfg.DefaultPitch),
-		"chapter_gap_seconds":       fmt.Sprintf("%d", cfg.ChapterGapSeconds),
+		"chapter_gap_seconds":       fmt.Sprintf("%.2f", cfg.ChapterGapSeconds),
 		"pronunciation_dict_file":   cfg.PronunciationDictFile,
 		"use_default_pronunciation": fmt.Sprintf("%t", cfg.UseDefaultPronunciation),
 		"max_file_size_mb":          fmt.Sprintf("%d", cfg.MaxFileSizeMB),
@@ -454,8 +454,8 @@ func DefaultConfig() *Config {
 		OpenBrowser:             true,
 		DefaultSpeed:            1.0,
 		DefaultPitch:            1.0,
-		ChapterGapSeconds:       2,
-		PartGapSeconds:          2,
+		ChapterGapSeconds:       2.0,
+		PartGapSeconds:          2.0,
 		DetectPartSeparators:    true,
 		SentenceBreakMs:         500,
 		ParagraphBreakMs:        800,

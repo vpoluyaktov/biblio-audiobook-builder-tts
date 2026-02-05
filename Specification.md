@@ -1042,4 +1042,42 @@ Stress marking is configured **per TTS provider** in the ABB-TTS web UI (Config 
 
 ---
 
-*Last updated: 2026-02-02*
+## Bug Fix: Chapter Gap Silence Not Applied ✅ FIXED
+
+### Problem Statement
+
+The 2-second silence between chapters (configured via `chapter_gap_seconds`) was not being applied when building M4B audiobooks. Investigation revealed that the silence generation code was correct, but the config value was always 0.
+
+### Root Cause
+
+Type mismatch in `config.LoadFromDB()`: The function expected `chapter_gap_seconds` and `part_gap_seconds` to be `float64` type, but `ToAppConfig()` in `storage/db.go` returns them as `int`. This caused the type assertion to fail silently, leaving the values at their zero default (0 seconds).
+
+### Solution
+
+1. Changed `chapter_gap_seconds` and `part_gap_seconds` from `int` to `float64` throughout the codebase
+2. This also enables fractional second values (e.g., 2.5 seconds) for more precise control
+
+### Files Modified
+
+- `internal/config/config.go` - Changed types to float64, updated LoadFromDB with int fallback
+- `internal/storage/db.go` - Changed Config struct types to float64, updated format strings
+- `internal/server/settings.go` - Changed SettingsRequest types to float64
+- `internal/server/worker.go` - Updated time.Duration calculations for float64
+
+### Testing
+
+- Added `TestCreateConcatFileWithChapterGap` test in `internal/audio/m4b_test.go` to verify silence is correctly inserted between chapters
+- Test confirms silence.wav is generated and inserted (numChapters - 1) times in the concat file
+
+### Configuration
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `chapter_gap_seconds` | float64 | 2.0 | Silence between chapters (supports decimals like 2.5) |
+| `part_gap_seconds` | float64 | 2.0 | Silence between parts/scene breaks (supports decimals) |
+
+**Date:** 2026-02-04
+
+---
+
+*Last updated: 2026-02-04*
