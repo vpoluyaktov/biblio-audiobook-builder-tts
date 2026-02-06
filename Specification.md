@@ -1080,4 +1080,59 @@ Type mismatch in `config.LoadFromDB()`: The function expected `chapter_gap_secon
 
 ---
 
-*Last updated: 2026-02-04*
+## Bug Fix: Audiobookshelf Upload - Title and Series Issues ✅ FIXED
+
+### Problem Statement
+
+Two issues with audiobooks uploaded to the Audiobookshelf (ABS) server:
+
+1. **Book title derived from filename instead of metadata**: For multi-part books, ABS displayed the title as "Иллюзия греха, Part 1" instead of "Иллюзия греха". This happened because the M4B `album` tag was set to the part-suffixed title (e.g., "Title, Part 1"), and ABS reads `tagAlbum` to determine the book title, overriding the directory-derived title.
+
+2. **Series metadata never sent**: The `Series` field was always empty in ABS uploads because:
+   - The `Book` struct had no `Series`/`SeriesNumber` fields
+   - The FB2 parser didn't parse the `<sequence>` tag (FB2's series element)
+   - The EPUB parser didn't parse `<meta name="calibre:series">` tags
+   - The upload client never populated the `series` form field
+
+### Root Cause
+
+**Issue 1**: In `internal/audio/multipart.go`, the `buildSinglePartWithEncoderProgress` function set both `Title` and `Album` to the part-suffixed name. ABS scanner (`AudioFileScanner.js`) maps `tagAlbum` → book title, so the part suffix propagated to the book name.
+
+**Issue 2**: Series metadata was never extracted from eBook files. FB2 stores series in `<sequence name="..." number="..."/>` inside `<title-info>`. EPUB stores series in `<meta name="calibre:series" content="..."/>` and `<meta name="calibre:series_index" content="..."/>` inside the OPF metadata.
+
+### Solution
+
+1. **Keep `Album` as base book title**: In multi-part M4B builds, only `Title` gets the ", Part N" suffix. `Album` retains the original book title, which ABS uses for the book name.
+
+2. **Add series parsing to both parsers**:
+   - Added `Series` and `SeriesNumber` fields to the `Book` struct
+   - FB2 parser now extracts `<sequence>` tag attributes
+   - EPUB parser now extracts `calibre:series` and `calibre:series_index` from `<meta>` tags
+
+3. **Pass series through the pipeline**:
+   - M4B metadata: Series written as `grouping` tag (format: "Series #N"), which ABS reads via `tagGrouping`
+   - ABS upload: Series passed in the `series` form field, used for directory structure (`<author>/<series>/<title>/`)
+
+### Files Modified
+
+- `internal/parser/parser.go` - Added `Series` and `SeriesNumber` fields to `Book` struct
+- `internal/parser/fb2.go` - Added `<sequence>` tag parsing to `fb2Document` struct
+- `internal/parser/epub.go` - Added `<meta>` tag parsing for `calibre:series` and `calibre:series_index`
+- `internal/audio/m4b.go` - Added `Series`/`SeriesNumber` to `M4BOptions`, embedded as `grouping` metadata
+- `internal/audio/multipart.go` - Removed `Album` override in multi-part builds
+- `internal/server/worker.go` - Pass series to M4B options and ABS upload
+
+### How ABS Uses the Metadata
+
+ABS determines book metadata from multiple sources with configurable precedence:
+1. **Folder structure**: `<folder>/<author>/<series>/<title>/` → derives title, author, series from directory names
+2. **Audio meta tags**: Reads M4B tags (`tagAlbum` → title, `tagArtist` → author, `tagGrouping` → series)
+3. **OPF/NFO files**: Additional metadata sources
+
+The `album` tag is critical because ABS maps it to the book title (with `tagTitle` as fallback).
+
+**Date:** 2026-02-06
+
+---
+
+*Last updated: 2026-02-06*

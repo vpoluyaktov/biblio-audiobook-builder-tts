@@ -49,13 +49,19 @@ type epubContainer struct {
 	} `xml:"rootfiles>rootfile"`
 }
 
+type epubMeta struct {
+	Name    string `xml:"name,attr"`
+	Content string `xml:"content,attr"`
+}
+
 type epubPackage struct {
 	XMLName  xml.Name `xml:"package"`
 	Metadata struct {
-		Title       string   `xml:"title"`
-		Creator     string   `xml:"creator"`
-		Description string   `xml:"description"`
-		Subjects    []string `xml:"subject"`
+		Title       string     `xml:"title"`
+		Creator     string     `xml:"creator"`
+		Description string     `xml:"description"`
+		Subjects    []string   `xml:"subject"`
+		Meta        []epubMeta `xml:"meta"`
 	} `xml:"metadata"`
 	Manifest struct {
 		Items []struct {
@@ -111,11 +117,24 @@ func (p *epubParser) ParseEpub(r io.Reader) (*Book, error) {
 	if desc == "" && len(pkg.Metadata.Subjects) > 0 {
 		desc = strings.Join(pkg.Metadata.Subjects, ", ")
 	}
+	// Extract series from <meta> tags (Calibre convention)
+	var seriesName, seriesNumber string
+	for _, m := range pkg.Metadata.Meta {
+		switch m.Name {
+		case "calibre:series":
+			seriesName = m.Content
+		case "calibre:series_index":
+			seriesNumber = m.Content
+		}
+	}
+
 	book := &Book{
-		Title:       pkg.Metadata.Title,
-		Author:      pkg.Metadata.Creator,
-		Description: desc,
-		Chapters:    make([]Chapter, 0),
+		Title:        pkg.Metadata.Title,
+		Author:       pkg.Metadata.Creator,
+		Series:       seriesName,
+		SeriesNumber: seriesNumber,
+		Description:  desc,
+		Chapters:     make([]Chapter, 0),
 		Metadata: map[string]string{
 			"description": desc,
 		},

@@ -774,6 +774,8 @@ func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (s
 		Title:           book.Title,
 		Author:          book.Author,
 		Album:           book.Title,
+		Series:          book.Series,
+		SeriesNumber:    book.SeriesNumber,
 		Genre:           "Audiobook",
 		Description:     book.Description,
 		GapBetweenChaps: gapDuration,
@@ -901,6 +903,7 @@ func (w *Worker) uploadToAudiobookshelf(job *Job, book *parser.Book) error {
 	ab := &audiobookshelf.Audiobook{
 		Title:  book.Title,
 		Author: book.Author,
+		Series: book.Series,
 		Files:  filesToUpload,
 	}
 

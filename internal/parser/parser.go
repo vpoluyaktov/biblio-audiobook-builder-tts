@@ -16,6 +16,8 @@ type Parser interface {
 type Book struct {
 	Title          string
 	Author         string
+	Series         string
+	SeriesNumber   string
 	Description    string
 	Chapters       []Chapter
 	CoverImage     []byte

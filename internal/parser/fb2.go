@@ -71,6 +71,10 @@ type fb2Document struct {
 			Annotation struct {
 				Content string `xml:",innerxml"`
 			} `xml:"annotation"`
+			Sequence struct {
+				Name   string `xml:"name,attr"`
+				Number string `xml:"number,attr"`
+			} `xml:"sequence"`
 			Coverpage struct {
 				Image struct {
 					Href string `xml:"href,attr"`
@@ -146,8 +150,10 @@ func (p *fb2Parser) ParseFB2(r io.Reader) (*Book, error) {
 		Author: strings.TrimSpace(fmt.Sprintf("%s %s",
 			fb2.Description.TitleInfo.Author.FirstName,
 			fb2.Description.TitleInfo.Author.LastName)),
-		Description: annotation,
-		Chapters:    make([]Chapter, 0),
+		Series:       fb2.Description.TitleInfo.Sequence.Name,
+		SeriesNumber: fb2.Description.TitleInfo.Sequence.Number,
+		Description:  annotation,
+		Chapters:     make([]Chapter, 0),
 		Metadata: map[string]string{
 			"description": annotation,
 		},

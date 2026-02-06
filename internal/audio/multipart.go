@@ -190,10 +190,9 @@ func buildSinglePartWithEncoderProgress(part Part, allParts []Part, outputDir st
 	partOptions := options
 	partOptions.Chapters = part.Chapters
 
-	// Adjust title for multi-part
+	// Adjust title for multi-part (keep Album as base book title for ABS metadata)
 	if len(allParts) > 1 {
 		partOptions.Title = fmt.Sprintf("%s, Part %d", options.Title, part.Number)
-		partOptions.Album = partOptions.Title
 	}
 
 	// Create builder

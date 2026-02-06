@@ -29,6 +29,8 @@ type M4BOptions struct {
 	Title           string
 	Author          string
 	Album           string
+	Series          string
+	SeriesNumber    string
 	Genre           string
 	Year            string
 	Description     string
@@ -210,6 +212,13 @@ func (b *M4BBuilder) createMetadataFile(outputPath string) error {
 		sb.WriteString(fmt.Sprintf("album=%s\n", escapeMetadata(b.options.Album)))
 	} else if b.options.Title != "" {
 		sb.WriteString(fmt.Sprintf("album=%s\n", escapeMetadata(b.options.Title)))
+	}
+	if b.options.Series != "" {
+		seriesTag := b.options.Series
+		if b.options.SeriesNumber != "" {
+			seriesTag += " #" + b.options.SeriesNumber
+		}
+		sb.WriteString(fmt.Sprintf("grouping=%s\n", escapeMetadata(seriesTag)))
 	}
 	if b.options.Genre != "" {
 		sb.WriteString(fmt.Sprintf("genre=%s\n", escapeMetadata(b.options.Genre)))
