@@ -28,8 +28,8 @@ type Config struct {
 	// TTS settings
 	DefaultSpeed            float64 `mapstructure:"default_speed"`
 	DefaultPitch            float64 `mapstructure:"default_pitch"`
-	ChapterGapSeconds       int     `mapstructure:"chapter_gap_seconds"`       // Silence between chapters
-	PartGapSeconds          int     `mapstructure:"part_gap_seconds"`          // Silence between parts (scene breaks)
+	ChapterGapSeconds       float64 `mapstructure:"chapter_gap_seconds"`       // Silence between chapters (supports decimals like 2.5)
+	PartGapSeconds          float64 `mapstructure:"part_gap_seconds"`          // Silence between parts (supports decimals)
 	DetectPartSeparators    bool    `mapstructure:"detect_part_separators"`    // Enable part separator detection
 	SentenceBreakMs         int     `mapstructure:"sentence_break_ms"`         // SSML break duration between sentences (default 300ms)
 	ParagraphBreakMs        int     `mapstructure:"paragraph_break_ms"`        // SSML break duration between paragraphs (default 350ms)
@@ -86,8 +86,8 @@ func Load(configFile string) (*Config, error) {
 	// TTS settings
 	viper.SetDefault("default_speed", 1.0)
 	viper.SetDefault("default_pitch", 1.0)
-	viper.SetDefault("chapter_gap_seconds", 2)          // 2 seconds silence between chapters
-	viper.SetDefault("part_gap_seconds", 2)             // 2 seconds silence between parts (scene breaks)
+	viper.SetDefault("chapter_gap_seconds", 2.0)        // 2 seconds silence between chapters (supports decimals)
+	viper.SetDefault("part_gap_seconds", 2.0)           // 2 seconds silence between parts (supports decimals)
 	viper.SetDefault("detect_part_separators", true)    // Enable part separator detection by default
 	viper.SetDefault("sentence_break_ms", 300)          // 300ms pause between sentences
 	viper.SetDefault("paragraph_break_ms", 350)         // 350ms pause between paragraphs
@@ -162,10 +162,14 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 		cfg.DefaultPitch = v
 	}
 	if v, ok := dbConfig["chapter_gap_seconds"].(float64); ok {
-		cfg.ChapterGapSeconds = int(v)
+		cfg.ChapterGapSeconds = v
+	} else if v, ok := dbConfig["chapter_gap_seconds"].(int); ok {
+		cfg.ChapterGapSeconds = float64(v)
 	}
 	if v, ok := dbConfig["part_gap_seconds"].(float64); ok {
-		cfg.PartGapSeconds = int(v)
+		cfg.PartGapSeconds = v
+	} else if v, ok := dbConfig["part_gap_seconds"].(int); ok {
+		cfg.PartGapSeconds = float64(v)
 	}
 	if v, ok := dbConfig["detect_part_separators"].(bool); ok {
 		cfg.DetectPartSeparators = v

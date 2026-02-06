@@ -616,7 +616,7 @@ func (w *Worker) convertChapterWithParts(job *Job, chapter parser.Chapter, conte
 		partGapSeconds = w.cfg.ChapterGapSeconds // Fall back to chapter gap
 	}
 	if partGapSeconds <= 0 {
-		partGapSeconds = 2 // Default 2 seconds
+		partGapSeconds = 2.0 // Default 2 seconds
 	}
 
 	// Create temp directory for part files
@@ -629,7 +629,8 @@ func (w *Worker) convertChapterWithParts(job *Job, chapter parser.Chapter, conte
 
 	// Generate silence file for between parts
 	silenceFile := filepath.Join(partsDir, "silence.wav")
-	if err := audio.GenerateSilentWAV(time.Duration(partGapSeconds)*time.Second, silenceFile, sampleRate); err != nil {
+	partGapDuration := time.Duration(partGapSeconds * float64(time.Second))
+	if err := audio.GenerateSilentWAV(partGapDuration, silenceFile, sampleRate); err != nil {
 		result.Error = fmt.Errorf("failed to generate silence file: %v", err)
 		return result
 	}
@@ -767,7 +768,8 @@ func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (s
 	}
 
 	// Prepare M4B options (sample rate is auto-detected from source files)
-	gapDuration := time.Duration(w.cfg.ChapterGapSeconds) * time.Second
+	gapDuration := time.Duration(w.cfg.ChapterGapSeconds * float64(time.Second))
+	logger.Info("Building M4B with chapter gap: %v (ChapterGapSeconds=%.2f)", gapDuration, w.cfg.ChapterGapSeconds)
 	options := audio.M4BOptions{
 		Title:           book.Title,
 		Author:          book.Author,

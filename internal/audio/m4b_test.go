@@ -174,6 +174,64 @@ func TestCreateConcatFile(t *testing.T) {
 	}
 }
 
+func TestCreateConcatFileWithChapterGap(t *testing.T) {
+	// Test that silence file is inserted between chapters when GapBetweenChaps is set
+	options := M4BOptions{
+		GapBetweenChaps: 2 * time.Second,
+	}
+	builder, err := NewM4BBuilder(options)
+	if err != nil {
+		t.Fatalf("NewM4BBuilder failed: %v", err)
+	}
+	defer builder.Cleanup()
+
+	// Set sample rate (normally auto-detected from audio files)
+	builder.sampleRate = 48000
+
+	audioFiles := []string{
+		"/path/to/chapter1.wav",
+		"/path/to/chapter2.wav",
+		"/path/to/chapter3.wav",
+	}
+
+	concatFile := builder.tempDir + "/concat.txt"
+	err = builder.createConcatFile(audioFiles, concatFile)
+	if err != nil {
+		t.Fatalf("createConcatFile failed: %v", err)
+	}
+
+	content, err := os.ReadFile(concatFile)
+	if err != nil {
+		t.Fatalf("Failed to read concat file: %v", err)
+	}
+
+	contentStr := string(content)
+	t.Logf("Concat file content:\n%s", contentStr)
+
+	// Check that silence file is inserted between chapters
+	if !containsString(contentStr, "silence.wav") {
+		t.Error("Concat file should contain silence.wav between chapters when GapBetweenChaps is set")
+	}
+
+	// Verify silence file was created
+	silenceFile := builder.tempDir + "/silence.wav"
+	if _, err := os.Stat(silenceFile); os.IsNotExist(err) {
+		t.Error("Silence file should be created when GapBetweenChaps is set")
+	}
+
+	// Count occurrences of silence.wav - should be (numChapters - 1)
+	silenceCount := 0
+	for i := 0; i < len(contentStr)-len("silence.wav"); i++ {
+		if contentStr[i:i+len("silence.wav")] == "silence.wav" {
+			silenceCount++
+		}
+	}
+	expectedSilenceCount := len(audioFiles) - 1 // silence between chapters, not after last
+	if silenceCount != expectedSilenceCount {
+		t.Errorf("Expected %d silence entries, got %d", expectedSilenceCount, silenceCount)
+	}
+}
+
 func TestCheckFFmpegAvailable(t *testing.T) {
 	// This test depends on system having ffmpeg installed
 	err := CheckFFmpegAvailable()
