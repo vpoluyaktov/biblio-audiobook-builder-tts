@@ -102,10 +102,12 @@ func (a *Adapter) ConvertToSpeech(text string, voice string, options *Conversion
 			ParagraphBreakMs:      options.ParagraphBreakMs,
 			ConvertDashesToBreaks: options.ConvertDashesToBreaks,
 			DashBreakDurationMs:   options.DashBreakDurationMs,
+			ParenthesesBreakMs:    options.ParenthesesBreakMs,
+			ColonBreakMs:          options.ColonBreakMs,
 			TitleBreakMs:          options.TitleBreakMs,
 		})
-		logger.Debug("Added SSML breaks to text before chunking (sentence: %dms, paragraph: %dms, title: %dms, dashes: %v)",
-			options.SentenceBreakMs, options.ParagraphBreakMs, options.TitleBreakMs, options.ConvertDashesToBreaks)
+		logger.Debug("Added SSML breaks to text before chunking (sentence: %dms, paragraph: %dms, title: %dms, dashes: %v, parentheses: %dms, colon: %dms)",
+			options.SentenceBreakMs, options.ParagraphBreakMs, options.TitleBreakMs, options.ConvertDashesToBreaks, options.ParenthesesBreakMs, options.ColonBreakMs)
 	}
 
 	// Split text into chunks (now with SSML breaks already embedded)

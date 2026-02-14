@@ -421,6 +421,18 @@
                                 <input type="number" id="cfg-dash-break-duration" min="0" max="2000" step="50" value="250">
                             </div>
                             <div class="form-group">
+                                <label for="cfg-parentheses-break">Parentheses Break (ms)</label>
+                                <input type="number" id="cfg-parentheses-break" min="0" max="2000" step="50" value="250">
+                                <small>Replace parenthetical fragments in ( ) with SSML breaks</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="cfg-colon-break">Colon Break (ms)</label>
+                                <input type="number" id="cfg-colon-break" min="0" max="2000" step="50" value="250">
+                                <small>Replace ':' with SSML break (0 keeps legacy colon-to-space)</small>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
                                 <label for="cfg-title-break">Title Break (ms)</label>
                                 <input type="number" id="cfg-title-break" min="0" max="3000" step="50" value="500">
                             </div>

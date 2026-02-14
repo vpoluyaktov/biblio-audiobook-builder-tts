@@ -249,6 +249,36 @@ func TestWrapTextInSSMLWithOptions_DashesToBreaks(t *testing.T) {
 	}
 }
 
+func TestWrapTextInSSMLWithOptions_ParenthesesToBreaks(t *testing.T) {
+	input := "В нашей системе ЭМ ВЭ ДЭ (но знаю точно, что не в ней одной) практика"
+
+	result := WrapTextInSSMLWithOptions(input, SSMLOptions{
+		UseSentencePauses:   false,
+		ParenthesesBreakMs:  250,
+		DashBreakDurationMs: 300,
+	})
+
+	if strings.Contains(result, "(") || strings.Contains(result, ")") {
+		t.Errorf("Parentheses should be removed, got: %s", result)
+	}
+
+	if strings.Count(result, `<break time="250ms"/>`) != 2 {
+		t.Errorf("Expected 2 parentheses break tags, got %d in: %s", strings.Count(result, `<break time="250ms"/>`), result)
+	}
+
+	if !strings.Contains(result, "но знаю точно, что не в ней одной") {
+		t.Errorf("Expected parenthetical content preserved, got: %s", result)
+	}
+
+	resultDisabled := WrapTextInSSMLWithOptions(input, SSMLOptions{
+		UseSentencePauses:  false,
+		ParenthesesBreakMs: 0,
+	})
+	if strings.Contains(resultDisabled, `<break time="250ms"/>`) {
+		t.Errorf("Parentheses break tags should not be present when disabled, got: %s", resultDisabled)
+	}
+}
+
 func TestSplitIntoParagraphs(t *testing.T) {
 	tests := []struct {
 		input    string

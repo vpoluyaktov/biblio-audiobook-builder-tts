@@ -520,6 +520,8 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 			ParagraphBreakMs:      w.cfg.ParagraphBreakMs,
 			ConvertDashesToBreaks: w.cfg.ConvertDashesToBreaks,
 			DashBreakDurationMs:   w.cfg.DashBreakDurationMs,
+			ParenthesesBreakMs:    w.cfg.ParenthesesBreakMs,
+			ColonBreakMs:          w.cfg.ColonBreakMs,
 			TitleBreakMs:          w.cfg.TitleBreakMs,
 		})
 		ssmlFileName := fmt.Sprintf("%02d_%s.ssml.txt", index+1, sanitizeFileName(chapter.Title))
@@ -553,6 +555,8 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		ParagraphBreakMs:      w.cfg.ParagraphBreakMs,
 		ConvertDashesToBreaks: w.cfg.ConvertDashesToBreaks,
 		DashBreakDurationMs:   w.cfg.DashBreakDurationMs,
+		ParenthesesBreakMs:    w.cfg.ParenthesesBreakMs,
+		ColonBreakMs:          w.cfg.ColonBreakMs,
 		TitleBreakMs:          w.cfg.TitleBreakMs,
 	}, progressCb)
 	if err != nil {

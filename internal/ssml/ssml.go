@@ -30,6 +30,8 @@ type SSMLOptions struct {
 	ParagraphBreakMs      int  // Duration of break between paragraphs in ms (0 = no breaks)
 	ConvertDashesToBreaks bool // Convert inline dashes to SSML break tags
 	DashBreakDurationMs   int  // Duration of break for dashes (default 300ms)
+	ParenthesesBreakMs    int  // Duration of break before/after parenthetical text (0 = disabled)
+	ColonBreakMs          int  // Duration of break replacing colon ':' (0 = use legacy colon-to-space)
 	TitleBreakMs          int  // Duration of break after titles in ms (0 = no breaks)
 
 	// Deprecated: Use SentenceBreakMs and ParagraphBreakMs instead
@@ -63,8 +65,10 @@ func AddSSMLBreaks(text string, opts SSMLOptions) string {
 		text = strings.ReplaceAll(text, titleMarkerText, "")
 	}
 
-	// Replace colons with spaces as some TTS engines struggle with them
-	text = strings.ReplaceAll(text, ":", " ")
+	// Legacy behavior: when colon breaks are disabled, replace colons with spaces.
+	if opts.ColonBreakMs <= 0 {
+		text = strings.ReplaceAll(text, ":", " ")
+	}
 	// Normalize multiple horizontal spaces to single space (preserve newlines)
 	text = regexp.MustCompile(`[ \t]+`).ReplaceAllString(text, " ")
 
@@ -76,13 +80,21 @@ func AddSSMLBreaks(text string, opts SSMLOptions) string {
 
 	// Choose the appropriate escape function based on options
 	escapeFunc := escapeXML
-	if opts.ConvertDashesToBreaks {
+	if opts.ConvertDashesToBreaks || opts.ParenthesesBreakMs > 0 || opts.ColonBreakMs > 0 {
 		breakMs := opts.DashBreakDurationMs
 		if breakMs <= 0 {
 			breakMs = 300
 		}
+		parenthesesBreakMs := opts.ParenthesesBreakMs
+		if parenthesesBreakMs < 0 {
+			parenthesesBreakMs = 0
+		}
+		colonBreakMs := opts.ColonBreakMs
+		if colonBreakMs < 0 {
+			colonBreakMs = 0
+		}
 		escapeFunc = func(t string) string {
-			return escapeXMLWithPauseBreaks(t, breakMs)
+			return escapeXMLWithPauseBreaks(t, opts.ConvertDashesToBreaks, breakMs, parenthesesBreakMs, colonBreakMs)
 		}
 	}
 
@@ -155,8 +167,10 @@ func WrapTextInSSMLWithOptions(text string, opts SSMLOptions) string {
 		text = strings.ReplaceAll(text, titleMarkerText, "")
 	}
 
-	// Replace colons with spaces as some TTS engines struggle with them
-	text = strings.ReplaceAll(text, ":", " ")
+	// Legacy behavior: when colon breaks are disabled, replace colons with spaces.
+	if opts.ColonBreakMs <= 0 {
+		text = strings.ReplaceAll(text, ":", " ")
+	}
 	// Normalize multiple horizontal spaces to single space (preserve newlines)
 	text = regexp.MustCompile(`[ \t]+`).ReplaceAllString(text, " ")
 
@@ -168,13 +182,21 @@ func WrapTextInSSMLWithOptions(text string, opts SSMLOptions) string {
 
 	// Choose the appropriate escape function based on options
 	escapeFunc := escapeXML
-	if opts.ConvertDashesToBreaks {
+	if opts.ConvertDashesToBreaks || opts.ParenthesesBreakMs > 0 || opts.ColonBreakMs > 0 {
 		breakMs := opts.DashBreakDurationMs
 		if breakMs <= 0 {
 			breakMs = 300
 		}
+		parenthesesBreakMs := opts.ParenthesesBreakMs
+		if parenthesesBreakMs < 0 {
+			parenthesesBreakMs = 0
+		}
+		colonBreakMs := opts.ColonBreakMs
+		if colonBreakMs < 0 {
+			colonBreakMs = 0
+		}
 		escapeFunc = func(t string) string {
-			return escapeXMLWithPauseBreaks(t, breakMs)
+			return escapeXMLWithPauseBreaks(t, opts.ConvertDashesToBreaks, breakMs, parenthesesBreakMs, colonBreakMs)
 		}
 	}
 
@@ -343,14 +365,14 @@ func escapeXML(text string) string {
 	return text
 }
 
-// PausePatternDef defines a pattern that should be converted to an SSML break
+// PausePatternDef defines a pattern that should be converted to an SSML break.
 // Pattern is a regex string, Replacement uses %s as placeholder for break tag
 type PausePatternDef struct {
 	Pattern     string
 	Replacement string
 }
 
-// DefaultPausePatternDefs contains patterns that should trigger pauses in TTS
+// DefaultPausePatternDefs contains patterns that should trigger pauses in TTS.
 // These are applied in order, so more specific patterns should come first
 var DefaultPausePatternDefs = []PausePatternDef{
 	// Ellipsis: "..." or "…" - adds pause after ellipsis
@@ -360,7 +382,12 @@ var DefaultPausePatternDefs = []PausePatternDef{
 	{`\s+[-—–]\s+`, ` %s `},
 }
 
-// compiledPausePatterns holds the compiled regex patterns (initialized once)
+// parentheticalPattern matches simple parenthetical fragments without nested parentheses.
+var parentheticalPattern = regexp.MustCompile(`\(\s*([^()]+?)\s*\)`)
+
+var colonPattern = regexp.MustCompile(`\s*:\s*`)
+
+// compiledPausePatterns holds the compiled regex patterns (initialized once).
 var compiledPausePatterns []struct {
 	Pattern     *regexp.Regexp
 	Replacement string
@@ -377,19 +404,42 @@ func init() {
 	}
 }
 
-// breakPlaceholder is used to protect break tags from XML escaping
+// breakPlaceholder is used to protect break tags from XML escaping.
 const breakPlaceholder = "\x01BREAK\x01"
 
-// ConvertPausePatterns replaces pause patterns with SSML break tags
-// This helps TTS engines that don't naturally pause on certain punctuation
-func ConvertPausePatterns(text string, breakDurationMs int) string {
+// parenthesesBreakPlaceholder is used for parenthetical pauses with independent duration.
+const parenthesesBreakPlaceholder = "\x01PAREN_BREAK\x01"
+
+// colonBreakPlaceholder is used for colon pauses with independent duration.
+const colonBreakPlaceholder = "\x01COLON_BREAK\x01"
+
+// ConvertPausePatterns replaces pause patterns with placeholders.
+// Placeholders are restored after XML escaping.
+func ConvertPausePatterns(text string, convertDashes bool, breakDurationMs, parenthesesBreakMs, colonBreakMs int) string {
 	if breakDurationMs <= 0 {
 		breakDurationMs = 300 // Default 300ms pause
 	}
+	if parenthesesBreakMs < 0 {
+		parenthesesBreakMs = 0
+	}
+	if colonBreakMs < 0 {
+		colonBreakMs = 0
+	}
 
-	for _, p := range compiledPausePatterns {
-		replacement := strings.Replace(p.Replacement, "%s", breakPlaceholder, 1)
-		text = p.Pattern.ReplaceAllString(text, replacement)
+	if convertDashes {
+		for _, p := range compiledPausePatterns {
+			replacement := strings.Replace(p.Replacement, "%s", breakPlaceholder, 1)
+			text = p.Pattern.ReplaceAllString(text, replacement)
+		}
+	}
+
+	if parenthesesBreakMs > 0 {
+		replacement := " " + parenthesesBreakPlaceholder + " $1 " + parenthesesBreakPlaceholder + " "
+		text = parentheticalPattern.ReplaceAllString(text, replacement)
+	}
+
+	if colonBreakMs > 0 {
+		text = colonPattern.ReplaceAllString(text, " "+colonBreakPlaceholder+" ")
 	}
 
 	return text
@@ -398,7 +448,7 @@ func ConvertPausePatterns(text string, breakDurationMs int) string {
 // ConvertDashesToBreaks is kept for backward compatibility
 // Deprecated: Use ConvertPausePatterns instead
 func ConvertDashesToBreaks(text string, breakDurationMs int) string {
-	return ConvertPausePatterns(text, breakDurationMs)
+	return ConvertPausePatterns(text, true, breakDurationMs, 0, 0)
 }
 
 // ConvertDashesToBreaksDefault uses the default 300ms break duration
@@ -406,15 +456,21 @@ func ConvertDashesToBreaksDefault(text string) string {
 	return ConvertDashesToBreaks(text, 300)
 }
 
-// escapeXMLWithPauseBreaks escapes XML but preserves pause pattern-to-break conversions
-// It first replaces pause patterns with placeholders, escapes XML, then restores break tags
-func escapeXMLWithPauseBreaks(text string, breakDurationMs int) string {
+// escapeXMLWithPauseBreaks escapes XML but preserves pause pattern-to-break conversions.
+// It first replaces pause patterns with placeholders, escapes XML, then restores break tags.
+func escapeXMLWithPauseBreaks(text string, convertDashes bool, breakDurationMs, parenthesesBreakMs, colonBreakMs int) string {
 	if breakDurationMs <= 0 {
 		breakDurationMs = 300
 	}
+	if parenthesesBreakMs < 0 {
+		parenthesesBreakMs = 0
+	}
+	if colonBreakMs < 0 {
+		colonBreakMs = 0
+	}
 
 	// Replace pause patterns with placeholder
-	text = ConvertPausePatterns(text, breakDurationMs)
+	text = ConvertPausePatterns(text, convertDashes, breakDurationMs, parenthesesBreakMs, colonBreakMs)
 
 	// Escape XML characters
 	text = escapeXML(text)
@@ -422,6 +478,16 @@ func escapeXMLWithPauseBreaks(text string, breakDurationMs int) string {
 	// Restore break tags with spaces (placeholders are not affected by XML escaping)
 	breakTag := fmt.Sprintf(` <break time="%dms"/> `, breakDurationMs)
 	text = strings.ReplaceAll(text, breakPlaceholder, breakTag)
+
+	if parenthesesBreakMs > 0 {
+		parenthesesBreakTag := fmt.Sprintf(` <break time="%dms"/> `, parenthesesBreakMs)
+		text = strings.ReplaceAll(text, parenthesesBreakPlaceholder, parenthesesBreakTag)
+	}
+
+	if colonBreakMs > 0 {
+		colonBreakTag := fmt.Sprintf(` <break time="%dms"/> `, colonBreakMs)
+		text = strings.ReplaceAll(text, colonBreakPlaceholder, colonBreakTag)
+	}
 
 	return text
 }

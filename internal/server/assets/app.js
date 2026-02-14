@@ -1446,6 +1446,8 @@ class App {
         document.getElementById('cfg-sentence-break').value = s.sentence_break_ms || 300;
         document.getElementById('cfg-paragraph-break').value = s.paragraph_break_ms || 350;
         document.getElementById('cfg-dash-break-duration').value = s.dash_break_duration_ms || 250;
+        document.getElementById('cfg-parentheses-break').value = s.parentheses_break_ms || 250;
+        document.getElementById('cfg-colon-break').value = s.colon_break_ms || 250;
         document.getElementById('cfg-title-break').value = s.title_break_ms || 500;
         document.getElementById('cfg-chapter-gap').value = s.chapter_gap_seconds || 2;
         document.getElementById('cfg-part-gap').value = s.part_gap_seconds || 2;
@@ -1682,6 +1684,8 @@ class App {
             sentence_break_ms: parseInt(document.getElementById('cfg-sentence-break').value),
             paragraph_break_ms: parseInt(document.getElementById('cfg-paragraph-break').value),
             dash_break_duration_ms: parseInt(document.getElementById('cfg-dash-break-duration').value),
+            parentheses_break_ms: parseInt(document.getElementById('cfg-parentheses-break').value),
+            colon_break_ms: parseInt(document.getElementById('cfg-colon-break').value),
             title_break_ms: parseInt(document.getElementById('cfg-title-break').value),
             chapter_gap_seconds: parseInt(document.getElementById('cfg-chapter-gap').value),
             part_gap_seconds: parseInt(document.getElementById('cfg-part-gap').value),
