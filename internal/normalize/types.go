@@ -127,6 +127,13 @@ type LanguageProcessor interface {
 	GetChapterGender() Gender
 }
 
+// AbbreviationNormalizer is an optional interface for language-specific
+// uppercase abbreviation normalization.
+type AbbreviationNormalizer interface {
+	// NormalizeAbbreviations expands uppercase abbreviations to spoken letter names.
+	NormalizeAbbreviations(text string) string
+}
+
 // langProcessorRegistry holds language-specific processors.
 var langProcessorRegistry = make(map[string]LanguageProcessor)
 

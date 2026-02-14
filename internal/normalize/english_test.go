@@ -55,6 +55,41 @@ func TestEnglishCardinal(t *testing.T) {
 	}
 }
 
+func TestEnglishNormalizeAbbreviations(t *testing.T) {
+	p := NewProcessor()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "USSR abbreviation",
+			input:    "USSR collapsed in 1991",
+			expected: "U ES ES AR collapsed in 1991",
+		},
+		{
+			name:     "mixed text",
+			input:    "The CIA and FBI shared reports",
+			expected: "The CEE I A and EF BEE I shared reports",
+		},
+		{
+			name:     "single uppercase letter unchanged",
+			input:    "Plan A was selected",
+			expected: "Plan A was selected",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := p.NormalizeAbbreviations(tt.input, "en")
+			if result != tt.expected {
+				t.Errorf("NormalizeAbbreviations(%q, en) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestEnglishOrdinal(t *testing.T) {
 	conv := &EnglishConverter{}
 	ctx := Context{Form: Ordinal}
