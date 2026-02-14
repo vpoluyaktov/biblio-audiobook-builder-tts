@@ -275,6 +275,86 @@ Flags:
 
 ---
 
+## Feature: Abbreviation Normalization (Per Provider) ✅ IMPLEMENTED
+
+### Problem Statement
+
+Abbreviations written in uppercase are often pronounced as whole words by TTS engines, which sounds unnatural for many acronyms.
+
+Examples:
+- English: `USSR` should be spoken as `U ES ES AR`
+- Russian: `МВД` should be spoken as `ЭМ ВЭ ДЭ`
+
+### Goal
+
+Add abbreviation normalization in the `normalize` package and make it configurable per TTS provider in **Settings → TTS Providers**.
+
+### Requirements
+
+1. **Per-provider toggle** in provider settings:
+   - `normalize_abbreviations` (boolean)
+2. **Language-specific normalization**:
+   - English examples: `USSR -> U ES ES AR`
+   - Russian examples:
+     - `МВД -> ЭМ ВЭ ДЭ`
+     - `ЦРУ -> ЦЭ ЭР У`
+     - `КПСС -> КА ПЭ ЭС ЭС`
+3. **Pipeline integration**:
+   - Apply only when enabled for the selected provider
+   - Run in chapter text normalization flow before TTS
+
+### Implementation Plan
+
+1. **Normalize package**
+   - Add optional interface for abbreviation normalization
+   - Implement language-specific abbreviation logic in:
+     - `internal/normalize/english.go`
+     - `internal/normalize/russian.go`
+   - Expose processor method:
+     - `Processor.NormalizeAbbreviations(text, lang)`
+
+2. **Backend provider config (DB + API + runtime)**
+   - Add `normalize_abbreviations` field to provider model/persistence
+   - Add DB migration for existing databases
+   - Include field in provider API responses and update requests
+   - Expose field in TTS service provider runtime info
+
+3. **Worker pipeline**
+   - Read provider flag and apply abbreviation normalization conditionally
+
+4. **UI (Settings → TTS Providers)**
+   - Add abbreviation indicator column in providers table
+   - Add checkbox in provider edit modal
+   - Include field in save/update payload
+
+5. **Tests**
+   - Add EN/RU tests for abbreviation normalization behavior
+
+### Implementation Status
+
+- [x] Feature branch created: `feature/abbreviation-normalization-per-provider`
+- [x] Normalize package interfaces and processor entrypoint added
+- [x] English abbreviation normalization implemented
+- [x] Russian abbreviation normalization implemented
+- [x] Worker pipeline integration added (per-provider toggle)
+- [x] Provider storage model + SQL migration for `normalize_abbreviations`
+- [x] Provider API/runtime structs updated
+- [x] Settings UI (table + modal + payload) updated
+- [x] Tests executed and verified
+- [x] Final pass and mark feature as implemented
+
+### Validation Notes
+
+- ✅ Targeted tests passed:
+  - `go test ./internal/normalize -run NormalizeAbbreviations`
+  - `go test ./internal/server ./internal/storage ./internal/tts`
+- ℹ️ `go test ./...` still reports existing unrelated failures in legacy tests
+  (`internal/normalize` ordinal/noun expectations and `internal/parser` FB2 title-break tests).
+
+**Date:** 2026-02-13
+
+---
+
 ## Feature: Title Break SSML Support 🔄 IN PROGRESS
 
 ### Problem Statement

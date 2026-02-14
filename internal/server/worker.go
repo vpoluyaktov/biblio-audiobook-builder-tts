@@ -410,9 +410,11 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 
 	// Apply number normalization if provider needs it
 	needsNormalization := true // Default to true for safety
+	abbreviationsEnabled := false
 	stressEnabled := false
 	if providerInfo := w.ttsService.GetProviderInfo(job.Provider); providerInfo != nil {
 		needsNormalization = providerInfo.NormalizeNumbers
+		abbreviationsEnabled = providerInfo.NormalizeAbbreviations
 		stressEnabled = providerInfo.StressEnabled
 	}
 	if needsNormalization {
@@ -422,6 +424,15 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		}
 		content = w.normalizer.Process(content, lang)
 		logger.Debug("Applied number normalization for provider %s (lang: %s)", job.Provider, lang)
+	}
+
+	if abbreviationsEnabled {
+		lang := job.Language
+		if lang == "" {
+			lang = "en"
+		}
+		content = w.normalizer.NormalizeAbbreviations(content, lang)
+		logger.Debug("Applied abbreviation normalization for provider %s (lang: %s)", job.Provider, lang)
 	}
 
 	// Apply stress marking for Russian text if enabled for this provider

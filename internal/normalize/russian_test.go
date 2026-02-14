@@ -53,6 +53,41 @@ func TestRussianCardinalMasculine(t *testing.T) {
 	}
 }
 
+func TestRussianNormalizeAbbreviations(t *testing.T) {
+	p := NewProcessor()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "МВД abbreviation",
+			input:    "МВД проводит проверку",
+			expected: "ЭМ ВЭ ДЭ проводит проверку",
+		},
+		{
+			name:     "ЦРУ abbreviation",
+			input:    "ЦРУ опубликовало отчёт",
+			expected: "ЦЭ ЭР У опубликовало отчёт",
+		},
+		{
+			name:     "КПСС abbreviation",
+			input:    "КПСС в истории СССР",
+			expected: "КА ПЭ ЭС ЭС в истории ЭС ЭС ЭС ЭР",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := p.NormalizeAbbreviations(tt.input, "ru")
+			if result != tt.expected {
+				t.Errorf("NormalizeAbbreviations(%q, ru) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestRussianCardinalFeminine(t *testing.T) {
 	conv := &RussianConverter{}
 	ctx := Context{Form: Cardinal, Gender: Feminine}
