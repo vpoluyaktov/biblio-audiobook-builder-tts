@@ -43,6 +43,8 @@ type Config struct {
 	ParagraphBreakMs        int     `json:"paragraph_break_ms"`
 	ConvertDashesToBreaks   bool    `json:"convert_dashes_to_breaks"`
 	DashBreakDurationMs     int     `json:"dash_break_duration_ms"`
+	ParenthesesBreakMs      int     `json:"parentheses_break_ms"`
+	ColonBreakMs            int     `json:"colon_break_ms"`
 	TitleBreakMs            int     `json:"title_break_ms"`
 	PronunciationDictFile   string  `json:"pronunciation_dict_file"`
 	UseDefaultPronunciation bool    `json:"use_default_pronunciation"`
@@ -365,6 +367,12 @@ func (db *DB) GetAllConfig() (*Config, error) {
 	if v, ok := configMap["dash_break_duration_ms"]; ok {
 		fmt.Sscanf(v, "%d", &cfg.DashBreakDurationMs)
 	}
+	if v, ok := configMap["parentheses_break_ms"]; ok {
+		fmt.Sscanf(v, "%d", &cfg.ParenthesesBreakMs)
+	}
+	if v, ok := configMap["colon_break_ms"]; ok {
+		fmt.Sscanf(v, "%d", &cfg.ColonBreakMs)
+	}
 	if v, ok := configMap["title_break_ms"]; ok {
 		fmt.Sscanf(v, "%d", &cfg.TitleBreakMs)
 	}
@@ -427,6 +435,15 @@ func (db *DB) SaveAllConfig(cfg *Config) error {
 		"default_speed":             fmt.Sprintf("%.2f", cfg.DefaultSpeed),
 		"default_pitch":             fmt.Sprintf("%.2f", cfg.DefaultPitch),
 		"chapter_gap_seconds":       fmt.Sprintf("%.2f", cfg.ChapterGapSeconds),
+		"part_gap_seconds":          fmt.Sprintf("%.2f", cfg.PartGapSeconds),
+		"detect_part_separators":    fmt.Sprintf("%t", cfg.DetectPartSeparators),
+		"sentence_break_ms":         fmt.Sprintf("%d", cfg.SentenceBreakMs),
+		"paragraph_break_ms":        fmt.Sprintf("%d", cfg.ParagraphBreakMs),
+		"convert_dashes_to_breaks":  fmt.Sprintf("%t", cfg.ConvertDashesToBreaks),
+		"dash_break_duration_ms":    fmt.Sprintf("%d", cfg.DashBreakDurationMs),
+		"parentheses_break_ms":      fmt.Sprintf("%d", cfg.ParenthesesBreakMs),
+		"colon_break_ms":            fmt.Sprintf("%d", cfg.ColonBreakMs),
+		"title_break_ms":            fmt.Sprintf("%d", cfg.TitleBreakMs),
 		"pronunciation_dict_file":   cfg.PronunciationDictFile,
 		"use_default_pronunciation": fmt.Sprintf("%t", cfg.UseDefaultPronunciation),
 		"max_file_size_mb":          fmt.Sprintf("%d", cfg.MaxFileSizeMB),
@@ -465,6 +482,8 @@ func DefaultConfig() *Config {
 		ParagraphBreakMs:        800,
 		ConvertDashesToBreaks:   true,
 		DashBreakDurationMs:     300,
+		ParenthesesBreakMs:      250,
+		ColonBreakMs:            250,
 		TitleBreakMs:            500,
 		PronunciationDictFile:   "",
 		UseDefaultPronunciation: true,
@@ -1461,6 +1480,8 @@ func (c *Config) ToAppConfig() map[string]interface{} {
 		"paragraph_break_ms":        c.ParagraphBreakMs,
 		"convert_dashes_to_breaks":  c.ConvertDashesToBreaks,
 		"dash_break_duration_ms":    c.DashBreakDurationMs,
+		"parentheses_break_ms":      c.ParenthesesBreakMs,
+		"colon_break_ms":            c.ColonBreakMs,
 		"title_break_ms":            c.TitleBreakMs,
 		"pronunciation_dict_file":   c.PronunciationDictFile,
 		"use_default_pronunciation": c.UseDefaultPronunciation,

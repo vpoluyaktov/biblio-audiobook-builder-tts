@@ -275,6 +275,82 @@ Flags:
 
 ---
 
+## Feature: Colon SSML Pauses (Configurable) ✅ IMPLEMENTED
+
+### Problem Statement
+
+Colons `:` were previously always replaced with spaces for compatibility. We need the same configurable pause behavior as other punctuation controls.
+
+### Goal
+
+Add configurable colon-to-SSML break conversion so `:` can become `<break time="...ms"/>` when enabled, while preserving legacy colon-to-space behavior when disabled (`0ms`).
+
+### Implementation Status
+
+- [x] Added `ColonBreakMs` option to SSML pipeline and conversion logic
+- [x] Added config/storage/settings API/UI wiring (`colon_break_ms`)
+- [x] Propagated option through worker and TTS conversion options
+- [x] Added tests for enabled/disabled colon behavior
+
+### Validation Notes
+
+- ✅ `go test ./internal/ssml ./internal/server ./internal/storage ./internal/tts`
+
+**Date:** 2026-02-13
+
+---
+
+## Feature: Parenthetical SSML Pauses (Configurable) ✅ IMPLEMENTED
+
+### Problem Statement
+
+Parenthetical fragments in text are currently spoken with parentheses symbols or without natural pauses by some engines.
+
+Example input:
+
+`В нашей системе ЭМ ВЭ ДЭ (но знаю точно, что не в ней одной) практика ...`
+
+Expected conversion:
+
+`В нашей системе ЭМ ВЭ ДЭ <break time="250ms"/> но знаю точно, что не в ней одной <break time="250ms"/> практика ...`
+
+### Goal
+
+Add configurable parenthetical SSML pauses in `internal/ssml`, and expose configuration in **Settings → TTS Settings** alongside existing pause controls.
+
+### Requirements
+
+1. Detect parenthetical text in `( ... )`.
+2. Replace parentheses with SSML breaks before and after content.
+3. Make pause duration configurable (milliseconds) in TTS settings.
+4. Keep parenthetical inner content unchanged.
+5. Support disabling via `0ms`.
+
+### Implementation Plan
+
+1. Extend `ssml.SSMLOptions` with `ParenthesesBreakMs`.
+2. Update pause conversion logic in `internal/ssml` to replace parenthetical segments.
+3. Wire `ParenthesesBreakMs` through config/storage/server settings/UI.
+4. Pass option through worker and TTS adapter SSML path.
+5. Add tests for enabled/disabled behavior and example conversion.
+
+### Implementation Status
+
+- [x] Feature branch created: `feature/ssml-parentheses-breaks`
+- [x] Specification task + plan added
+- [x] SSML parenthetical conversion implemented
+- [x] Settings backend + persistence updated
+- [x] Settings UI updated
+- [x] Tests added and verified
+
+### Validation Notes
+
+- ✅ `go test ./internal/ssml ./internal/server ./internal/storage ./internal/tts`
+
+**Date:** 2026-02-13
+
+---
+
 ## Feature: Abbreviation Normalization (Per Provider) ✅ IMPLEMENTED
 
 ### Problem Statement

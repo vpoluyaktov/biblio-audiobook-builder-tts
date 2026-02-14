@@ -37,11 +37,11 @@ func TestColonReplacement(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := WrapTextInSSMLWithOptions(tt.text, SSMLOptions{})
-			
+
 			// Remove SSML tags to check the text content
 			textContent := strings.ReplaceAll(result, "<speak>", "")
 			textContent = strings.ReplaceAll(textContent, "</speak>", "")
-			
+
 			if !strings.Contains(textContent, tt.wantText) {
 				t.Errorf("Expected text to contain %q\nGot: %s", tt.wantText, textContent)
 			}
@@ -54,13 +54,36 @@ func TestColonReplacement(t *testing.T) {
 	}
 }
 
+func TestColonBreaks_Configurable(t *testing.T) {
+	input := "В нашей системе: это важно: без сомнений"
+
+	withBreaks := AddSSMLBreaks(input, SSMLOptions{
+		ColonBreakMs: 250,
+	})
+
+	if strings.Count(withBreaks, `<break time="250ms"/>`) != 2 {
+		t.Fatalf("expected 2 colon break tags, got %d in %s", strings.Count(withBreaks, `<break time="250ms"/>`), withBreaks)
+	}
+	if strings.Contains(withBreaks, ":") {
+		t.Fatalf("expected no colons when colon breaks enabled, got %s", withBreaks)
+	}
+
+	legacy := AddSSMLBreaks(input, SSMLOptions{})
+	if strings.Contains(legacy, `<break time="250ms"/>`) {
+		t.Fatalf("unexpected colon break tag in legacy mode: %s", legacy)
+	}
+	if strings.Contains(legacy, ":") {
+		t.Fatalf("expected legacy mode to replace colons with spaces, got %s", legacy)
+	}
+}
+
 // TestColonReplacementWithBreaks tests colon replacement with SSML breaks
 func TestColonReplacementWithBreaks(t *testing.T) {
 	tests := []struct {
-		name           string
-		text           string
-		opts           SSMLOptions
-		shouldContain  []string
+		name             string
+		text             string
+		opts             SSMLOptions
+		shouldContain    []string
 		shouldNotContain []string
 	}{
 		{
