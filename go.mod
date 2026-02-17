@@ -13,10 +13,10 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/mattn/go-sqlite3 v1.14.33
 	github.com/spf13/viper v1.16.0
+	github.com/vpoluyaktov/biblio-ebook-parser v0.1.1
 	github.com/vpoluyaktov/tview v0.0.0-20231214005853-8e25b7977d36
 	golang.org/x/crypto v0.47.0
 	golang.org/x/term v0.39.0
-	golang.org/x/text v0.33.0
 )
 
 require (
@@ -47,6 +47,7 @@ require (
 	github.com/subosito/gotenv v1.4.2 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

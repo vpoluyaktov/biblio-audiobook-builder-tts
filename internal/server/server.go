@@ -1744,14 +1744,11 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse the book
-	var book *parser.Book
-	if ext == ".epub" {
-		p := parser.NewEpubParser()
-		book, err = p.ParseEpub(bytes.NewReader(content))
-	} else {
-		p := parser.NewFB2Parser()
-		book, err = p.ParseFB2(bytes.NewReader(content))
+	format := "epub"
+	if ext == ".fb2" {
+		format = "fb2"
 	}
+	book, err := parser.ParseReader(bytes.NewReader(content), format)
 
 	if err != nil {
 		s.jsonError(w, http.StatusBadRequest, fmt.Sprintf("Failed to parse book: %v", err))
