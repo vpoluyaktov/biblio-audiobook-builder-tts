@@ -231,16 +231,7 @@ func (w *Worker) processJob(job *Job) {
 
 // parseBook parses the ebook file
 func (w *Worker) parseBook(filePath string) (*parser.Book, error) {
-	ext := strings.ToLower(filepath.Ext(filePath))
-
-	switch ext {
-	case ".epub":
-		return parser.NewEpubParser().ParseEpubFile(filePath)
-	case ".fb2":
-		return parser.NewFB2Parser().ParseFB2File(filePath)
-	default:
-		return nil, fmt.Errorf("unsupported file format: %s", ext)
-	}
+	return parser.ParseFile(filePath)
 }
 
 // ChapterResult holds the result of converting a single chapter

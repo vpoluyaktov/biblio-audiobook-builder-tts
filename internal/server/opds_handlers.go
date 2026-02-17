@@ -498,14 +498,11 @@ func (s *Server) handleOPDSDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse the book to create a preview
-	var book *parser.Book
-	if ext == ".epub" {
-		p := parser.NewEpubParser()
-		book, err = p.ParseEpub(bytes.NewReader(data))
-	} else {
-		p := parser.NewFB2Parser()
-		book, err = p.ParseFB2(bytes.NewReader(data))
+	format := "epub"
+	if ext == ".fb2" {
+		format = "fb2"
 	}
+	book, err := parser.ParseReader(bytes.NewReader(data), format)
 
 	if err != nil {
 		// Clean up temp file on error
