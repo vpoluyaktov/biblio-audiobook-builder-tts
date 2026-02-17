@@ -225,6 +225,8 @@ github.com/subosito/gotenv v1.4.2 h1:X1TuBLAMDFbaTAChgCBLu3DU3UPyELpnF2jjJ2cz/S8
 github.com/subosito/gotenv v1.4.2/go.mod h1:ayKnFf/c6rvx/2iiLrJUk1e6plDbT3edrFNGqEflhK0=
 github.com/vpoluyaktov/biblio-ebook-parser v0.0.0-20260217165922-328cf1c15000 h1:VREik41SCFHCtVTBfc9lVNgMK8nCKd/Dn2MFXsoMELc=
 github.com/vpoluyaktov/biblio-ebook-parser v0.0.0-20260217165922-328cf1c15000/go.mod h1:XHRjAirb5D78M+TcOjXPDObi0GnQlEWKrQyWJ7fJ1qA=
+github.com/vpoluyaktov/biblio-ebook-parser v0.1.0 h1:mt/NIH0jfWoeCskAileg9wt50T8dJgqeNavHnBaA4AU=
+github.com/vpoluyaktov/biblio-ebook-parser v0.1.0/go.mod h1:XHRjAirb5D78M+TcOjXPDObi0GnQlEWKrQyWJ7fJ1qA=
 github.com/vpoluyaktov/tview v0.0.0-20231214005853-8e25b7977d36 h1:LVQnRWAOsqkDjS4gBsnIF/jR49FUNHzMgxnwFj/ggkc=
 github.com/vpoluyaktov/tview v0.0.0-20231214005853-8e25b7977d36/go.mod h1:/BiZSJJQIVX4s+YXAhMa3kMZ3NpzG/PxwWN7oZ3k2kY=
 github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e h1:JVG44RsyaB9T2KIHavMF/ppJZNG9ZpyihvCd0w101no=
