@@ -2,6 +2,8 @@ module biblio-audiobook-builder-tts
 
 go 1.24.0
 
+replace github.com/vpoluyaktov/biblio-ebook-parser => ../biblio-ebook-parser
+
 toolchain go1.24.11
 
 require (
@@ -13,10 +15,11 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/mattn/go-sqlite3 v1.14.33
 	github.com/spf13/viper v1.16.0
+	github.com/vpoluyaktov/biblio-ebook-parser v0.0.0-00010101000000-000000000000
 	github.com/vpoluyaktov/tview v0.0.0-20231214005853-8e25b7977d36
 	golang.org/x/crypto v0.47.0
 	golang.org/x/term v0.39.0
-	golang.org/x/text v0.33.0
+	golang.org/x/text v0.34.0
 )
 
 require (
