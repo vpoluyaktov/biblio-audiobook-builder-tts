@@ -1,16 +1,8 @@
 package parser
 
 import (
-	"io"
 	"strings"
 )
-
-// Parser interface defines methods for parsing different book formats
-type Parser interface {
-	ParseEpub(r io.Reader) (*Book, error)
-	ParseFB2(r io.Reader) (*Book, error)
-	Parse(path string) (*Book, error)
-}
 
 // Book represents the parsed book content
 type Book struct {
@@ -50,9 +42,4 @@ func (b *Book) GetTotalWords() int {
 		total += len(strings.Fields(ch.Content))
 	}
 	return total
-}
-
-// NewParser is deprecated and should not be used. Use NewEpubParser or NewFB2Parser instead.
-func NewParser() Parser {
-	panic("NewParser is deprecated. Use NewEpubParser or NewFB2Parser instead.")
 }
