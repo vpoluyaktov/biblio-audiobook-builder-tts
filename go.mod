@@ -2,6 +2,8 @@ module biblio-audiobook-builder-tts
 
 go 1.24.0
 
+replace github.com/vpoluyaktov/biblio-ebook-parser => ../biblio-ebook-parser
+
 toolchain go1.24.11
 
 require (

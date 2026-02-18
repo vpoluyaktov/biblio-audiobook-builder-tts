@@ -68,6 +68,25 @@ biblio-audiobook-builder-tts/
 
 ## Recent Changes
 
+### 2026-02-18: Cover Extraction via Unified Parser Library
+
+**Cover extraction now handled by unified parser library:**
+- All cover extraction uses `biblio-ebook-parser` library
+- Cover images extracted through parser's `Metadata.CoverData` field
+- Supports both EPUB and FB2 formats
+- Fast extraction without parsing full book content
+
+**Benefits:**
+- Eliminates potential code duplication
+- Automatic bug fixes when parser library is updated
+- Consistent cover handling across all Biblio services
+- Option to use `cover.GeneratePlaceholder()` for missing covers
+
+**Implementation:**
+- Parser adapter in `internal/parser/adapter.go` extracts cover from metadata
+- Cover data stored in `Book.CoverImage` field
+- Preview store serves covers via `/api/preview/{id}/cover` endpoint
+
 ### 2026-02-18: Fix TTS Crash on ASCII Special Characters
 
 **Issue**: Silero TTS engine crashed with HTTP 400 error when encountering certain ASCII special characters in text (e.g., `$`, `%`, `#`, `^`, `*`, `@`, etc.). Error example:
