@@ -72,6 +72,26 @@ func TextForTTS(text string) string {
 	// Replace common problematic Unicode characters with TTS-friendly equivalents
 	// These are characters that often cause TTS engines to mispronounce or error
 	replacements := map[string]string{
+		// ASCII special characters that cause TTS engines to crash
+		// These often appear in censored text, broken formatting, or encoding artifacts
+		"$":  "",  // Dollar sign
+		"%":  "",  // Percent sign
+		"#":  "",  // Hash/pound sign
+		"^":  "",  // Caret
+		"*":  "",  // Asterisk (often used for censoring)
+		"@":  "",  // At sign
+		"~":  "",  // Tilde
+		"|":  "",  // Pipe
+		"\\": "",  // Backslash
+		"/":  "",  // Forward slash
+		"<":  "",  // Less than
+		">":  "",  // Greater than
+		"{":  "",  // Left brace
+		"}":  "",  // Right brace
+		"[":  "",  // Left bracket
+		"]":  "",  // Right bracket
+		"_":  " ", // Underscore (replace with space)
+
 		// Dashes - replace with spoken equivalents
 		"\u2014": " - ", // Em dash
 		"\u2013": " - ", // En dash

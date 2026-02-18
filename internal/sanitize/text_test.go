@@ -451,6 +451,55 @@ func TestTextSanitizer(t *testing.T) {
 	})
 }
 
+func TestTextForTTS_RemovesASCIISpecialCharacters(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		// Bug fix: characters that caused TTS crash with status 400
+		{"Dollar sign", "Price is $100", "Price is 100"},
+		{"Percent sign", "Success rate 95%", "Success rate 95"},
+		{"Hash/pound", "Issue #123", "Issue 123"},
+		{"Caret", "x^2 + y^2", "x2 + y2"},
+		{"Asterisk censoring", "What the *** happened", "What the happened"},
+		{"At sign", "Email me @user", "Email me user"},
+		{"Tilde", "~approximate value~", "approximate value"},
+		{"Pipe", "option1 | option2", "option1 option2"},
+		{"Backslash", "path\\to\\file", "pathtofile"},
+		{"Angle brackets", "<tag>content</tag>", "tagcontenttag"},
+		{"Curly braces", "{key: value}", "key: value"},
+		{"Square brackets", "[note]", "note"},
+		{"Underscore", "file_name_here", "file name here"},
+
+		// Real-world bug case from error report
+		{"Bug report case", "- $ euros pounds %#^*, - заявил капитан Иванов", "- euros pounds , - заявил капитан Иванов"},
+
+		// Multiple consecutive special characters
+		{"Multiple asterisks", "***censored***", "censored"},
+		{"Mixed special chars", "$#@!%^&*", "!&"},
+		{"Special chars with text", "Hello $%^ world", "Hello world"},
+
+		// Edge cases
+		{"Only special chars", "$%#^*", ""},
+		{"Special chars between words", "word1$%#word2", "word1word2"},
+		{"Underscore spacing", "hello_world_test", "hello world test"},
+
+		// Legitimate punctuation should be preserved
+		{"Exclamation preserved", "Hello world!", "Hello world!"},
+		{"Ampersand preserved", "Tom & Jerry", "Tom & Jerry"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := TextForTTS(tt.input)
+			if result != tt.expected {
+				t.Errorf("TextForTTS(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestTextForTTS_EmptyAndEdgeCases(t *testing.T) {
 	tests := []struct {
 		name     string
