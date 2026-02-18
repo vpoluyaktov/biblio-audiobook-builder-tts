@@ -66,6 +66,37 @@ biblio-audiobook-builder-tts/
 
 ---
 
+## Recent Changes
+
+### 2026-02-18: Fix TTS Crash on ASCII Special Characters
+
+**Issue**: Silero TTS engine crashed with HTTP 400 error when encountering certain ASCII special characters in text (e.g., `$`, `%`, `#`, `^`, `*`, `@`, etc.). Error example:
+```
+TTS synthesis failed: '^'
+```
+
+**Root Cause**: The text sanitization in `internal/sanitize/text.go` handled Unicode special characters but did not remove problematic ASCII special characters that appear in:
+- Censored/profanity text (e.g., `***`, `$#@!`)
+- Broken formatting/encoding artifacts
+- HTML/XML tags in improperly parsed content
+- Programming symbols in non-technical text
+
+**Solution**: Enhanced `TextForTTS()` function to remove ASCII special characters that cause TTS engines to fail:
+- Removed: `$`, `%`, `#`, `^`, `*`, `@`, `~`, `|`, `\`, `/`, `<`, `>`, `{`, `}`, `[`, `]`
+- Converted to space: `_` (underscore)
+- Preserved: `!`, `&` (legitimate punctuation)
+
+**Testing**: Added comprehensive test suite covering:
+- Real-world bug case from error report
+- Individual special character removal
+- Multiple consecutive special characters
+- Edge cases (only special chars, mixed with text)
+- Preservation of legitimate punctuation
+
+**Impact**: Prevents TTS conversion failures on books with special characters in dialogue, censored text, or formatting artifacts.
+
+---
+
 ### Future Enhancements
 
 - Deeper observability of conversion pipeline stages
