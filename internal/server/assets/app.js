@@ -2276,6 +2276,7 @@ class App {
         // Add options based on available search URLs
         const hasTitleSearch = searchInfo.title_search_url || searchInfo.search_template_url || searchInfo.opensearch_url;
         const hasAuthorSearch = searchInfo.author_search_url;
+        const hasSeriesSearch = searchInfo.series_search_url;
 
         if (hasTitleSearch) {
             const option = document.createElement('option');
@@ -2291,8 +2292,15 @@ class App {
             this.opdsSearchType.appendChild(option);
         }
 
+        if (hasSeriesSearch) {
+            const option = document.createElement('option');
+            option.value = 'series';
+            option.textContent = '📚 By Series';
+            this.opdsSearchType.appendChild(option);
+        }
+
         // If no specific search types, add a generic "All" option
-        if (!hasTitleSearch && !hasAuthorSearch) {
+        if (!hasTitleSearch && !hasAuthorSearch && !hasSeriesSearch) {
             const option = document.createElement('option');
             option.value = '';
             option.textContent = '🔍 All';
@@ -2312,6 +2320,8 @@ class App {
             this.opdsSearchInput.placeholder = 'Enter author name...';
         } else if (type === 'title') {
             this.opdsSearchInput.placeholder = 'Enter book title...';
+        } else if (type === 'series') {
+            this.opdsSearchInput.placeholder = 'Enter series name...';
         } else {
             this.opdsSearchInput.placeholder = 'Search books...';
         }

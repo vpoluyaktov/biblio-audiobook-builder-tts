@@ -114,6 +114,27 @@ TTS synthesis failed: '^'
 
 **Impact**: Prevents TTS conversion failures on books with special characters in dialogue, censored text, or formatting artifacts.
 
+### 2026-02-18: OPDS Author and Series Search Support
+
+**Extended OPDS catalog browser to support author and series search:**
+- Added `SeriesSearchURL` field to `SearchInfo` struct in OPDS client
+- Updated `GetSearchTemplateByType()` to handle "series" search type
+- Extended OPDS feed parsing to extract series search URLs from catalog links
+- Added series search option to UI dropdown (By Title / By Author / By Series)
+- Updated JavaScript to dynamically show available search types based on catalog capabilities
+
+**Benefits:**
+- Users can now search for books by author name or series name in OPDS catalogs
+- Seamless integration with biblio-ebooks-catalog's new search endpoints
+- UI automatically adapts to show only search types supported by each catalog
+- Consistent search experience across all OPDS catalog sources
+
+**Implementation:**
+- OPDS client: `internal/opds/client.go` - `SearchInfo` struct and `GetSearchTemplateByType()`
+- UI template: `internal/server/templates/index.html` - added series option to dropdown
+- JavaScript: `internal/server/assets/app.js` - `updateSearchTypeOptions()` and `updateSearchPlaceholder()`
+- Backend handler: `internal/server/opds_handlers.go` - already supports type parameter
+
 ---
 
 ### Future Enhancements
@@ -131,4 +152,4 @@ TTS synthesis failed: '^'
 
 ---
 
-*Last updated: 2026-02-14*
+*Last updated: 2026-02-18*

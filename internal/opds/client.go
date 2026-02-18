@@ -173,6 +173,8 @@ type SearchInfo struct {
 	TitleSearchURL string `json:"title_search_url,omitempty"`
 	// AuthorSearchURL is a URL template for author-specific search
 	AuthorSearchURL string `json:"author_search_url,omitempty"`
+	// SeriesSearchURL is a URL template for series-specific search
+	SeriesSearchURL string `json:"series_search_url,omitempty"`
 }
 
 // FetchCatalog fetches and parses an OPDS catalog from a URL
@@ -262,6 +264,11 @@ func (c *Client) ParseCatalog(data []byte, baseURL string) (*CatalogResponse, er
 					// Extract author search URL - build clean URL with just author parameter
 					authorURL := extractFieldSearchURL(link.Href, "author")
 					searchInfo.AuthorSearchURL = resolveURL(base, authorURL)
+				}
+				if strings.Contains(link.Href, "{atom:series}") {
+					// Extract series search URL - build clean URL with just series parameter
+					seriesURL := extractFieldSearchURL(link.Href, "series")
+					searchInfo.SeriesSearchURL = resolveURL(base, seriesURL)
 				}
 			}
 		}
@@ -520,7 +527,7 @@ func (c *Client) GetSearchTemplate(searchInfo *SearchInfo) (string, error) {
 }
 
 // GetSearchTemplateByType returns the search URL template for a specific search type.
-// searchType can be "title", "author", or "" for default search.
+// searchType can be "title", "author", "series", or "" for default search.
 // For feeds like FreeLib that support field-specific search, using "title" returns
 // actual book results instead of navigation categories.
 func (c *Client) GetSearchTemplateByType(searchInfo *SearchInfo, searchType string) (string, error) {
@@ -537,6 +544,10 @@ func (c *Client) GetSearchTemplateByType(searchInfo *SearchInfo, searchType stri
 	case "author":
 		if searchInfo.AuthorSearchURL != "" {
 			return searchInfo.AuthorSearchURL, nil
+		}
+	case "series":
+		if searchInfo.SeriesSearchURL != "" {
+			return searchInfo.SeriesSearchURL, nil
 		}
 	}
 
