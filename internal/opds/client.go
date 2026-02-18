@@ -551,7 +551,9 @@ func (osd *OpenSearchDescription) GetSearchURLByTitle(title string) string {
 
 // PopulateSearchURLs extracts all search URL templates from OpenSearch description
 func (osd *OpenSearchDescription) PopulateSearchURLs(searchInfo *SearchInfo) {
+	fmt.Printf("Debug: PopulateSearchURLs - Processing %d URLs from OpenSearch descriptor\n", len(osd.URLs))
 	for _, u := range osd.URLs {
+		fmt.Printf("Debug: URL Type=%s, Template=%s, Rel=%s\n", u.Type, u.Template, u.Rel)
 		if !strings.Contains(u.Type, "atom+xml") {
 			continue
 		}
@@ -560,12 +562,15 @@ func (osd *OpenSearchDescription) PopulateSearchURLs(searchInfo *SearchInfo) {
 		template := u.Template
 		if strings.Contains(template, "/search/authors") {
 			searchInfo.AuthorSearchURL = template
+			fmt.Printf("Debug: Set AuthorSearchURL to %s\n", template)
 		} else if strings.Contains(template, "/search/series") {
 			searchInfo.SeriesSearchURL = template
+			fmt.Printf("Debug: Set SeriesSearchURL to %s\n", template)
 		} else if strings.Contains(template, "/search?") || strings.HasSuffix(template, "/search") {
 			// Default book/title search
 			if searchInfo.TitleSearchURL == "" {
 				searchInfo.TitleSearchURL = template
+				fmt.Printf("Debug: Set TitleSearchURL to %s\n", template)
 			}
 		}
 	}
