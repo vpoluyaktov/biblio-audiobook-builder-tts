@@ -15,7 +15,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/mattn/go-sqlite3 v1.14.33
 	github.com/spf13/viper v1.16.0
-	github.com/vpoluyaktov/biblio-ebook-parser v0.1.1
+	github.com/vpoluyaktov/biblio-ebook-parser v0.2.0
 	github.com/vpoluyaktov/tview v0.0.0-20231214005853-8e25b7977d36
 	golang.org/x/crypto v0.47.0
 	golang.org/x/term v0.39.0
