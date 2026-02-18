@@ -223,6 +223,8 @@ github.com/stretchr/testify v1.8.3 h1:RP3t2pwF7cMEbC1dqtB6poj3niw/9gnV4Cjg5oW5gt
 github.com/stretchr/testify v1.8.3/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
 github.com/subosito/gotenv v1.4.2 h1:X1TuBLAMDFbaTAChgCBLu3DU3UPyELpnF2jjJ2cz/S8=
 github.com/subosito/gotenv v1.4.2/go.mod h1:ayKnFf/c6rvx/2iiLrJUk1e6plDbT3edrFNGqEflhK0=
+github.com/vpoluyaktov/biblio-ebook-parser v0.2.0 h1:9QiSMV753X/eYIX32kODAioUlxzcca+6cG9FPzSZKKs=
+github.com/vpoluyaktov/biblio-ebook-parser v0.2.0/go.mod h1:Q9ZRFBtxprwqg8doFfiDekEOR4R/UPPJyzevxvMpqxQ=
 github.com/vpoluyaktov/tview v0.0.0-20231214005853-8e25b7977d36 h1:LVQnRWAOsqkDjS4gBsnIF/jR49FUNHzMgxnwFj/ggkc=
 github.com/vpoluyaktov/tview v0.0.0-20231214005853-8e25b7977d36/go.mod h1:/BiZSJJQIVX4s+YXAhMa3kMZ3NpzG/PxwWN7oZ3k2kY=
 github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e h1:JVG44RsyaB9T2KIHavMF/ppJZNG9ZpyihvCd0w101no=
