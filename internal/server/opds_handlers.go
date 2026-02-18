@@ -344,6 +344,16 @@ func (s *Server) handleOPDSBrowse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Debug: Log search info
+	if catalog.SearchInfo != nil {
+		logger.Info("OPDS Browse - SearchInfo: Supported=%v, TitleURL=%s, AuthorURL=%s, SeriesURL=%s, OpenSearchURL=%s",
+			catalog.SearchInfo.Supported,
+			catalog.SearchInfo.TitleSearchURL,
+			catalog.SearchInfo.AuthorSearchURL,
+			catalog.SearchInfo.SeriesSearchURL,
+			catalog.SearchInfo.OpenSearchURL)
+	}
+
 	s.jsonResponse(w, http.StatusOK, catalog)
 }
 
