@@ -290,11 +290,15 @@ func (c *Client) ParseCatalog(data []byte, baseURL string) (*CatalogResponse, er
 		// If we have an OpenSearch URL, fetch it now to populate all search URLs
 		if searchInfo.OpenSearchURL != "" {
 			osd, err := c.FetchOpenSearchDescription(searchInfo.OpenSearchURL)
-			if err == nil {
+			if err != nil {
+				// Log the error but continue - we'll try again later if needed
+				fmt.Printf("Warning: Failed to fetch OpenSearch descriptor from %s: %v\n", searchInfo.OpenSearchURL, err)
+			} else {
 				// Populate all search URL types from the OpenSearch description
 				osd.PopulateSearchURLs(searchInfo)
+				fmt.Printf("Debug: Populated search URLs - Title: %s, Author: %s, Series: %s\n",
+					searchInfo.TitleSearchURL, searchInfo.AuthorSearchURL, searchInfo.SeriesSearchURL)
 			}
-			// Continue even if OpenSearch fetch fails - we have the URL for later
 		}
 		response.SearchInfo = searchInfo
 	}
