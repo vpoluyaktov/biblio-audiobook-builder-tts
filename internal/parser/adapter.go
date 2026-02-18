@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/vpoluyaktov/biblio-ebook-parser/cover"
 	_ "github.com/vpoluyaktov/biblio-ebook-parser/formats" // Register parsers
 	ebookparser "github.com/vpoluyaktov/biblio-ebook-parser/parser"
 	"github.com/vpoluyaktov/biblio-ebook-parser/renderer/plaintext"
@@ -161,6 +162,16 @@ func ParseFile(filePath string) (*Book, error) {
 		book.SeriesNumber = fmt.Sprintf("%d", unifiedBook.Metadata.SeriesIndex)
 	}
 
+	// Generate placeholder cover if book has no cover
+	if len(book.CoverImage) == 0 {
+		placeholderCover, err := cover.GeneratePlaceholder(book.Title, book.Author)
+		if err == nil {
+			book.CoverImage = placeholderCover
+			book.CoverImageType = "image/jpeg"
+			book.CoverImageName = "cover.jpg"
+		}
+	}
+
 	// Convert chapters
 	for i, ch := range plaintextContent.Chapters {
 		book.Chapters[i] = Chapter{
@@ -227,6 +238,16 @@ func ParseReader(reader io.Reader, format string) (*Book, error) {
 	// Set series number
 	if unifiedBook.Metadata.SeriesIndex > 0 {
 		book.SeriesNumber = fmt.Sprintf("%d", unifiedBook.Metadata.SeriesIndex)
+	}
+
+	// Generate placeholder cover if book has no cover
+	if len(book.CoverImage) == 0 {
+		placeholderCover, err := cover.GeneratePlaceholder(book.Title, book.Author)
+		if err == nil {
+			book.CoverImage = placeholderCover
+			book.CoverImageType = "image/jpeg"
+			book.CoverImageName = "cover.jpg"
+		}
 	}
 
 	// Convert chapters
