@@ -287,6 +287,15 @@ func (c *Client) ParseCatalog(data []byte, baseURL string) (*CatalogResponse, er
 
 	// Set search info if search is supported
 	if searchInfo.Supported {
+		// If we have an OpenSearch URL, fetch it now to populate all search URLs
+		if searchInfo.OpenSearchURL != "" {
+			osd, err := c.FetchOpenSearchDescription(searchInfo.OpenSearchURL)
+			if err == nil {
+				// Populate all search URL types from the OpenSearch description
+				osd.PopulateSearchURLs(searchInfo)
+			}
+			// Continue even if OpenSearch fetch fails - we have the URL for later
+		}
 		response.SearchInfo = searchInfo
 	}
 
@@ -520,6 +529,44 @@ func (osd *OpenSearchDescription) GetAtomSearchTemplate() string {
 	return ""
 }
 
+// GetSearchURLByTitle extracts a specific search URL template by its title attribute
+func (osd *OpenSearchDescription) GetSearchURLByTitle(title string) string {
+	for _, u := range osd.URLs {
+		if strings.Contains(u.Type, "atom+xml") && strings.Contains(strings.ToLower(u.Rel), "results") {
+			if strings.Contains(strings.ToLower(u.Rel), strings.ToLower(title)) {
+				return u.Template
+			}
+			// Also check the title attribute if present
+			if urlTitle := u.Rel; strings.Contains(strings.ToLower(urlTitle), strings.ToLower(title)) {
+				return u.Template
+			}
+		}
+	}
+	return ""
+}
+
+// PopulateSearchURLs extracts all search URL templates from OpenSearch description
+func (osd *OpenSearchDescription) PopulateSearchURLs(searchInfo *SearchInfo) {
+	for _, u := range osd.URLs {
+		if !strings.Contains(u.Type, "atom+xml") {
+			continue
+		}
+
+		// Check URL path to determine search type
+		template := u.Template
+		if strings.Contains(template, "/search/authors") {
+			searchInfo.AuthorSearchURL = template
+		} else if strings.Contains(template, "/search/series") {
+			searchInfo.SeriesSearchURL = template
+		} else if strings.Contains(template, "/search?") || strings.HasSuffix(template, "/search") {
+			// Default book/title search
+			if searchInfo.TitleSearchURL == "" {
+				searchInfo.TitleSearchURL = template
+			}
+		}
+	}
+}
+
 // GetSearchTemplate returns the search URL template for a catalog.
 // It first checks for a direct Atom search template, then falls back to fetching OpenSearch description.
 func (c *Client) GetSearchTemplate(searchInfo *SearchInfo) (string, error) {
@@ -562,12 +609,33 @@ func (c *Client) GetSearchTemplateByType(searchInfo *SearchInfo, searchType stri
 		return searchInfo.SearchTemplateURL, nil
 	}
 
-	// Fall back to OpenSearch description (Gutenberg style)
+	// Fall back to OpenSearch description - fetch and populate all search URLs
 	if searchInfo.OpenSearchURL != "" {
 		osd, err := c.FetchOpenSearchDescription(searchInfo.OpenSearchURL)
 		if err != nil {
 			return "", fmt.Errorf("failed to get OpenSearch description: %w", err)
 		}
+
+		// Populate all search URLs from OpenSearch description
+		osd.PopulateSearchURLs(searchInfo)
+
+		// Now try again with the populated URLs
+		switch searchType {
+		case "title":
+			if searchInfo.TitleSearchURL != "" {
+				return searchInfo.TitleSearchURL, nil
+			}
+		case "author":
+			if searchInfo.AuthorSearchURL != "" {
+				return searchInfo.AuthorSearchURL, nil
+			}
+		case "series":
+			if searchInfo.SeriesSearchURL != "" {
+				return searchInfo.SeriesSearchURL, nil
+			}
+		}
+
+		// Fallback to generic search template
 		template := osd.GetAtomSearchTemplate()
 		if template == "" {
 			return "", fmt.Errorf("no search URL template found in OpenSearch description")
