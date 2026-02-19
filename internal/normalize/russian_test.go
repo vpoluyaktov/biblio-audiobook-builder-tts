@@ -735,22 +735,22 @@ func TestRussianDateRanges(t *testing.T) {
 		{
 			name:     "date range with month",
 			input:    "6-16 августа 1991 года",
-			expected: "шестое, тире, шестнадцатое августа одна тысяча девятьсот девяносто первого года",
+			expected: "шестого, тире, шестнадцатого августа одна тысяча девятьсот девяносто первого года",
 		},
 		{
 			name:     "date range January",
 			input:    "1-5 января",
-			expected: "первое, тире, пятое января",
+			expected: "первого, тире, пятого января",
 		},
 		{
 			name:     "date range March",
 			input:    "10-20 марта",
-			expected: "десятое, тире, двадцатое марта",
+			expected: "десятого, тире, двадцатого марта",
 		},
 		{
 			name:     "date range December",
 			input:    "25-31 декабря",
-			expected: "двадцать пятое, тире, тридцать первое декабря",
+			expected: "двадцать пятого, тире, тридцать первого декабря",
 		},
 	}
 
@@ -885,22 +885,22 @@ func TestRussianDateFormat(t *testing.T) {
 		{
 			name:     "day of March",
 			input:    "25 марта",
-			expected: "двадцать пятое марта",
+			expected: "двадцать пятого марта",
 		},
 		{
 			name:     "day of January",
 			input:    "1 января",
-			expected: "первое января",
+			expected: "первого января",
 		},
 		{
 			name:     "day of December",
 			input:    "31 декабря",
-			expected: "тридцать первое декабря",
+			expected: "тридцать первого декабря",
 		},
 		{
 			name:     "full date with year",
 			input:    "25 марта 1996 года",
-			expected: "двадцать пятое марта одна тысяча девятьсот девяносто шестого года",
+			expected: "двадцать пятого марта одна тысяча девятьсот девяносто шестого года",
 		},
 		{
 			name:     "date in sentence with genitive trigger",
@@ -916,6 +916,16 @@ func TestRussianDateFormat(t *testing.T) {
 			name:     "date after preposition после",
 			input:    "после 1 марта",
 			expected: "после первого марта",
+		},
+		{
+			name:     "date 27 марта - user reported bug",
+			input:    "произошла 27 марта 1977 года",
+			expected: "произошла двадцать седьмого марта одна тысяча девятьсот семьдесят седьмого года",
+		},
+		{
+			name:     "date 21 декабря - user reported bug",
+			input:    "21 декабря 1988 года",
+			expected: "двадцать первого декабря одна тысяча девятьсот восемьдесят восьмого года",
 		},
 		{
 			name:     "year nominative",

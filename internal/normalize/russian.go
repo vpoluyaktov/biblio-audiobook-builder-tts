@@ -829,8 +829,8 @@ func (r *RussianConverter) ordinalWithScale(n int64, gender Gender) string {
 }
 
 // processDateRanges handles date range patterns like "6-16 августа".
-// Both numbers are converted to ordinal neuter (for dates) with comma and "тире" between them.
-// Example: "6-16 августа" → "шестое, тире, шестнадцатое августа"
+// Both numbers are converted to ordinal neuter genitive (for dates) with comma and "тире" between them.
+// Example: "6-16 августа" → "шестого, тире, шестнадцатого августа"
 func (p *RussianProcessor) processDateRanges(text string, converter NumberConverter) string {
 	matches := RussianDateRangePattern.FindAllStringSubmatchIndex(text, -1)
 	if len(matches) == 0 {
@@ -856,7 +856,7 @@ func (p *RussianProcessor) processDateRanges(text string, converter NumberConver
 			continue
 		}
 
-		// Convert both numbers to ordinal neuter (for dates like "шестое", "шестнадцатое")
+		// Convert both numbers to ordinal neuter (for dates)
 		ctx := Context{
 			Form:   Ordinal,
 			Gender: Neuter,
@@ -866,7 +866,12 @@ func (p *RussianProcessor) processDateRanges(text string, converter NumberConver
 		words1 := converter.ToWords(n1, ctx)
 		words2 := converter.ToWords(n2, ctx)
 
-		// Build replacement: "шестое, тире, шестнадцатое августа"
+		// In Russian, dates with months are always in genitive case
+		// Transform from nominative to genitive (шестое → шестого)
+		words1 = TransformOrdinalCase(words1, Genitive, Neuter)
+		words2 = TransformOrdinalCase(words2, Genitive, Neuter)
+
+		// Build replacement: "шестого, тире, шестнадцатого августа"
 		replacement := words1 + ", тире, " + words2 + " " + month
 		result = result[:fullStart] + replacement + result[fullEnd:]
 	}
@@ -1008,12 +1013,10 @@ func (p *RussianProcessor) DetectContext(wordBefore, wordAfter string, nounDB *N
 
 			lowerWord := strings.ToLower(wordAfter)
 			if IsRussianMonth(lowerWord) {
-				// Dates: "25 марта" → ordinal neuter
-				// Use genitive case if triggered by preceding word
+				// Dates: "25 марта" → ordinal neuter genitive
+				// In Russian, dates with months are always in genitive case
 				ctx.Form = Ordinal
-				if genitiveTriggered {
-					ctx.Case = Genitive
-				}
+				ctx.Case = Genitive
 				return ctx, true
 			} else if lowerWord == "год" {
 				// Year nominative: "1996 год" → ordinal masculine
