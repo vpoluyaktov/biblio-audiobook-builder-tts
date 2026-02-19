@@ -68,6 +68,29 @@ biblio-audiobook-builder-tts/
 
 ## Recent Changes
 
+### 2026-02-18: Fix English Ordinal Triggers for Arabic Numbers
+
+**Issue**: English tests were failing because "chapter" and "page" were not triggering ordinal numbers for Arabic numerals. Examples:
+- Input: `Chapter 5`
+- Incorrect output: `Chapter five` (cardinal)
+- Correct output: `Chapter fifth` (ordinal)
+
+**Root Cause**: The English noun database had "chapter" and "page" marked as cardinal triggers (`c`) instead of ordinal triggers (`o`). This was intentional for Roman numerals ("Chapter VII" → "Chapter seven"), but Arabic numbers should use ordinal form.
+
+**Solution**: 
+- Changed "chapter" and "page" to ordinal triggers (`o`) in English noun database (`internal/normalize/data/en.csv`)
+- Updated Roman numeral processing in `internal/normalize/roman.go` to always use cardinal form for English Roman numerals after nouns, regardless of the noun's trigger form
+- This allows different behavior for Roman vs Arabic numbers with the same noun
+
+**Behavior**:
+- Roman numerals: `Chapter VII` → `Chapter seven` (cardinal)
+- Arabic numbers: `Chapter 5` → `Chapter fifth` (ordinal)
+- Russian unchanged: `Глава III` → `Глава третья` (ordinal)
+
+**Testing**: All English and Russian tests now pass, including ordinal and Roman numeral tests.
+
+**Impact**: Fixes grammatically correct English narration for chapter/page numbers with Arabic numerals.
+
 ### 2026-02-18: Fix Russian Year Normalization in Prepositional Case
 
 **Issue**: Russian year normalization was incorrect when years appeared before "году" (prepositional case). Example:
