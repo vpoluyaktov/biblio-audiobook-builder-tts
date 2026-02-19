@@ -691,6 +691,27 @@ func TestProcessorRussian(t *testing.T) {
 			input:    "Глава 100",
 			expected: "Глава сотая",
 		},
+		// Hyphenated model names
+		{
+			name:     "hyphenated aircraft model Ту-154",
+			input:    "Ту-154",
+			expected: "Ту сто пятьдесят четыре",
+		},
+		{
+			name:     "hyphenated aircraft with text",
+			input:    "Самолёт Ту-154 прибыл",
+			expected: "Самолёт Ту сто пятьдесят четыре прибыл",
+		},
+		{
+			name:     "hyphenated Boeing model",
+			input:    "Боинг-747",
+			expected: "Боинг семьсот сорок семь",
+		},
+		{
+			name:     "hyphenated Boeing with text",
+			input:    "Самолёт Боинг-747 вылетел",
+			expected: "Самолёт Боинг семьсот сорок семь вылетел",
+		},
 	}
 
 	for _, tt := range tests {

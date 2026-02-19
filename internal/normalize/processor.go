@@ -59,14 +59,31 @@ func (p *Processor) Process(text, lang string) string {
 	for i := len(matches) - 1; i >= 0; i-- {
 		start, end := matches[i][0], matches[i][1]
 		numStr := result[start:end]
+		replaceStart := start
+		isHyphenatedModel := false
 
 		// Skip if this looks like a negative number that's actually part of text
 		// (e.g., already processed or not a real negative)
 		if strings.HasPrefix(numStr, "-") && start > 0 {
-			prevChar := result[start-1]
-			// If previous char is a digit, this hyphen is a suffix marker, skip
-			if prevChar >= '0' && prevChar <= '9' {
-				continue
+			// Get the character before the hyphen (properly handle UTF-8)
+			beforeHyphen := result[:start]
+			runes := []rune(beforeHyphen)
+			if len(runes) > 0 {
+				prevRune := runes[len(runes)-1]
+
+				// If previous char is a digit, this hyphen is a suffix marker, skip
+				if prevRune >= '0' && prevRune <= '9' {
+					continue
+				}
+
+				// If previous char is a letter, this is a hyphen separator (e.g., DC-7, Ту-154)
+				// Extract just the number part without the hyphen
+				if unicode.IsLetter(prevRune) {
+					// Skip the hyphen for parsing, but include it in replacement
+					start++
+					numStr = result[start:end]
+					isHyphenatedModel = true
+				}
 			}
 		}
 
@@ -88,7 +105,13 @@ func (p *Processor) Process(text, lang string) string {
 		}
 
 		// Replace in result
-		result = result[:start] + words + result[end:]
+		if isHyphenatedModel {
+			// Replace hyphen with space (replaceStart includes the hyphen)
+			result = result[:replaceStart] + " " + words + result[end:]
+		} else {
+			// Normal replacement without adding space
+			result = result[:start] + words + result[end:]
+		}
 	}
 
 	return result

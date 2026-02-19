@@ -68,6 +68,39 @@ biblio-audiobook-builder-tts/
 
 ## Recent Changes
 
+### 2026-02-19: Fix Hyphen Normalization in Model Names
+
+**Issue**: Hyphens in model names (like DC-7, Ту-154, Боинг-747) were being treated as minus signs, resulting in incorrect normalization:
+- Input: `DC-7`
+- Incorrect output: `DC minus seven`
+- Correct output: `DC seven`
+
+- Input: `Ту-154`
+- Incorrect output: `Ту минус сто пятьдесят четыре`
+- Correct output: `Ту сто пятьдесят четыре`
+
+- Input: `Боинг-747`
+- Incorrect output: `Боинг минус семьсот сорок семь`
+- Correct output: `Боинг семьсот сорок семь`
+
+**Root Cause**: The number pattern regex (`-?\d+`) matches numbers with optional leading hyphens, treating them as minus signs. When a hyphen appears after a letter (as in model names), it should be treated as a separator, not a minus sign.
+
+**Solution**: 
+- Enhanced hyphen detection logic in `internal/normalize/processor.go` to distinguish between:
+  - Actual minus signs (preceded by whitespace or at text start)
+  - Hyphens as separators in model names (preceded by letters)
+- Fixed UTF-8 character handling to properly detect Cyrillic and other multi-byte characters before hyphens
+- When a hyphen follows a letter, the hyphen is replaced with a space and only the number is normalized
+
+**Behavior**:
+- Model names: `DC-7` → `DC seven`, `Ту-154` → `Ту сто пятьдесят четыре`
+- Negative numbers: `-5 degrees` → `minus five degrees` (unchanged)
+- Ordinal suffixes: `1996-го` → `одна тысяча девятьсот девяносто шестого` (unchanged)
+
+**Testing**: Added comprehensive test cases for both English and Russian hyphenated model names. All existing tests continue to pass.
+
+**Impact**: Fixes incorrect narration of aircraft models, vehicle designations, and other hyphenated alphanumeric identifiers in both English and Russian text.
+
 ### 2026-02-18: Fix English Ordinal Triggers for Arabic Numbers
 
 **Issue**: English tests were failing because "chapter" and "page" were not triggering ordinal numbers for Arabic numerals. Examples:

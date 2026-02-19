@@ -57,6 +57,16 @@ func TestProcessorEnglish(t *testing.T) {
 			input:    "Temperature is -5 degrees",
 			expected: "Temperature is minus five degrees",
 		},
+		{
+			name:     "hyphenated model name DC-7",
+			input:    "DC-7",
+			expected: "DC seven",
+		},
+		{
+			name:     "hyphenated model with text",
+			input:    "The DC-7 aircraft",
+			expected: "The DC seven aircraft",
+		},
 	}
 
 	for _, tt := range tests {
