@@ -3,9 +3,9 @@
 # gender: m=masculine, f=feminine, n=neuter
 # form: o=ordinal, c=cardinal
 #
-# Cardinal triggers for Roman numerals (Part I → Part one, Chapter VII → Chapter seven)
-chapter,m,c,chapter,chapters
-page,m,c,page,pages
+# Ordinal triggers (Chapter 5 → Chapter fifth, Page 42 → Page forty-second)
+chapter,m,o,chapter,chapters
+page,m,o,page,pages
 part,m,c,part,parts
 section,m,c,section,sections
 volume,m,c,volume,volumes

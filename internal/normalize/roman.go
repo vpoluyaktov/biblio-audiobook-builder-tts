@@ -301,15 +301,21 @@ func ProcessRomanNumerals(text, lang string, converter NumberConverter, nounDB *
 		var ctx Context
 		switch position {
 		case RomanAfterNoun:
-			// "Part I", "Глава III" → use noun's trigger form (ordinal for chapters/parts)
-			// "Часть I" → "Часть первая", "Глава III" → "Глава третья"
+			// English: "Part I" → "Part one" (cardinal), "Chapter VII" → "Chapter seven" (cardinal)
+			// Russian: "Глава III" → "Глава третья" (ordinal), "Часть I" → "Часть первая" (ordinal)
 			ctx = Context{
 				Form:   Ordinal,
 				Gender: Masculine,
 				Case:   Nominative,
 			}
 			if nounInfo != nil {
-				ctx.Form = nounInfo.TriggerForm
+				// English Roman numerals after nouns always use cardinal form
+				// Other languages use the noun's trigger form
+				if lang == "en" {
+					ctx.Form = Cardinal
+				} else {
+					ctx.Form = nounInfo.TriggerForm
+				}
 				ctx.Gender = nounInfo.Gender
 			}
 
