@@ -60,6 +60,12 @@ type ConfigDB interface {
 	UpdateProvider(provider *storage.TTSProvider) error
 	SetDefaultProvider(id string) error
 	GetDefaultProvider() (*storage.TTSProvider, error)
+	// Pronunciation dictionary operations
+	GetAllPronunciationRules() ([]storage.PronunciationRule, error)
+	GetPronunciationRule(id int64) (*storage.PronunciationRule, error)
+	CreatePronunciationRule(rule *storage.PronunciationRule) error
+	UpdatePronunciationRule(rule *storage.PronunciationRule) error
+	DeletePronunciationRule(id int64) error
 }
 
 // New creates a new server instance
@@ -246,6 +252,10 @@ func (s *Server) Start() error {
 	mux.HandleFunc(basePath+"/api/nouns", s.requireAuth(s.handleNouns))
 	mux.HandleFunc(basePath+"/api/nouns/", s.requireAuth(s.handleNoun))
 	mux.HandleFunc(basePath+"/api/nouns/languages", s.requireAuth(s.handleNounLanguages))
+
+	// Pronunciation dictionary endpoints - protected
+	mux.HandleFunc(basePath+"/api/pronunciation", s.requireAuth(s.handlePronunciationRules))
+	mux.HandleFunc(basePath+"/api/pronunciation/", s.requireAuth(s.handlePronunciationRule))
 
 	// OPDS endpoints - protected
 	mux.HandleFunc(basePath+"/api/opds/sources", s.requireAuth(s.handleOPDSSources))

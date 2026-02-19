@@ -344,6 +344,25 @@ class App {
 
         // OPDS elements
         this.opdsSourceSelect = document.getElementById('opds-source');
+
+        // Pronunciation dictionary elements
+        this.pronunciationTable = document.getElementById('pronunciation-table');
+        this.pronunciationTbody = document.getElementById('pronunciation-tbody');
+        this.addPronunciationRuleBtn = document.getElementById('add-pronunciation-rule-btn');
+        this.pronunciationRuleModal = document.getElementById('pronunciation-rule-modal');
+        this.pronunciationRuleModalTitle = document.getElementById('pronunciation-rule-modal-title');
+        this.pronunciationRuleModalClose = document.getElementById('pronunciation-rule-modal-close');
+        this.pronunciationRuleModalCancel = document.getElementById('pronunciation-rule-modal-cancel');
+        this.pronunciationRuleModalSave = document.getElementById('pronunciation-rule-modal-save');
+        this.pronunciationRuleModalDelete = document.getElementById('pronunciation-rule-modal-delete');
+        this.pronunciationRuleEditId = document.getElementById('pronunciation-rule-edit-id');
+        this.pronunciationRulePattern = document.getElementById('pronunciation-rule-pattern');
+        this.pronunciationRulePlain = document.getElementById('pronunciation-rule-plain');
+        this.pronunciationRuleSSML = document.getElementById('pronunciation-rule-ssml');
+        this.pronunciationRuleComment = document.getElementById('pronunciation-rule-comment');
+        this.pronunciationRuleEnabled = document.getElementById('pronunciation-rule-enabled');
+        
+        this.pronunciationRules = [];
         this.opdsBrowseBtn = document.getElementById('opds-browse-btn');
         this.opdsSearchContainer = document.getElementById('opds-search-container');
         this.opdsSearchType = document.getElementById('opds-search-type');
@@ -523,6 +542,18 @@ class App {
             document.getElementById('opds-source-modal-save').addEventListener('click', () => this.saveOpdsSource());
             document.getElementById('opds-source-test').addEventListener('click', () => this.testOpdsSourceConnection());
             this.opdsSourceModal.querySelector('.modal-overlay').addEventListener('click', () => this.closeOpdsSourceModal());
+        }
+
+        // Pronunciation Dictionary (in Settings tab)
+        if (this.addPronunciationRuleBtn) {
+            this.addPronunciationRuleBtn.addEventListener('click', () => this.openPronunciationRuleModal());
+        }
+        if (this.pronunciationRuleModal) {
+            this.pronunciationRuleModalClose.addEventListener('click', () => this.closePronunciationRuleModal());
+            this.pronunciationRuleModalCancel.addEventListener('click', () => this.closePronunciationRuleModal());
+            this.pronunciationRuleModalSave.addEventListener('click', () => this.savePronunciationRule());
+            this.pronunciationRuleModalDelete.addEventListener('click', () => this.deletePronunciationRule());
+            this.pronunciationRuleModal.querySelector('.modal-overlay').addEventListener('click', () => this.closePronunciationRuleModal());
         }
     }
 
@@ -1389,6 +1420,7 @@ class App {
     async openSettings() {
         await this.loadSettings();
         this.populateSettingsForm();
+        await this.loadPronunciationRules();
         this.settingsModal.classList.add('active');
     }
 
@@ -2614,6 +2646,150 @@ class App {
             this.showToast('Source deleted', 'success');
         } catch (e) {
             this.showToast('Failed to delete source: ' + e.message, 'error');
+        }
+    }
+
+    // Pronunciation Dictionary Methods
+    async loadPronunciationRules() {
+        try {
+            const response = await fetch(apiUrl('/api/pronunciation'));
+            if (!response.ok) throw new Error('Failed to load pronunciation rules');
+            this.pronunciationRules = await response.json();
+            this.renderPronunciationRules();
+        } catch (e) {
+            console.error('Failed to load pronunciation rules:', e);
+            this.showToast('Failed to load pronunciation rules', 'error');
+        }
+    }
+
+    renderPronunciationRules() {
+        if (!this.pronunciationTbody) return;
+        
+        this.pronunciationTbody.innerHTML = '';
+        
+        if (this.pronunciationRules.length === 0) {
+            this.pronunciationTbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No pronunciation rules defined</td></tr>';
+            return;
+        }
+
+        this.pronunciationRules.forEach(rule => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><code>${this.escapeHtml(rule.pattern)}</code></td>
+                <td>${this.escapeHtml(rule.replacement_plain)}</td>
+                <td>${this.escapeHtml(rule.replacement_ssml)}</td>
+                <td>${this.escapeHtml(rule.comment)}</td>
+                <td><span class="status-badge ${rule.enabled ? 'enabled' : 'disabled'}">${rule.enabled ? 'Enabled' : 'Disabled'}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-secondary" onclick="app.editPronunciationRule(${rule.id})">✏️ Edit</button>
+                </td>
+            `;
+            this.pronunciationTbody.appendChild(row);
+        });
+    }
+
+    openPronunciationRuleModal(ruleId = null) {
+        if (ruleId) {
+            const rule = this.pronunciationRules.find(r => r.id === ruleId);
+            if (!rule) return;
+            
+            this.pronunciationRuleModalTitle.textContent = 'Edit Pronunciation Rule';
+            this.pronunciationRuleEditId.value = rule.id;
+            this.pronunciationRulePattern.value = rule.pattern;
+            this.pronunciationRulePlain.value = rule.replacement_plain;
+            this.pronunciationRuleSSML.value = rule.replacement_ssml;
+            this.pronunciationRuleComment.value = rule.comment;
+            this.pronunciationRuleEnabled.checked = rule.enabled;
+            this.pronunciationRuleModalDelete.style.display = 'inline-block';
+        } else {
+            this.pronunciationRuleModalTitle.textContent = 'Add Pronunciation Rule';
+            this.pronunciationRuleEditId.value = '';
+            this.pronunciationRulePattern.value = '';
+            this.pronunciationRulePlain.value = '';
+            this.pronunciationRuleSSML.value = '';
+            this.pronunciationRuleComment.value = '';
+            this.pronunciationRuleEnabled.checked = true;
+            this.pronunciationRuleModalDelete.style.display = 'none';
+        }
+        
+        this.pronunciationRuleModal.classList.add('active');
+    }
+
+    closePronunciationRuleModal() {
+        this.pronunciationRuleModal.classList.remove('active');
+    }
+
+    editPronunciationRule(id) {
+        this.openPronunciationRuleModal(id);
+    }
+
+    async savePronunciationRule() {
+        const pattern = this.pronunciationRulePattern.value.trim();
+        const replacementPlain = this.pronunciationRulePlain.value.trim();
+        const replacementSSML = this.pronunciationRuleSSML.value.trim() || replacementPlain;
+        const comment = this.pronunciationRuleComment.value.trim();
+        const enabled = this.pronunciationRuleEnabled.checked;
+        const id = this.pronunciationRuleEditId.value;
+
+        if (!pattern || !replacementPlain) {
+            this.showToast('Pattern and plain text replacement are required', 'error');
+            return;
+        }
+
+        const ruleData = {
+            pattern,
+            replacement_plain: replacementPlain,
+            replacement_ssml: replacementSSML,
+            comment,
+            enabled
+        };
+
+        try {
+            const url = id ? apiUrl(`/api/pronunciation/${id}`) : apiUrl('/api/pronunciation');
+            const method = id ? 'PUT' : 'POST';
+            
+            const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(ruleData)
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to save rule');
+            }
+
+            await this.loadPronunciationRules();
+            this.closePronunciationRuleModal();
+            this.showToast(id ? 'Rule updated' : 'Rule created', 'success');
+        } catch (e) {
+            this.showToast('Failed to save rule: ' + e.message, 'error');
+        }
+    }
+
+    async deletePronunciationRule() {
+        const id = this.pronunciationRuleEditId.value;
+        if (!id) return;
+
+        if (!confirm('Are you sure you want to delete this pronunciation rule?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(apiUrl(`/api/pronunciation/${id}`), {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to delete rule');
+            }
+
+            await this.loadPronunciationRules();
+            this.closePronunciationRuleModal();
+            this.showToast('Rule deleted', 'success');
+        } catch (e) {
+            this.showToast('Failed to delete rule: ' + e.message, 'error');
         }
     }
 

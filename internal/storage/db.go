@@ -100,6 +100,18 @@ type Job struct {
 	CompletedAt        *time.Time       `json:"completed_at"`
 }
 
+// PronunciationRule represents a pronunciation dictionary entry
+type PronunciationRule struct {
+	ID               int64     `json:"id"`
+	Pattern          string    `json:"pattern"`
+	ReplacementPlain string    `json:"replacement_plain"`
+	ReplacementSSML  string    `json:"replacement_ssml"`
+	Comment          string    `json:"comment"`
+	Enabled          bool      `json:"enabled"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
 // NewDB creates a new database connection
 func NewDB(dbPath string) (*DB, error) {
 	// Ensure directory exists
@@ -222,6 +234,19 @@ func (db *DB) migrate() error {
 
 	CREATE INDEX IF NOT EXISTS idx_providers_enabled ON providers(enabled);
 	CREATE INDEX IF NOT EXISTS idx_providers_type ON providers(type);
+
+	CREATE TABLE IF NOT EXISTS pronunciation_dictionary (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		pattern TEXT NOT NULL,
+		replacement_plain TEXT NOT NULL,
+		replacement_ssml TEXT NOT NULL,
+		comment TEXT DEFAULT '',
+		enabled BOOLEAN DEFAULT 1,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_pronunciation_enabled ON pronunciation_dictionary(enabled);
 	`
 
 	_, err := db.conn.Exec(schema)
@@ -1458,6 +1483,11 @@ func (db *DB) InitializeDefaults() error {
 		logger.Warn("Failed to initialize TTS providers: %v", err)
 	}
 
+	// Initialize default pronunciation rules
+	if err := db.InitializeDefaultPronunciationRules(); err != nil {
+		logger.Warn("Failed to initialize pronunciation rules: %v", err)
+	}
+
 	return nil
 }
 
@@ -1492,4 +1522,269 @@ func (c *Config) ToAppConfig() map[string]interface{} {
 		"audiobookshelf_password":   c.AudiobookshelfPassword,
 		"audiobookshelf_library":    c.AudiobookshelfLibrary,
 	}
+}
+
+// GetAllPronunciationRules retrieves all pronunciation rules from the database
+func (db *DB) GetAllPronunciationRules() ([]PronunciationRule, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	rows, err := db.conn.Query(`
+		SELECT id, pattern, replacement_plain, replacement_ssml, comment, enabled, created_at, updated_at
+		FROM pronunciation_dictionary
+		ORDER BY id
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rules []PronunciationRule
+	for rows.Next() {
+		var rule PronunciationRule
+		err := rows.Scan(
+			&rule.ID,
+			&rule.Pattern,
+			&rule.ReplacementPlain,
+			&rule.ReplacementSSML,
+			&rule.Comment,
+			&rule.Enabled,
+			&rule.CreatedAt,
+			&rule.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		rules = append(rules, rule)
+	}
+
+	return rules, rows.Err()
+}
+
+// GetPronunciationRule retrieves a single pronunciation rule by ID
+func (db *DB) GetPronunciationRule(id int64) (*PronunciationRule, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	var rule PronunciationRule
+	err := db.conn.QueryRow(`
+		SELECT id, pattern, replacement_plain, replacement_ssml, comment, enabled, created_at, updated_at
+		FROM pronunciation_dictionary
+		WHERE id = ?
+	`, id).Scan(
+		&rule.ID,
+		&rule.Pattern,
+		&rule.ReplacementPlain,
+		&rule.ReplacementSSML,
+		&rule.Comment,
+		&rule.Enabled,
+		&rule.CreatedAt,
+		&rule.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &rule, nil
+}
+
+// CreatePronunciationRule creates a new pronunciation rule
+func (db *DB) CreatePronunciationRule(rule *PronunciationRule) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	result, err := db.conn.Exec(`
+		INSERT INTO pronunciation_dictionary (pattern, replacement_plain, replacement_ssml, comment, enabled, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+	`, rule.Pattern, rule.ReplacementPlain, rule.ReplacementSSML, rule.Comment, rule.Enabled)
+	if err != nil {
+		return err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+
+	rule.ID = id
+	return nil
+}
+
+// UpdatePronunciationRule updates an existing pronunciation rule
+func (db *DB) UpdatePronunciationRule(rule *PronunciationRule) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	_, err := db.conn.Exec(`
+		UPDATE pronunciation_dictionary
+		SET pattern = ?, replacement_plain = ?, replacement_ssml = ?, comment = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, rule.Pattern, rule.ReplacementPlain, rule.ReplacementSSML, rule.Comment, rule.Enabled, rule.ID)
+	return err
+}
+
+// DeletePronunciationRule deletes a pronunciation rule by ID
+func (db *DB) DeletePronunciationRule(id int64) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	_, err := db.conn.Exec("DELETE FROM pronunciation_dictionary WHERE id = ?", id)
+	return err
+}
+
+// InitializeDefaultPronunciationRules populates the dictionary with default rules if empty
+func (db *DB) InitializeDefaultPronunciationRules() error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	// Check if dictionary already has entries
+	var count int
+	err := db.conn.QueryRow("SELECT COUNT(*) FROM pronunciation_dictionary").Scan(&count)
+	if err != nil {
+		return err
+	}
+
+	if count > 0 {
+		return nil // Already initialized
+	}
+
+	logger.Info("Initializing pronunciation dictionary with default rules")
+
+	// Default pronunciation rules
+	defaults := []PronunciationRule{
+		{
+			Pattern:          `\bMr\.`,
+			ReplacementPlain: "Mister",
+			ReplacementSSML:  "Mister",
+			Comment:          "Expand Mr.",
+			Enabled:          true,
+		},
+		{
+			Pattern:          `\bMrs\.`,
+			ReplacementPlain: "Missus",
+			ReplacementSSML:  "Missus",
+			Comment:          "Expand Mrs.",
+			Enabled:          true,
+		},
+		{
+			Pattern:          `\bMs\.`,
+			ReplacementPlain: "Miss",
+			ReplacementSSML:  "Miss",
+			Comment:          "Expand Ms.",
+			Enabled:          true,
+		},
+		{
+			Pattern:          `\bDr\.`,
+			ReplacementPlain: "Doctor",
+			ReplacementSSML:  "Doctor",
+			Comment:          "Expand Dr.",
+			Enabled:          true,
+		},
+		{
+			Pattern:          `\bSt\.`,
+			ReplacementPlain: "Saint",
+			ReplacementSSML:  "Saint",
+			Comment:          "Expand St.",
+			Enabled:          true,
+		},
+		{
+			Pattern:          `\bvs\.`,
+			ReplacementPlain: "versus",
+			ReplacementSSML:  "versus",
+			Comment:          "Expand vs.",
+			Enabled:          true,
+		},
+		{
+			Pattern:          `\betc\.`,
+			ReplacementPlain: "etcetera",
+			ReplacementSSML:  "etcetera",
+			Comment:          "Expand etc.",
+			Enabled:          true,
+		},
+		{
+			Pattern:          `\be\.g\.`,
+			ReplacementPlain: "for example",
+			ReplacementSSML:  "for example",
+			Comment:          "Expand e.g.",
+			Enabled:          true,
+		},
+		{
+			Pattern:          `\bi\.e\.`,
+			ReplacementPlain: "that is",
+			ReplacementSSML:  "that is",
+			Comment:          "Expand i.e.",
+			Enabled:          true,
+		},
+		{
+			Pattern:          `\$(\d+)`,
+			ReplacementPlain: "$1 dollars",
+			ReplacementSSML:  "$1 dollars",
+			Comment:          "Dollar amounts",
+			Enabled:          true,
+		},
+		{
+			Pattern:          `(\d+)%`,
+			ReplacementPlain: "$1 percent",
+			ReplacementSSML:  "$1 percent",
+			Comment:          "Percentages",
+			Enabled:          true,
+		},
+		{
+			Pattern:          `&`,
+			ReplacementPlain: " and ",
+			ReplacementSSML:  " and ",
+			Comment:          "Ampersand",
+			Enabled:          true,
+		},
+		{
+			Pattern:          `(?i)\bCopyright\b`,
+			ReplacementPlain: "Copyright",
+			ReplacementSSML:  "Copyright",
+			Comment:          "Copyright word",
+			Enabled:          true,
+		},
+		{
+			Pattern:          `\(c\)`,
+			ReplacementPlain: "Copyright",
+			ReplacementSSML:  "Copyright",
+			Comment:          "Copyright symbol (c)",
+			Enabled:          true,
+		},
+		{
+			Pattern:          `©`,
+			ReplacementPlain: "Copyright",
+			ReplacementSSML:  "Copyright",
+			Comment:          "Copyright symbol ©",
+			Enabled:          true,
+		},
+		{
+			Pattern:          `(?i)\blinux\b`,
+			ReplacementPlain: "Linux",
+			ReplacementSSML:  "Linux",
+			Comment:          "Linux pronunciation",
+			Enabled:          true,
+		},
+		{
+			Pattern:          `(?i)\bgithub\b`,
+			ReplacementPlain: "GitHub",
+			ReplacementSSML:  "GitHub",
+			Comment:          "GitHub pronunciation",
+			Enabled:          true,
+		},
+	}
+
+	for _, rule := range defaults {
+		_, err := db.conn.Exec(`
+			INSERT INTO pronunciation_dictionary (pattern, replacement_plain, replacement_ssml, comment, enabled, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		`, rule.Pattern, rule.ReplacementPlain, rule.ReplacementSSML, rule.Comment, rule.Enabled)
+		if err != nil {
+			logger.Warn("Failed to create default pronunciation rule '%s': %v", rule.Comment, err)
+		}
+	}
+
+	return nil
 }

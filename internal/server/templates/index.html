@@ -320,6 +320,7 @@
                 <button class="tab-btn" data-tab="output">Output</button>
                 <button class="tab-btn" data-tab="audiobookshelf">Audiobookshelf</button>
                 <button class="tab-btn" data-tab="opds">OPDS Sources</button>
+                <button class="tab-btn" data-tab="dictionary">Dictionary</button>
             </div>
             <div class="settings-body">
                 <!-- General Tab -->
@@ -528,6 +529,34 @@
                         </table>
                     </div>
                 </div>
+
+                <!-- Dictionary Tab -->
+                <div class="tab-content" id="tab-dictionary">
+                    <div class="settings-section">
+                        <div class="section-header-row">
+                            <div>
+                                <h3>📖 Pronunciation Dictionary</h3>
+                                <p class="section-description">Customize pronunciation rules for TTS. Supports regex patterns and SSML markup.</p>
+                            </div>
+                            <button class="btn btn-primary" id="add-pronunciation-rule-btn">➕ Add Rule</button>
+                        </div>
+                        <table class="pronunciation-table" id="pronunciation-table">
+                            <thead>
+                                <tr>
+                                    <th>Pattern</th>
+                                    <th>Plain Text</th>
+                                    <th>SSML</th>
+                                    <th>Comment</th>
+                                    <th>Enabled</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pronunciation-tbody">
+                                <!-- Rules will be populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="settings-cancel">Cancel</button>
@@ -689,6 +718,56 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="opds-source-modal-cancel">Cancel</button>
                 <button class="btn btn-primary" id="opds-source-modal-save">💾 Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pronunciation Rule Edit Modal -->
+    <div class="modal" id="pronunciation-rule-modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-content pronunciation-rule-modal">
+            <div class="modal-header">
+                <h2 id="pronunciation-rule-modal-title">Add Pronunciation Rule</h2>
+                <button class="modal-close" id="pronunciation-rule-modal-close">×</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="pronunciation-rule-edit-id">
+                
+                <div class="form-group">
+                    <label for="pronunciation-rule-pattern">Pattern (Regex) *</label>
+                    <input type="text" id="pronunciation-rule-pattern" placeholder="\bMr\.">
+                    <small>Regular expression pattern to match</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="pronunciation-rule-plain">Replacement (Plain Text) *</label>
+                    <input type="text" id="pronunciation-rule-plain" placeholder="Mister">
+                    <small>Plain text replacement for non-SSML providers</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="pronunciation-rule-ssml">Replacement (SSML)</label>
+                    <input type="text" id="pronunciation-rule-ssml" placeholder="Mister">
+                    <small>SSML markup replacement for SSML-capable providers (optional, defaults to plain text)</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="pronunciation-rule-comment">Comment</label>
+                    <input type="text" id="pronunciation-rule-comment" placeholder="Expand Mr. abbreviation">
+                    <small>Optional description of this rule</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="pronunciation-rule-enabled" checked>
+                        Enabled
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="pronunciation-rule-modal-cancel">Cancel</button>
+                <button class="btn btn-danger" id="pronunciation-rule-modal-delete" style="display:none;">🗑️ Delete</button>
+                <button class="btn btn-primary" id="pronunciation-rule-modal-save">💾 Save</button>
             </div>
         </div>
     </div>
