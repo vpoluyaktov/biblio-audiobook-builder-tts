@@ -272,6 +272,9 @@ func (db *DB) migrate() error {
 	// Add ssml_support column if it doesn't exist (migration for existing DBs)
 	db.conn.Exec("ALTER TABLE providers ADD COLUMN ssml_support BOOLEAN DEFAULT 0")
 
+	// Add language column to pronunciation_dictionary if it doesn't exist (migration for existing DBs)
+	db.conn.Exec("ALTER TABLE pronunciation_dictionary ADD COLUMN language TEXT NOT NULL DEFAULT 'en'")
+
 	// Add max_chunk_size column if it doesn't exist (migration for existing DBs)
 	db.conn.Exec("ALTER TABLE providers ADD COLUMN max_chunk_size INTEGER DEFAULT 900")
 
