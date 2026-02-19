@@ -68,6 +68,34 @@ biblio-audiobook-builder-tts/
 
 ## Recent Changes
 
+### 2026-02-19: Fix Russian Date Normalization to Use Genitive Case
+
+**Issue**: Russian dates with month names were incorrectly using nominative case instead of genitive case:
+- Input: `27 марта 1977 года`
+- Incorrect output: `двадцать седьмое марта одна тысяча девятьсот семьдесят седьмого года`
+- Correct output: `двадцать седьмого марта одна тысяча девятьсот семьдесят седьмого года`
+
+- Input: `21 декабря 1988 года`
+- Incorrect output: `двадцать первое декабря одна тысяча девятьсот восемьдесят восьмого года`
+- Correct output: `двадцать первого декабря одна тысяча девятьсот восемьдесят восьмого года`
+
+**Root Cause**: The `DetectContext` function in `internal/normalize/russian.go` was only applying genitive case to dates when preceded by specific trigger words (like "произошла", "случилось"). However, in Russian grammar, dates with month names are **always** in genitive case, regardless of context.
+
+**Solution**: 
+- Modified `DetectContext()` to always set genitive case when a number appears before a Russian month name
+- Updated `processDateRanges()` to apply genitive case transformation for date ranges (e.g., "6-16 августа")
+- Removed conditional genitive case logic that depended on trigger words for dates with months
+
+**Behavior**:
+- Simple dates: `27 марта` → `двадцать седьмого марта` (genitive)
+- Full dates: `21 декабря 1988 года` → `двадцать первого декабря одна тысяча девятьсот восемьдесят восьмого года`
+- Date ranges: `6-16 августа` → `шестого, тире, шестнадцатого августа`
+- Dates with trigger words still work: `произошла 27 марта` → `произошла двадцать седьмого марта`
+
+**Testing**: Added comprehensive test cases for both reported bug examples and updated all existing date tests to expect genitive case. All Russian normalization tests pass.
+
+**Impact**: Fixes grammatically incorrect Russian date narration throughout all audiobook conversions.
+
 ### 2026-02-19: Fix Hyphen Normalization in Model Names
 
 **Issue**: Hyphens in model names (like DC-7, Ту-154, Боинг-747) were being treated as minus signs, resulting in incorrect normalization:
