@@ -32,6 +32,7 @@ type JobDB interface {
 	CreateJob(job *storage.Job) error
 	UpdateJob(job *storage.Job) error
 	DeleteJob(id string) error
+	GetAllPronunciationRules() ([]storage.PronunciationRule, error)
 }
 
 // Worker processes conversion jobs from the queue
@@ -69,6 +70,24 @@ func NewWorker(db JobDB, hub *Hub, ttsService tts.Service, cfg *config.Config) *
 		} else {
 			logger.Info("Loaded pronunciation dictionary from %s", cfg.PronunciationDictFile)
 		}
+	}
+
+	// Load pronunciation rules from database
+	if dbRules, err := db.GetAllPronunciationRules(); err == nil {
+		for _, rule := range dbRules {
+			if err := textSanitizer.GetDictionary().AddRuleWithSSML(
+				rule.Pattern,
+				rule.ReplacementPlain,
+				rule.ReplacementSSML,
+				rule.Language,
+				rule.Enabled,
+			); err != nil {
+				logger.Warn("Failed to add pronunciation rule from database: %v", err)
+			}
+		}
+		logger.Info("Loaded %d pronunciation rules from database", len(dbRules))
+	} else {
+		logger.Warn("Failed to load pronunciation rules from database: %v", err)
 	}
 
 	// Initialize part separator detector if enabled
