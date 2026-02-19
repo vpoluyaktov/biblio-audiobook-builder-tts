@@ -399,7 +399,11 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 
 	content := chapter.Content
 
-	// Apply number normalization if provider needs it
+	// Step 1: Apply text sanitization and pronunciation dictionary rules FIRST
+	// This ensures user-defined pronunciation rules have priority over automatic processing
+	content = w.sanitizer.Sanitize(content)
+
+	// Step 2: Apply number normalization if provider needs it
 	needsNormalization := true // Default to true for safety
 	abbreviationsEnabled := false
 	stressEnabled := false
@@ -417,6 +421,7 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		logger.Debug("Applied number normalization for provider %s (lang: %s)", job.Provider, lang)
 	}
 
+	// Step 3: Apply abbreviation normalization if enabled
 	if abbreviationsEnabled {
 		lang := job.Language
 		if lang == "" {
@@ -426,7 +431,7 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		logger.Debug("Applied abbreviation normalization for provider %s (lang: %s)", job.Provider, lang)
 	}
 
-	// Apply stress marking for Russian text if enabled for this provider
+	// Step 4: Apply stress marking for Russian text if enabled for this provider
 	if stressEnabled && w.stressClient != nil && w.stressClient.IsAvailable() {
 		lang := job.Language
 		if lang == "" {
@@ -444,9 +449,6 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 			}
 		}
 	}
-
-	// Apply text sanitization (pronunciation rules) to chapter content
-	content = w.sanitizer.Sanitize(content)
 
 	// Detect and mark part separators if enabled
 	if w.separatorDetector != nil {
