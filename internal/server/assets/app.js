@@ -356,13 +356,17 @@ class App {
         this.pronunciationRuleModalSave = document.getElementById('pronunciation-rule-modal-save');
         this.pronunciationRuleModalDelete = document.getElementById('pronunciation-rule-modal-delete');
         this.pronunciationRuleEditId = document.getElementById('pronunciation-rule-edit-id');
+        this.pronunciationRuleLanguage = document.getElementById('pronunciation-rule-language');
         this.pronunciationRulePattern = document.getElementById('pronunciation-rule-pattern');
         this.pronunciationRulePlain = document.getElementById('pronunciation-rule-plain');
         this.pronunciationRuleSSML = document.getElementById('pronunciation-rule-ssml');
         this.pronunciationRuleComment = document.getElementById('pronunciation-rule-comment');
         this.pronunciationRuleEnabled = document.getElementById('pronunciation-rule-enabled');
+        this.dictionaryLanguageFilter = document.getElementById('dictionary-language-filter');
+        this.dictionarySearchFilter = document.getElementById('dictionary-search-filter');
         
         this.pronunciationRules = [];
+        this.filteredPronunciationRules = [];
         this.opdsBrowseBtn = document.getElementById('opds-browse-btn');
         this.opdsSearchContainer = document.getElementById('opds-search-container');
         this.opdsSearchType = document.getElementById('opds-search-type');
@@ -554,6 +558,12 @@ class App {
             this.pronunciationRuleModalSave.addEventListener('click', () => this.savePronunciationRule());
             this.pronunciationRuleModalDelete.addEventListener('click', () => this.deletePronunciationRule());
             this.pronunciationRuleModal.querySelector('.modal-overlay').addEventListener('click', () => this.closePronunciationRuleModal());
+        }
+        if (this.dictionaryLanguageFilter) {
+            this.dictionaryLanguageFilter.addEventListener('change', () => this.filterPronunciationRules());
+        }
+        if (this.dictionarySearchFilter) {
+            this.dictionarySearchFilter.addEventListener('input', () => this.filterPronunciationRules());
         }
     }
 
@@ -2655,11 +2665,37 @@ class App {
             const response = await fetch(apiUrl('/api/pronunciation'));
             if (!response.ok) throw new Error('Failed to load pronunciation rules');
             this.pronunciationRules = await response.json();
-            this.renderPronunciationRules();
+            this.filterPronunciationRules();
         } catch (e) {
             console.error('Failed to load pronunciation rules:', e);
             this.showToast('Failed to load pronunciation rules', 'error');
         }
+    }
+
+    filterPronunciationRules() {
+        if (!this.pronunciationRules) return;
+        
+        const languageFilter = this.dictionaryLanguageFilter ? this.dictionaryLanguageFilter.value : '';
+        const searchFilter = this.dictionarySearchFilter ? this.dictionarySearchFilter.value.toLowerCase() : '';
+        
+        this.filteredPronunciationRules = this.pronunciationRules.filter(rule => {
+            // Language filter
+            if (languageFilter && rule.language !== languageFilter) {
+                return false;
+            }
+            
+            // Search filter
+            if (searchFilter) {
+                const searchText = `${rule.pattern} ${rule.replacement_plain} ${rule.replacement_ssml} ${rule.comment}`.toLowerCase();
+                if (!searchText.includes(searchFilter)) {
+                    return false;
+                }
+            }
+            
+            return true;
+        });
+        
+        this.renderPronunciationRules();
     }
 
     renderPronunciationRules() {
@@ -2667,34 +2703,50 @@ class App {
         
         this.pronunciationTbody.innerHTML = '';
         
-        if (this.pronunciationRules.length === 0) {
-            this.pronunciationTbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No pronunciation rules defined</td></tr>';
+        if (this.filteredPronunciationRules.length === 0) {
+            this.pronunciationTbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No pronunciation rules found</td></tr>';
             return;
         }
 
-        this.pronunciationRules.forEach(rule => {
+        this.filteredPronunciationRules.forEach(rule => {
             const row = document.createElement('tr');
+            row.dataset.ruleId = rule.id;
             row.innerHTML = `
-                <td><code>${this.escapeHtml(rule.pattern)}</code></td>
-                <td>${this.escapeHtml(rule.replacement_plain)}</td>
-                <td>${this.escapeHtml(rule.replacement_ssml)}</td>
-                <td>${this.escapeHtml(rule.comment)}</td>
-                <td><span class="status-badge ${rule.enabled ? 'enabled' : 'disabled'}">${rule.enabled ? 'Enabled' : 'Disabled'}</span></td>
+                <td class="editable" data-field="pattern"><code>${this.escapeHtml(rule.pattern)}</code></td>
+                <td class="editable" data-field="replacement_plain">${this.escapeHtml(rule.replacement_plain)}</td>
+                <td class="editable" data-field="replacement_ssml">${this.escapeHtml(rule.replacement_ssml)}</td>
+                <td class="editable" data-field="comment">${this.escapeHtml(rule.comment)}</td>
                 <td>
-                    <button class="btn btn-sm btn-secondary" onclick="app.editPronunciationRule(${rule.id})">✏️ Edit</button>
+                    <label class="toggle-switch">
+                        <input type="checkbox" ${rule.enabled ? 'checked' : ''} onchange="app.toggleRuleEnabled(${rule.id}, this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="app.deleteRuleInline(${rule.id})">🗑️</button>
                 </td>
             `;
+            
+            // Add inline editing to editable cells
+            row.querySelectorAll('.editable').forEach(cell => {
+                cell.addEventListener('click', () => this.makeEditable(cell, rule.id));
+            });
+            
             this.pronunciationTbody.appendChild(row);
         });
     }
 
     openPronunciationRuleModal(ruleId = null) {
+        // Get current language filter to pre-select for new rules
+        const currentLang = this.dictionaryLanguageFilter ? this.dictionaryLanguageFilter.value : 'en';
+        
         if (ruleId) {
             const rule = this.pronunciationRules.find(r => r.id === ruleId);
             if (!rule) return;
             
             this.pronunciationRuleModalTitle.textContent = 'Edit Pronunciation Rule';
             this.pronunciationRuleEditId.value = rule.id;
+            this.pronunciationRuleLanguage.value = rule.language || 'en';
             this.pronunciationRulePattern.value = rule.pattern;
             this.pronunciationRulePlain.value = rule.replacement_plain;
             this.pronunciationRuleSSML.value = rule.replacement_ssml;
@@ -2704,6 +2756,7 @@ class App {
         } else {
             this.pronunciationRuleModalTitle.textContent = 'Add Pronunciation Rule';
             this.pronunciationRuleEditId.value = '';
+            this.pronunciationRuleLanguage.value = currentLang || 'en';
             this.pronunciationRulePattern.value = '';
             this.pronunciationRulePlain.value = '';
             this.pronunciationRuleSSML.value = '';
@@ -2724,6 +2777,7 @@ class App {
     }
 
     async savePronunciationRule() {
+        const language = this.pronunciationRuleLanguage.value;
         const pattern = this.pronunciationRulePattern.value.trim();
         const replacementPlain = this.pronunciationRulePlain.value.trim();
         const replacementSSML = this.pronunciationRuleSSML.value.trim() || replacementPlain;
@@ -2737,6 +2791,7 @@ class App {
         }
 
         const ruleData = {
+            language,
             pattern,
             replacement_plain: replacementPlain,
             replacement_ssml: replacementSSML,
@@ -2787,6 +2842,124 @@ class App {
 
             await this.loadPronunciationRules();
             this.closePronunciationRuleModal();
+            this.showToast('Rule deleted', 'success');
+        } catch (e) {
+            this.showToast('Failed to delete rule: ' + e.message, 'error');
+        }
+    }
+
+    makeEditable(cell, ruleId) {
+        if (cell.querySelector('input')) return; // Already editing
+        
+        const field = cell.dataset.field;
+        const rule = this.pronunciationRules.find(r => r.id === ruleId);
+        if (!rule) return;
+        
+        const currentValue = rule[field] || '';
+        const isCode = field === 'pattern';
+        
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = currentValue;
+        input.style.width = '100%';
+        input.style.boxSizing = 'border-box';
+        
+        const saveEdit = async () => {
+            const newValue = input.value.trim();
+            if (newValue === currentValue) {
+                cell.innerHTML = isCode ? `<code>${this.escapeHtml(currentValue)}</code>` : this.escapeHtml(currentValue);
+                return;
+            }
+            
+            try {
+                const updatedRule = { ...rule, [field]: newValue };
+                const response = await fetch(apiUrl(`/api/pronunciation/${ruleId}`), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        language: updatedRule.language,
+                        pattern: updatedRule.pattern,
+                        replacement_plain: updatedRule.replacement_plain,
+                        replacement_ssml: updatedRule.replacement_ssml,
+                        comment: updatedRule.comment,
+                        enabled: updatedRule.enabled
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to update rule');
+                }
+                
+                await this.loadPronunciationRules();
+                this.showToast('Rule updated', 'success');
+            } catch (e) {
+                this.showToast('Failed to update: ' + e.message, 'error');
+                cell.innerHTML = isCode ? `<code>${this.escapeHtml(currentValue)}</code>` : this.escapeHtml(currentValue);
+            }
+        };
+        
+        input.addEventListener('blur', saveEdit);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                saveEdit();
+            } else if (e.key === 'Escape') {
+                cell.innerHTML = isCode ? `<code>${this.escapeHtml(currentValue)}</code>` : this.escapeHtml(currentValue);
+            }
+        });
+        
+        cell.innerHTML = '';
+        cell.appendChild(input);
+        input.focus();
+        input.select();
+    }
+
+    async toggleRuleEnabled(ruleId, enabled) {
+        try {
+            const rule = this.pronunciationRules.find(r => r.id === ruleId);
+            if (!rule) return;
+            
+            const response = await fetch(apiUrl(`/api/pronunciation/${ruleId}`), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    language: rule.language,
+                    pattern: rule.pattern,
+                    replacement_plain: rule.replacement_plain,
+                    replacement_ssml: rule.replacement_ssml,
+                    comment: rule.comment,
+                    enabled: enabled
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to toggle rule');
+            }
+            
+            await this.loadPronunciationRules();
+            this.showToast(enabled ? 'Rule enabled' : 'Rule disabled', 'success');
+        } catch (e) {
+            this.showToast('Failed to toggle rule: ' + e.message, 'error');
+            // Reload to reset the checkbox
+            await this.loadPronunciationRules();
+        }
+    }
+
+    async deleteRuleInline(ruleId) {
+        if (!confirm('Are you sure you want to delete this pronunciation rule?')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(apiUrl(`/api/pronunciation/${ruleId}`), {
+                method: 'DELETE'
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to delete rule');
+            }
+            
+            await this.loadPronunciationRules();
             this.showToast('Rule deleted', 'success');
         } catch (e) {
             this.showToast('Failed to delete rule: ' + e.message, 'error');

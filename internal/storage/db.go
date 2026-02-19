@@ -103,6 +103,7 @@ type Job struct {
 // PronunciationRule represents a pronunciation dictionary entry
 type PronunciationRule struct {
 	ID               int64     `json:"id"`
+	Language         string    `json:"language"`
 	Pattern          string    `json:"pattern"`
 	ReplacementPlain string    `json:"replacement_plain"`
 	ReplacementSSML  string    `json:"replacement_ssml"`
@@ -237,6 +238,7 @@ func (db *DB) migrate() error {
 
 	CREATE TABLE IF NOT EXISTS pronunciation_dictionary (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		language TEXT NOT NULL DEFAULT 'en',
 		pattern TEXT NOT NULL,
 		replacement_plain TEXT NOT NULL,
 		replacement_ssml TEXT NOT NULL,
@@ -247,6 +249,7 @@ func (db *DB) migrate() error {
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_pronunciation_enabled ON pronunciation_dictionary(enabled);
+	CREATE INDEX IF NOT EXISTS idx_pronunciation_language ON pronunciation_dictionary(language);
 	`
 
 	_, err := db.conn.Exec(schema)
@@ -1530,9 +1533,9 @@ func (db *DB) GetAllPronunciationRules() ([]PronunciationRule, error) {
 	defer db.mu.RUnlock()
 
 	rows, err := db.conn.Query(`
-		SELECT id, pattern, replacement_plain, replacement_ssml, comment, enabled, created_at, updated_at
+		SELECT id, language, pattern, replacement_plain, replacement_ssml, comment, enabled, created_at, updated_at
 		FROM pronunciation_dictionary
-		ORDER BY id
+		ORDER BY language, id
 	`)
 	if err != nil {
 		return nil, err
@@ -1544,6 +1547,7 @@ func (db *DB) GetAllPronunciationRules() ([]PronunciationRule, error) {
 		var rule PronunciationRule
 		err := rows.Scan(
 			&rule.ID,
+			&rule.Language,
 			&rule.Pattern,
 			&rule.ReplacementPlain,
 			&rule.ReplacementSSML,
@@ -1568,11 +1572,12 @@ func (db *DB) GetPronunciationRule(id int64) (*PronunciationRule, error) {
 
 	var rule PronunciationRule
 	err := db.conn.QueryRow(`
-		SELECT id, pattern, replacement_plain, replacement_ssml, comment, enabled, created_at, updated_at
+		SELECT id, language, pattern, replacement_plain, replacement_ssml, comment, enabled, created_at, updated_at
 		FROM pronunciation_dictionary
 		WHERE id = ?
 	`, id).Scan(
 		&rule.ID,
+		&rule.Language,
 		&rule.Pattern,
 		&rule.ReplacementPlain,
 		&rule.ReplacementSSML,
@@ -1596,10 +1601,15 @@ func (db *DB) CreatePronunciationRule(rule *PronunciationRule) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
+	// Default to English if no language specified
+	if rule.Language == "" {
+		rule.Language = "en"
+	}
+
 	result, err := db.conn.Exec(`
-		INSERT INTO pronunciation_dictionary (pattern, replacement_plain, replacement_ssml, comment, enabled, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-	`, rule.Pattern, rule.ReplacementPlain, rule.ReplacementSSML, rule.Comment, rule.Enabled)
+		INSERT INTO pronunciation_dictionary (language, pattern, replacement_plain, replacement_ssml, comment, enabled, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+	`, rule.Language, rule.Pattern, rule.ReplacementPlain, rule.ReplacementSSML, rule.Comment, rule.Enabled)
 	if err != nil {
 		return err
 	}
@@ -1620,9 +1630,9 @@ func (db *DB) UpdatePronunciationRule(rule *PronunciationRule) error {
 
 	_, err := db.conn.Exec(`
 		UPDATE pronunciation_dictionary
-		SET pattern = ?, replacement_plain = ?, replacement_ssml = ?, comment = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP
+		SET language = ?, pattern = ?, replacement_plain = ?, replacement_ssml = ?, comment = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, rule.Pattern, rule.ReplacementPlain, rule.ReplacementSSML, rule.Comment, rule.Enabled, rule.ID)
+	`, rule.Language, rule.Pattern, rule.ReplacementPlain, rule.ReplacementSSML, rule.Comment, rule.Enabled, rule.ID)
 	return err
 }
 
@@ -1656,6 +1666,7 @@ func (db *DB) InitializeDefaultPronunciationRules() error {
 	// Default pronunciation rules
 	defaults := []PronunciationRule{
 		{
+			Language:         "en",
 			Pattern:          `\bMr\.`,
 			ReplacementPlain: "Mister",
 			ReplacementSSML:  "Mister",
@@ -1663,6 +1674,7 @@ func (db *DB) InitializeDefaultPronunciationRules() error {
 			Enabled:          true,
 		},
 		{
+			Language:         "en",
 			Pattern:          `\bMrs\.`,
 			ReplacementPlain: "Missus",
 			ReplacementSSML:  "Missus",
@@ -1670,6 +1682,7 @@ func (db *DB) InitializeDefaultPronunciationRules() error {
 			Enabled:          true,
 		},
 		{
+			Language:         "en",
 			Pattern:          `\bMs\.`,
 			ReplacementPlain: "Miss",
 			ReplacementSSML:  "Miss",
@@ -1677,6 +1690,7 @@ func (db *DB) InitializeDefaultPronunciationRules() error {
 			Enabled:          true,
 		},
 		{
+			Language:         "en",
 			Pattern:          `\bDr\.`,
 			ReplacementPlain: "Doctor",
 			ReplacementSSML:  "Doctor",
@@ -1684,6 +1698,7 @@ func (db *DB) InitializeDefaultPronunciationRules() error {
 			Enabled:          true,
 		},
 		{
+			Language:         "en",
 			Pattern:          `\bSt\.`,
 			ReplacementPlain: "Saint",
 			ReplacementSSML:  "Saint",
@@ -1691,6 +1706,7 @@ func (db *DB) InitializeDefaultPronunciationRules() error {
 			Enabled:          true,
 		},
 		{
+			Language:         "en",
 			Pattern:          `\bvs\.`,
 			ReplacementPlain: "versus",
 			ReplacementSSML:  "versus",
@@ -1698,6 +1714,7 @@ func (db *DB) InitializeDefaultPronunciationRules() error {
 			Enabled:          true,
 		},
 		{
+			Language:         "en",
 			Pattern:          `\betc\.`,
 			ReplacementPlain: "etcetera",
 			ReplacementSSML:  "etcetera",
@@ -1705,6 +1722,7 @@ func (db *DB) InitializeDefaultPronunciationRules() error {
 			Enabled:          true,
 		},
 		{
+			Language:         "en",
 			Pattern:          `\be\.g\.`,
 			ReplacementPlain: "for example",
 			ReplacementSSML:  "for example",
@@ -1712,6 +1730,7 @@ func (db *DB) InitializeDefaultPronunciationRules() error {
 			Enabled:          true,
 		},
 		{
+			Language:         "en",
 			Pattern:          `\bi\.e\.`,
 			ReplacementPlain: "that is",
 			ReplacementSSML:  "that is",
@@ -1719,6 +1738,7 @@ func (db *DB) InitializeDefaultPronunciationRules() error {
 			Enabled:          true,
 		},
 		{
+			Language:         "en",
 			Pattern:          `\$(\d+)`,
 			ReplacementPlain: "$1 dollars",
 			ReplacementSSML:  "$1 dollars",
@@ -1726,6 +1746,7 @@ func (db *DB) InitializeDefaultPronunciationRules() error {
 			Enabled:          true,
 		},
 		{
+			Language:         "en",
 			Pattern:          `(\d+)%`,
 			ReplacementPlain: "$1 percent",
 			ReplacementSSML:  "$1 percent",
@@ -1733,6 +1754,7 @@ func (db *DB) InitializeDefaultPronunciationRules() error {
 			Enabled:          true,
 		},
 		{
+			Language:         "en",
 			Pattern:          `&`,
 			ReplacementPlain: " and ",
 			ReplacementSSML:  " and ",
@@ -1740,6 +1762,7 @@ func (db *DB) InitializeDefaultPronunciationRules() error {
 			Enabled:          true,
 		},
 		{
+			Language:         "en",
 			Pattern:          `(?i)\bCopyright\b`,
 			ReplacementPlain: "Copyright",
 			ReplacementSSML:  "Copyright",
@@ -1747,6 +1770,7 @@ func (db *DB) InitializeDefaultPronunciationRules() error {
 			Enabled:          true,
 		},
 		{
+			Language:         "en",
 			Pattern:          `\(c\)`,
 			ReplacementPlain: "Copyright",
 			ReplacementSSML:  "Copyright",
@@ -1754,6 +1778,7 @@ func (db *DB) InitializeDefaultPronunciationRules() error {
 			Enabled:          true,
 		},
 		{
+			Language:         "en",
 			Pattern:          `©`,
 			ReplacementPlain: "Copyright",
 			ReplacementSSML:  "Copyright",
@@ -1761,6 +1786,7 @@ func (db *DB) InitializeDefaultPronunciationRules() error {
 			Enabled:          true,
 		},
 		{
+			Language:         "en",
 			Pattern:          `(?i)\blinux\b`,
 			ReplacementPlain: "Linux",
 			ReplacementSSML:  "Linux",
@@ -1768,6 +1794,7 @@ func (db *DB) InitializeDefaultPronunciationRules() error {
 			Enabled:          true,
 		},
 		{
+			Language:         "en",
 			Pattern:          `(?i)\bgithub\b`,
 			ReplacementPlain: "GitHub",
 			ReplacementSSML:  "GitHub",
@@ -1778,9 +1805,9 @@ func (db *DB) InitializeDefaultPronunciationRules() error {
 
 	for _, rule := range defaults {
 		_, err := db.conn.Exec(`
-			INSERT INTO pronunciation_dictionary (pattern, replacement_plain, replacement_ssml, comment, enabled, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-		`, rule.Pattern, rule.ReplacementPlain, rule.ReplacementSSML, rule.Comment, rule.Enabled)
+			INSERT INTO pronunciation_dictionary (language, pattern, replacement_plain, replacement_ssml, comment, enabled, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		`, rule.Language, rule.Pattern, rule.ReplacementPlain, rule.ReplacementSSML, rule.Comment, rule.Enabled)
 		if err != nil {
 			logger.Warn("Failed to create default pronunciation rule '%s': %v", rule.Comment, err)
 		}

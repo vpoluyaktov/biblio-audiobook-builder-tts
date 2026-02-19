@@ -12,6 +12,7 @@ import (
 
 // PronunciationRuleRequest represents the request body for creating/updating a pronunciation rule
 type PronunciationRuleRequest struct {
+	Language         string `json:"language"`
 	Pattern          string `json:"pattern"`
 	ReplacementPlain string `json:"replacement_plain"`
 	ReplacementSSML  string `json:"replacement_ssml"`
@@ -108,15 +109,21 @@ func (s *Server) createPronunciationRule(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Default to English if no language specified
+	if req.Language == "" {
+		req.Language = "en"
+	}
+
 	// If SSML replacement is empty, use plain replacement
 	if req.ReplacementSSML == "" {
 		req.ReplacementSSML = req.ReplacementPlain
 	}
 
 	rule := &storage.PronunciationRule{
+		Language:         req.Language,
 		Pattern:          req.Pattern,
-		ReplacementPlain: req.ReplacementPlain,
-		ReplacementSSML:  req.ReplacementSSML,
+		ReplacementPlain: strings.ToLower(req.ReplacementPlain),
+		ReplacementSSML:  strings.ToLower(req.ReplacementSSML),
 		Comment:          req.Comment,
 		Enabled:          req.Enabled,
 	}
@@ -149,6 +156,11 @@ func (s *Server) updatePronunciationRule(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
+	// Default to English if no language specified
+	if req.Language == "" {
+		req.Language = "en"
+	}
+
 	// If SSML replacement is empty, use plain replacement
 	if req.ReplacementSSML == "" {
 		req.ReplacementSSML = req.ReplacementPlain
@@ -156,9 +168,10 @@ func (s *Server) updatePronunciationRule(w http.ResponseWriter, r *http.Request,
 
 	rule := &storage.PronunciationRule{
 		ID:               id,
+		Language:         req.Language,
 		Pattern:          req.Pattern,
-		ReplacementPlain: req.ReplacementPlain,
-		ReplacementSSML:  req.ReplacementSSML,
+		ReplacementPlain: strings.ToLower(req.ReplacementPlain),
+		ReplacementSSML:  strings.ToLower(req.ReplacementSSML),
 		Comment:          req.Comment,
 		Enabled:          req.Enabled,
 	}

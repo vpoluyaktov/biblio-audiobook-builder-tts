@@ -8,6 +8,7 @@
         window.APP_BASE_PATH = "{{.BasePath}}";
     </script>
     <link rel="stylesheet" href="{{.BasePath}}/assets/style.css">
+    <link rel="stylesheet" href="{{.BasePath}}/assets/style_pronunciation.css">
 </head>
 <body>
     <div class="container">
@@ -536,19 +537,33 @@
                         <div class="section-header-row">
                             <div>
                                 <h3>📖 Pronunciation Dictionary</h3>
-                                <p class="section-description">Customize pronunciation rules for TTS. Supports regex patterns and SSML markup.</p>
+                                <p class="section-description">Customize pronunciation rules for TTS. Supports regex patterns and SSML markup. Click on cells to edit.</p>
                             </div>
                             <button class="btn btn-primary" id="add-pronunciation-rule-btn">➕ Add Rule</button>
+                        </div>
+                        <div class="dictionary-filters">
+                            <div class="form-group" style="display: inline-block; margin-right: 1rem;">
+                                <label for="dictionary-language-filter">Language:</label>
+                                <select id="dictionary-language-filter" style="width: auto; display: inline-block; margin-left: 0.5rem;">
+                                    <option value="">All Languages</option>
+                                    <option value="en">English (en)</option>
+                                    <option value="ru">Russian (ru)</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="display: inline-block;">
+                                <label for="dictionary-search-filter">Search:</label>
+                                <input type="text" id="dictionary-search-filter" placeholder="Filter by pattern, replacement, or comment..." style="width: 300px; display: inline-block; margin-left: 0.5rem;">
+                            </div>
                         </div>
                         <table class="pronunciation-table" id="pronunciation-table">
                             <thead>
                                 <tr>
-                                    <th>Pattern</th>
-                                    <th>Plain Text</th>
-                                    <th>SSML</th>
-                                    <th>Comment</th>
-                                    <th>Enabled</th>
-                                    <th>Actions</th>
+                                    <th style="width: 15%;">Pattern</th>
+                                    <th style="width: 15%;">Plain Text</th>
+                                    <th style="width: 15%;">SSML</th>
+                                    <th style="width: 30%;">Comment</th>
+                                    <th style="width: 10%;">Enabled</th>
+                                    <th style="width: 15%;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="pronunciation-tbody">
@@ -733,6 +748,15 @@
             <div class="modal-body">
                 <input type="hidden" id="pronunciation-rule-edit-id">
                 
+                <div class="form-group">
+                    <label for="pronunciation-rule-language">Language *</label>
+                    <select id="pronunciation-rule-language">
+                        <option value="en">English (en)</option>
+                        <option value="ru">Russian (ru)</option>
+                    </select>
+                    <small>Language for this pronunciation rule</small>
+                </div>
+
                 <div class="form-group">
                     <label for="pronunciation-rule-pattern">Pattern (Regex) *</label>
                     <input type="text" id="pronunciation-rule-pattern" placeholder="\bMr\.">

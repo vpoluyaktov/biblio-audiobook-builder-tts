@@ -399,9 +399,16 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 
 	content := chapter.Content
 
+	// Get language for language-specific processing
+	lang := job.Language
+	if lang == "" {
+		lang = "en" // Fallback to English if not set
+	}
+
 	// Step 1: Apply text sanitization and pronunciation dictionary rules FIRST
 	// This ensures user-defined pronunciation rules have priority over automatic processing
-	content = w.sanitizer.Sanitize(content)
+	// Apply only rules for the book's language
+	content = w.sanitizer.SanitizeWithLanguage(content, lang)
 
 	// Step 2: Apply number normalization if provider needs it
 	needsNormalization := true // Default to true for safety
@@ -468,10 +475,6 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 	// Check if chapter has speakable content for the target language
 	// Generate silent audio for chapters that have no content the TTS engine can process
 	// (e.g., "Illustration." for Russian TTS) to maintain chapter alignment in the audiobook
-	lang := job.Language
-	if lang == "" {
-		lang = "en"
-	}
 	if !sanitize.HasSpeakableContentForLanguage(content, lang) {
 		logger.Info("Chapter %d (%s) has no speakable content for language '%s' - generating 1 second of silence", index+1, chapter.Title, lang)
 
