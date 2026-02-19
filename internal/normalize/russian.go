@@ -1026,6 +1026,12 @@ func (p *RussianProcessor) DetectContext(wordBefore, wordAfter string, nounDB *N
 				ctx.Gender = Masculine
 				ctx.Case = Genitive
 				return ctx, true
+			} else if lowerWord == "году" {
+				// Year prepositional: "В 1996 году" → ordinal masculine prepositional
+				ctx.Form = Ordinal
+				ctx.Gender = Masculine
+				ctx.Case = Prepositional
+				return ctx, true
 			}
 
 			// Default for quantities: cardinal

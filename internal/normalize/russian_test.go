@@ -901,6 +901,11 @@ func TestRussianDateFormat(t *testing.T) {
 			input:    "1996 год",
 			expected: "одна тысяча девятьсот девяносто шестой год",
 		},
+		{
+			name:     "year prepositional",
+			input:    "В 1876 году",
+			expected: "В одна тысяча восемьсот семьдесят шестом году",
+		},
 	}
 
 	for _, tt := range tests {

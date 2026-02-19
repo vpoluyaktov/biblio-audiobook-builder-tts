@@ -68,6 +68,31 @@ biblio-audiobook-builder-tts/
 
 ## Recent Changes
 
+### 2026-02-18: Fix Russian Year Normalization in Prepositional Case
+
+**Issue**: Russian year normalization was incorrect when years appeared before "году" (prepositional case). Example:
+- Input: `В 1876 году`
+- Incorrect output: `В одна тысяча восемьсот семьдесят шесть году`
+- Correct output: `В одна тысяча восемьсот семьдесят шестом году`
+
+**Root Cause**: The noun database and context detection logic did not recognize "году" (prepositional case of "год") as a trigger for prepositional case ordinal numbers. The system only handled "год" (nominative) and "года" (genitive).
+
+**Solution**: 
+- Added "году" entry to Russian noun database (`internal/normalize/data/ru.csv`)
+- Extended `DetectContext()` in `internal/normalize/russian.go` to detect "году" and set prepositional case
+- Existing `transformToPrepositional()` function already handled the correct transformation (шестой → шестом)
+
+**Testing**: Added test case to verify correct prepositional case transformation for years:
+```go
+{
+    name:     "year prepositional",
+    input:    "В 1876 году",
+    expected: "В одна тысяча восемьсот семьдесят шестом году",
+}
+```
+
+**Impact**: Fixes grammatically incorrect Russian year narration in prepositional case contexts (e.g., "В ... году", "На ... году").
+
 ### 2026-02-18: Cover Extraction via Unified Parser Library
 
 **Cover extraction now handled by unified parser library:**
