@@ -2870,7 +2870,12 @@ class App {
                 cell.innerHTML = isCode ? `<code>${this.escapeHtml(currentValue)}</code>` : this.escapeHtml(currentValue);
                 return;
             }
-            
+
+            // Remove blur listener before any async work to prevent a second
+            // saveEdit() call: loadPronunciationRules() clears the tbody via
+            // innerHTML='', which fires a synchronous blur on the detached input.
+            input.removeEventListener('blur', saveEdit);
+
             try {
                 const updatedRule = { ...rule, [field]: newValue };
                 const response = await fetch(apiUrl(`/api/pronunciation/${ruleId}`), {
@@ -2885,16 +2890,24 @@ class App {
                         enabled: updatedRule.enabled
                     })
                 });
-                
+
                 if (!response.ok) {
                     throw new Error('Failed to update rule');
                 }
-                
-                await this.loadPronunciationRules();
+
                 this.showToast('Rule updated', 'success');
             } catch (e) {
                 this.showToast('Failed to update: ' + e.message, 'error');
                 cell.innerHTML = isCode ? `<code>${this.escapeHtml(currentValue)}</code>` : this.escapeHtml(currentValue);
+                return;
+            }
+
+            // Reload the table after a confirmed successful save. Errors here
+            // are non-fatal — the data is already persisted.
+            try {
+                await this.loadPronunciationRules();
+            } catch (e) {
+                console.warn('Pronunciation rules reload failed after save:', e);
             }
         };
         
