@@ -72,23 +72,8 @@ func NewWorker(db JobDB, hub *Hub, ttsService tts.Service, cfg *config.Config) *
 		}
 	}
 
-	// Load pronunciation rules from database
-	if dbRules, err := db.GetAllPronunciationRules(); err == nil {
-		for _, rule := range dbRules {
-			if err := textSanitizer.GetDictionary().AddRuleWithSSML(
-				rule.Pattern,
-				rule.ReplacementPlain,
-				rule.ReplacementSSML,
-				rule.Language,
-				rule.Enabled,
-			); err != nil {
-				logger.Warn("Failed to add pronunciation rule from database: %v", err)
-			}
-		}
-		logger.Info("Loaded %d pronunciation rules from database", len(dbRules))
-	} else {
-		logger.Warn("Failed to load pronunciation rules from database: %v", err)
-	}
+	// Note: Database pronunciation rules are loaded per-chapter to allow
+	// real-time updates without service restart
 
 	// Initialize part separator detector if enabled
 	var separatorDetector *normalize.PartSeparatorDetector
@@ -134,6 +119,48 @@ func (w *Worker) Stop() {
 	w.cancel()
 	w.wg.Wait()
 	log.Println("Job worker stopped")
+}
+
+// loadPronunciationRulesFromDB reloads pronunciation rules from database
+func (w *Worker) loadPronunciationRulesFromDB() error {
+	// Get all pronunciation rules from database
+	dbRules, err := w.db.GetAllPronunciationRules()
+	if err != nil {
+		return fmt.Errorf("failed to get pronunciation rules: %w", err)
+	}
+
+	// Clear existing database rules (keep default and file-based rules)
+	// We need to reload only the database rules, so we'll clear all and reload everything
+	dict := w.sanitizer.GetDictionary()
+	dict.Clear()
+
+	// Reload default rules if enabled
+	if w.cfg.UseDefaultPronunciation {
+		w.sanitizer.LoadDefaultRules()
+	}
+
+	// Reload file-based rules if specified
+	if w.cfg.PronunciationDictFile != "" {
+		if err := dict.LoadFromFile(w.cfg.PronunciationDictFile); err != nil {
+			logger.Warn("Failed to reload pronunciation dictionary from file: %v", err)
+		}
+	}
+
+	// Load database rules
+	for _, rule := range dbRules {
+		if err := dict.AddRuleWithSSML(
+			rule.Pattern,
+			rule.ReplacementPlain,
+			rule.ReplacementSSML,
+			rule.Language,
+			rule.Enabled,
+		); err != nil {
+			logger.Warn("Failed to add pronunciation rule from database: %v", err)
+		}
+	}
+
+	logger.Debug("Reloaded %d pronunciation rules from database", len(dbRules))
+	return nil
 }
 
 // processLoop continuously checks for and processes pending jobs
@@ -422,6 +449,11 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 	lang := job.Language
 	if lang == "" {
 		lang = "en" // Fallback to English if not set
+	}
+
+	// Reload pronunciation rules from database to get latest changes
+	if err := w.loadPronunciationRulesFromDB(); err != nil {
+		logger.Warn("Failed to reload pronunciation rules from database: %v", err)
 	}
 
 	// Step 1: Apply text sanitization and pronunciation dictionary rules FIRST
