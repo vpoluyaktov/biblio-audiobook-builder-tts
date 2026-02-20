@@ -525,12 +525,18 @@ func (s *TextSanitizer) Sanitize(text string) string {
 
 // SanitizeWithLanguage applies TTS sanitization and language-specific pronunciation rules
 func (s *TextSanitizer) SanitizeWithLanguage(text string, language string) string {
+	return s.SanitizeWithOptions(text, language, false)
+}
+
+// SanitizeWithOptions applies TTS sanitization and language-specific pronunciation rules
+// with optional SSML replacement support
+func (s *TextSanitizer) SanitizeWithOptions(text string, language string, useSSML bool) string {
 	// First apply TTS sanitization (Unicode normalization)
 	result := TextForTTS(text)
 
 	// Then apply pronunciation dictionary rules for the specified language
 	if s.dictionary != nil && s.dictionary.RuleCount() > 0 {
-		result = s.dictionary.ApplyWithLanguage(result, false, language)
+		result = s.dictionary.ApplyWithLanguage(result, useSSML, language)
 	}
 
 	return result
