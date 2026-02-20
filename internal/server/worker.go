@@ -456,20 +456,24 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		logger.Warn("Failed to reload pronunciation rules from database: %v", err)
 	}
 
-	// Step 1: Apply text sanitization and pronunciation dictionary rules FIRST
-	// This ensures user-defined pronunciation rules have priority over automatic processing
-	// Apply only rules for the book's language
-	content = w.sanitizer.SanitizeWithLanguage(content, lang)
-
-	// Step 2: Apply number normalization if provider needs it
+	// Get provider info BEFORE applying pronunciation rules to determine SSML support
 	needsNormalization := true // Default to true for safety
 	abbreviationsEnabled := false
 	stressEnabled := false
+	useSSML := false
 	if providerInfo := w.ttsService.GetProviderInfo(job.Provider); providerInfo != nil {
 		needsNormalization = providerInfo.NormalizeNumbers
 		abbreviationsEnabled = providerInfo.NormalizeAbbreviations
 		stressEnabled = providerInfo.StressEnabled
+		useSSML = providerInfo.SSMLSupport
 	}
+
+	// Step 1: Apply text sanitization and pronunciation dictionary rules FIRST
+	// This ensures user-defined pronunciation rules have priority over automatic processing
+	// Apply only rules for the book's language, using SSML replacements if provider supports it
+	content = w.sanitizer.SanitizeWithOptions(content, lang, useSSML)
+
+	// Step 2: Apply number normalization if provider needs it
 	if needsNormalization {
 		lang := job.Language
 		if lang == "" {
