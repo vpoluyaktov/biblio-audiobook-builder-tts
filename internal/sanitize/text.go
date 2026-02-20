@@ -295,9 +295,12 @@ func TextForTTS(text string) string {
 
 // PronunciationRule represents a single pronunciation replacement rule
 type PronunciationRule struct {
-	Pattern     *regexp.Regexp
-	Replacement string
-	Comment     string
+	Pattern          *regexp.Regexp
+	ReplacementPlain string
+	ReplacementSSML  string
+	Language         string
+	Comment          string
+	Enabled          bool
 }
 
 // PronunciationDictionary manages text replacements for TTS
@@ -312,26 +315,60 @@ func NewPronunciationDictionary() *PronunciationDictionary {
 	}
 }
 
-// AddRule adds a pronunciation rule
+// AddRule adds a pronunciation rule with plain text replacement
 func (d *PronunciationDictionary) AddRule(pattern, replacement string) error {
+	return d.AddRuleWithSSML(pattern, replacement, replacement, "en", true)
+}
+
+// AddRuleWithSSML adds a pronunciation rule with separate plain and SSML replacements
+func (d *PronunciationDictionary) AddRuleWithSSML(pattern, replacementPlain, replacementSSML, language string, enabled bool) error {
 	re, err := regexp.Compile(pattern)
 	if err != nil {
 		return err
 	}
 
+	// Default to English if no language specified
+	if language == "" {
+		language = "en"
+	}
+
 	d.rules = append(d.rules, PronunciationRule{
-		Pattern:     re,
-		Replacement: replacement,
+		Pattern:          re,
+		ReplacementPlain: strings.ToLower(replacementPlain),
+		ReplacementSSML:  strings.ToLower(replacementSSML),
+		Language:         language,
+		Enabled:          enabled,
 	})
 
 	return nil
 }
 
-// Apply applies all pronunciation rules to the text
+// Apply applies all enabled pronunciation rules to the text (uses plain text replacements)
 func (d *PronunciationDictionary) Apply(text string) string {
+	return d.ApplyWithMode(text, false)
+}
+
+// ApplyWithMode applies all enabled pronunciation rules with SSML support option
+func (d *PronunciationDictionary) ApplyWithMode(text string, useSSML bool) string {
+	return d.ApplyWithLanguage(text, useSSML, "")
+}
+
+// ApplyWithLanguage applies enabled pronunciation rules for a specific language
+func (d *PronunciationDictionary) ApplyWithLanguage(text string, useSSML bool, language string) string {
 	result := text
 	for _, rule := range d.rules {
-		result = rule.Pattern.ReplaceAllString(result, rule.Replacement)
+		if !rule.Enabled {
+			continue
+		}
+		// If language is specified, only apply rules for that language
+		if language != "" && rule.Language != language {
+			continue
+		}
+		replacement := rule.ReplacementPlain
+		if useSSML && rule.ReplacementSSML != "" {
+			replacement = rule.ReplacementSSML
+		}
+		result = rule.Pattern.ReplaceAllString(result, replacement)
 	}
 	return result
 }
@@ -410,48 +447,52 @@ func (d *PronunciationDictionary) parseLine(line string) (PronunciationRule, err
 	}
 
 	rule.Pattern = re
-	rule.Replacement = replacement
+	rule.ReplacementPlain = replacement
+	rule.ReplacementSSML = replacement
+	rule.Enabled = true
 
 	return rule, nil
 }
 
 // GetDefaultRules returns common pronunciation fixes
 func GetDefaultRules() []struct {
-	Pattern     string
-	Replacement string
-	Comment     string
+	Pattern          string
+	ReplacementPlain string
+	ReplacementSSML  string
+	Comment          string
 } {
 	return []struct {
-		Pattern     string
-		Replacement string
-		Comment     string
+		Pattern          string
+		ReplacementPlain string
+		ReplacementSSML  string
+		Comment          string
 	}{
 		// Common abbreviations
-		{`\bMr\.`, "Mister", "Expand Mr."},
-		{`\bMrs\.`, "Missus", "Expand Mrs."},
-		{`\bDr\.`, "Doctor", "Expand Dr."},
-		{`\bSt\.`, "Saint", "Expand St."},
-		{`\bvs\.`, "versus", "Expand vs."},
-		{`\betc\.`, "etcetera", "Expand etc."},
-		{`\be\.g\.`, "for example", "Expand e.g."},
-		{`\bi\.e\.`, "that is", "Expand i.e."},
+		{`\bMr\.`, "Mister", "Mister", "Expand Mr."},
+		{`\bMrs\.`, "Missus", "Missus", "Expand Mrs."},
+		{`\bDr\.`, "Doctor", "Doctor", "Expand Dr."},
+		{`\bSt\.`, "Saint", "Saint", "Expand St."},
+		{`\bvs\.`, "versus", "versus", "Expand vs."},
+		{`\betc\.`, "etcetera", "etcetera", "Expand etc."},
+		{`\be\.g\.`, "for example", "for example", "Expand e.g."},
+		{`\bi\.e\.`, "that is", "that is", "Expand i.e."},
 
 		// Numbers and symbols
-		{`\$(\d+)`, "$1 dollars", "Dollar amounts"},
-		{`(\d+)%`, "$1 percent", "Percentages"},
-		{`&`, " and ", "Ampersand"},
+		{`\$(\d+)`, "$1 dollars", "$1 dollars", "Dollar amounts"},
+		{`(\d+)%`, "$1 percent", "$1 percent", "Percentages"},
+		{`&`, " and ", " and ", "Ampersand"},
 
 		// Copyright symbols
-		{`(?i)\bCopyright\b`, "Copyright", "Copyright word"},
-		{`\(c\)`, "Copyright", "Copyright symbol (c)"},
-		{`©`, "Copyright", "Copyright symbol ©"},
+		{`(?i)\bCopyright\b`, "Copyright", "Copyright", "Copyright word"},
+		{`\(c\)`, "Copyright", "Copyright", "Copyright symbol (c)"},
+		{`©`, "Copyright", "Copyright", "Copyright symbol ©"},
 
 		// Common mispronunciations
-		{`(?i)\blinux\b`, "Linux", "Linux pronunciation"},
-		{`(?i)\bgithub\b`, "GitHub", "GitHub pronunciation"},
+		{`(?i)\blinux\b`, "Linux", "Linux", "Linux pronunciation"},
+		{`(?i)\bgithub\b`, "GitHub", "GitHub", "GitHub pronunciation"},
 
 		// Clean up multiple spaces (preserve newlines for paragraph breaks)
-		{`[ \t]+`, " ", "Normalize horizontal whitespace"},
+		{`[ \t]+`, " ", " ", "Normalize horizontal whitespace"},
 	}
 }
 
@@ -479,12 +520,17 @@ func (s *TextSanitizer) GetDictionary() *PronunciationDictionary {
 
 // Sanitize applies both TTS sanitization and pronunciation rules
 func (s *TextSanitizer) Sanitize(text string) string {
+	return s.SanitizeWithLanguage(text, "")
+}
+
+// SanitizeWithLanguage applies TTS sanitization and language-specific pronunciation rules
+func (s *TextSanitizer) SanitizeWithLanguage(text string, language string) string {
 	// First apply TTS sanitization (Unicode normalization)
 	result := TextForTTS(text)
 
-	// Then apply pronunciation dictionary rules
+	// Then apply pronunciation dictionary rules for the specified language
 	if s.dictionary != nil && s.dictionary.RuleCount() > 0 {
-		result = s.dictionary.Apply(result)
+		result = s.dictionary.ApplyWithLanguage(result, false, language)
 	}
 
 	return result
@@ -493,6 +539,6 @@ func (s *TextSanitizer) Sanitize(text string) string {
 // LoadDefaultRules loads the default pronunciation rules into the dictionary
 func (s *TextSanitizer) LoadDefaultRules() {
 	for _, rule := range GetDefaultRules() {
-		s.dictionary.AddRule(rule.Pattern, rule.Replacement)
+		s.dictionary.AddRuleWithSSML(rule.Pattern, rule.ReplacementPlain, rule.ReplacementSSML, "en", true)
 	}
 }

@@ -246,6 +246,65 @@ TTS synthesis failed: '^'
 
 ---
 
+### 2026-02-19: Database-Backed Custom Pronunciation Dictionary
+
+**Feature**: User-editable pronunciation dictionary stored in database with SSML support.
+
+**Motivation**: Users need to customize pronunciation for specific words, names, or phrases that TTS engines mispronounce. The previous file-based approach required manual file editing and didn't support SSML markup for advanced pronunciation control.
+
+**Implementation**:
+- **Database Schema**: New `pronunciation_dictionary` table with fields:
+  - `id` (INTEGER PRIMARY KEY)
+  - `pattern` (TEXT) - Regex pattern to match
+  - `replacement_plain` (TEXT) - Plain text replacement
+  - `replacement_ssml` (TEXT) - SSML markup replacement (for providers with SSML support)
+  - `comment` (TEXT) - User notes about the rule
+  - `enabled` (BOOLEAN) - Toggle rule on/off
+  - `created_at`, `updated_at` (DATETIME)
+
+- **Storage Layer**: CRUD operations in `internal/storage/db.go`:
+  - `GetAllPronunciationRules()` - Retrieve all dictionary entries
+  - `GetPronunciationRule(id)` - Get single entry
+  - `CreatePronunciationRule()` - Add new entry
+  - `UpdatePronunciationRule()` - Modify existing entry
+  - `DeletePronunciationRule(id)` - Remove entry
+  - `InitializeDefaultPronunciationRules()` - Populate with defaults on first run
+
+- **Text Processing**: Updated `internal/sanitize/text.go`:
+  - `PronunciationDictionary` now loads from database
+  - Supports both plain text and SSML replacements
+  - Applies rules based on provider's SSML support capability
+  - Respects `enabled` flag for each rule
+
+- **API Endpoints**: New handlers in `internal/server/`:
+  - `GET /api/pronunciation` - List all rules
+  - `POST /api/pronunciation` - Create new rule
+  - `PUT /api/pronunciation/:id` - Update rule
+  - `DELETE /api/pronunciation/:id` - Delete rule
+
+- **UI**: New "Dictionary" tab in Settings page:
+  - Table view of all pronunciation rules
+  - Add/Edit/Delete functionality
+  - Enable/Disable toggle for each rule
+  - Separate columns for plain and SSML replacements
+  - Comment field for documentation
+
+**Benefits**:
+- No manual file editing required
+- SSML support for advanced pronunciation control
+- Easy enable/disable of rules without deletion
+- Persistent storage across application restarts
+- Pre-populated with common pronunciation fixes
+- Per-provider optimization (SSML vs plain text)
+
+**Default Rules**: System initializes with common fixes:
+- Abbreviations (Mr., Mrs., Dr., etc.)
+- Currency symbols ($, %, etc.)
+- Common technical terms (Linux, GitHub, etc.)
+- Copyright symbols
+
+---
+
 ### Future Enhancements
 
 - Deeper observability of conversion pipeline stages

@@ -32,6 +32,7 @@ type JobDB interface {
 	CreateJob(job *storage.Job) error
 	UpdateJob(job *storage.Job) error
 	DeleteJob(id string) error
+	GetAllPronunciationRules() ([]storage.PronunciationRule, error)
 }
 
 // Worker processes conversion jobs from the queue
@@ -70,6 +71,9 @@ func NewWorker(db JobDB, hub *Hub, ttsService tts.Service, cfg *config.Config) *
 			logger.Info("Loaded pronunciation dictionary from %s", cfg.PronunciationDictFile)
 		}
 	}
+
+	// Note: Database pronunciation rules are loaded per-chapter to allow
+	// real-time updates without service restart
 
 	// Initialize part separator detector if enabled
 	var separatorDetector *normalize.PartSeparatorDetector
@@ -115,6 +119,48 @@ func (w *Worker) Stop() {
 	w.cancel()
 	w.wg.Wait()
 	log.Println("Job worker stopped")
+}
+
+// loadPronunciationRulesFromDB reloads pronunciation rules from database
+func (w *Worker) loadPronunciationRulesFromDB() error {
+	// Get all pronunciation rules from database
+	dbRules, err := w.db.GetAllPronunciationRules()
+	if err != nil {
+		return fmt.Errorf("failed to get pronunciation rules: %w", err)
+	}
+
+	// Clear existing database rules (keep default and file-based rules)
+	// We need to reload only the database rules, so we'll clear all and reload everything
+	dict := w.sanitizer.GetDictionary()
+	dict.Clear()
+
+	// Reload default rules if enabled
+	if w.cfg.UseDefaultPronunciation {
+		w.sanitizer.LoadDefaultRules()
+	}
+
+	// Reload file-based rules if specified
+	if w.cfg.PronunciationDictFile != "" {
+		if err := dict.LoadFromFile(w.cfg.PronunciationDictFile); err != nil {
+			logger.Warn("Failed to reload pronunciation dictionary from file: %v", err)
+		}
+	}
+
+	// Load database rules
+	for _, rule := range dbRules {
+		if err := dict.AddRuleWithSSML(
+			rule.Pattern,
+			rule.ReplacementPlain,
+			rule.ReplacementSSML,
+			rule.Language,
+			rule.Enabled,
+		); err != nil {
+			logger.Warn("Failed to add pronunciation rule from database: %v", err)
+		}
+	}
+
+	logger.Debug("Reloaded %d pronunciation rules from database", len(dbRules))
+	return nil
 }
 
 // processLoop continuously checks for and processes pending jobs
@@ -399,7 +445,23 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 
 	content := chapter.Content
 
-	// Apply number normalization if provider needs it
+	// Get language for language-specific processing
+	lang := job.Language
+	if lang == "" {
+		lang = "en" // Fallback to English if not set
+	}
+
+	// Reload pronunciation rules from database to get latest changes
+	if err := w.loadPronunciationRulesFromDB(); err != nil {
+		logger.Warn("Failed to reload pronunciation rules from database: %v", err)
+	}
+
+	// Step 1: Apply text sanitization and pronunciation dictionary rules FIRST
+	// This ensures user-defined pronunciation rules have priority over automatic processing
+	// Apply only rules for the book's language
+	content = w.sanitizer.SanitizeWithLanguage(content, lang)
+
+	// Step 2: Apply number normalization if provider needs it
 	needsNormalization := true // Default to true for safety
 	abbreviationsEnabled := false
 	stressEnabled := false
@@ -417,6 +479,7 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		logger.Debug("Applied number normalization for provider %s (lang: %s)", job.Provider, lang)
 	}
 
+	// Step 3: Apply abbreviation normalization if enabled
 	if abbreviationsEnabled {
 		lang := job.Language
 		if lang == "" {
@@ -426,7 +489,7 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		logger.Debug("Applied abbreviation normalization for provider %s (lang: %s)", job.Provider, lang)
 	}
 
-	// Apply stress marking for Russian text if enabled for this provider
+	// Step 4: Apply stress marking for Russian text if enabled for this provider
 	if stressEnabled && w.stressClient != nil && w.stressClient.IsAvailable() {
 		lang := job.Language
 		if lang == "" {
@@ -444,9 +507,6 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 			}
 		}
 	}
-
-	// Apply text sanitization (pronunciation rules) to chapter content
-	content = w.sanitizer.Sanitize(content)
 
 	// Detect and mark part separators if enabled
 	if w.separatorDetector != nil {
@@ -466,10 +526,6 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 	// Check if chapter has speakable content for the target language
 	// Generate silent audio for chapters that have no content the TTS engine can process
 	// (e.g., "Illustration." for Russian TTS) to maintain chapter alignment in the audiobook
-	lang := job.Language
-	if lang == "" {
-		lang = "en"
-	}
 	if !sanitize.HasSpeakableContentForLanguage(content, lang) {
 		logger.Info("Chapter %d (%s) has no speakable content for language '%s' - generating 1 second of silence", index+1, chapter.Title, lang)
 

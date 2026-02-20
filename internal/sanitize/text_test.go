@@ -389,7 +389,7 @@ func TestGetDefaultRules(t *testing.T) {
 
 	for _, rule := range rules {
 		dict := NewPronunciationDictionary()
-		err := dict.AddRule(rule.Pattern, rule.Replacement)
+		err := dict.AddRuleWithSSML(rule.Pattern, rule.ReplacementPlain, rule.ReplacementSSML, "en", true)
 		if err != nil {
 			t.Errorf("Default rule pattern %q failed to compile: %v", rule.Pattern, err)
 		}
