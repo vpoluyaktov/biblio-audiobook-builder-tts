@@ -68,6 +68,68 @@ biblio-audiobook-builder-tts/
 
 ## Recent Changes
 
+### 2026-02-20: Latin Letter Pronunciation in Russian Text
+
+**Feature**: Automatic conversion of Latin letters and abbreviations to Russian pronunciation when they appear in Russian text.
+
+**Motivation**: Russian TTS engines struggle with Latin letters and abbreviations (like "FBI", "USB", "DC-19") embedded in Russian text. These need to be converted to their Russian phonetic equivalents for proper narration.
+
+**Implementation**:
+- **Core Module**: New `internal/sanitize/latin_ru.go` with `LatinToRussianConverter`
+- **Context Detection**: Intelligent detection of Russian vs English text context using Cyrillic character ratio analysis
+- **Pattern Matching**: Regex-based detection of Latin abbreviations, including:
+  - Simple abbreviations: `FBI` → `эф би ай`
+  - Hyphenated models: `DC-19` → `ди си 19`, `L-3` → `эл 3`
+  - Complex patterns: `DC-19-A` → `ди си 19-эй`
+  - Number+letter: `5G` → `5 джи`, `4G` → `4 джи`
+  - Mixed case: `WiFi` → `дабл ю ай эф ай`, `GHz` → `джи эйч зет`
+
+**CSV Data**: 
+- Created `internal/sanitize/data/latin_ru.csv` with comprehensive Latin letter pronunciations
+- Includes common technology abbreviations (USB, HDMI, CPU, GPU, etc.)
+- Includes organizations (NASA, FBI, CIA, NATO, etc.)
+- Includes business/medical/scientific terms (CEO, PhD, DNA, RNA, etc.)
+
+**Context Detection Logic**:
+- Analyzes 50-character window around each abbreviation
+- Converts if Cyrillic characters present and either:
+  - More Cyrillic than Latin characters, OR
+  - Cyrillic represents at least 20% of total letters
+- Prevents false conversions in English text with occasional Russian words
+
+**Examples**:
+```
+Input:  "Агентство FBI использует технологию AI"
+Output: "Агентство эф би ай использует технологию эй ай"
+
+Input:  "Самолет DC-10 совершил посадку"
+Output: "Самолет ди си 10 совершил посадку"
+
+Input:  "Подключите USB устройство"
+Output: "Подключите ю эс би устройство"
+
+Input:  "Процессор CPU работает на частоте 3 GHz"
+Output: "Процессор си пи ю работает на частоте 3 джи эйч зет"
+```
+
+**Testing**: Comprehensive test suite with 50+ test cases covering:
+- Simple abbreviations (2-3 letters)
+- Single letters (A, B, C)
+- Hyphenated patterns (DC-19, L-3, DC-19-A)
+- Number+letter patterns (5G, 4G)
+- Mixed case (WiFi, PhD, HTML, CSS)
+- Context detection (Russian vs English text)
+- Edge cases (punctuation, newlines, special characters)
+- Real-world examples (technical docs, news articles, aviation, medical, IT)
+
+**Benefits**:
+- Proper Russian narration of technical terms and abbreviations
+- Automatic handling without manual text preprocessing
+- Context-aware to avoid false conversions in English text
+- Extensible via CSV data files for new abbreviations
+
+---
+
 ### 2026-02-19: Fix Russian Date Normalization to Use Genitive Case
 
 **Issue**: Russian dates with month names were incorrectly using nominative case instead of genitive case:
