@@ -1,0 +1,28 @@
+# Russian pronunciation dictionary
+# Format: pattern,replacement_plain,replacement_ssml,comment
+# pattern: regex pattern to match
+# replacement_plain: plain text replacement (for non-SSML providers)
+# replacement_ssml: SSML markup replacement (for SSML-capable providers)
+# comment: description of the rule
+#
+# Common abbreviations
+\bг-н,господин,господин,Expand г-н (мистер)
+\bг-жа,госпожа,госпожа,Expand г-жа (миссис)
+\bдр\.,доктор,доктор,Expand др. (доктор)
+\bпроф\.,профессор,профессор,Expand проф. (профессор)
+\bт\.д\.,так далее,так далее,Expand т.д.
+\bт\.п\.,тому подобное,тому подобное,Expand т.п.
+\bт\.е\.,то есть,то есть,Expand т.е.
+\bнапр\.,например,например,Expand напр.
+#
+# Numbers and symbols
+(\d+)%,$1 процентов,$1 процентов,Percentages
+&, и , и ,Ampersand
+#
+# Copyright symbols
+(?i)\bCopyright\b,Копирайт,Копирайт,Copyright word
+\(c\),Копирайт,Копирайт,Copyright symbol (c)
+©,Копирайт,Копирайт,Copyright symbol ©
+#
+# Clean up multiple spaces (preserve newlines for paragraph breaks)
+[ \t]+, , ,Normalize horizontal whitespace
