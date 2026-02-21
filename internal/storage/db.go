@@ -224,7 +224,7 @@ func (db *DB) migrate() error {
 		tts_workers INTEGER DEFAULT 3,
 		max_chunk_size INTEGER DEFAULT 900,
 		normalize_numbers BOOLEAN DEFAULT 1,
-		transliterate_latin_to_russian BOOLEAN DEFAULT 0,
+		transliteration BOOLEAN DEFAULT 0,
 		ssml_support BOOLEAN DEFAULT 0,
 		stress_enabled BOOLEAN DEFAULT 0,
 		sample_rate INTEGER DEFAULT 48000,
@@ -294,8 +294,8 @@ func (db *DB) migrate() error {
 	// Add stress_enabled column if it doesn't exist (migration for existing DBs)
 	db.conn.Exec("ALTER TABLE providers ADD COLUMN stress_enabled BOOLEAN DEFAULT 0")
 
-	// Add transliterate_latin_to_russian column if it doesn't exist (migration for existing DBs)
-	db.conn.Exec("ALTER TABLE providers ADD COLUMN transliterate_latin_to_russian BOOLEAN DEFAULT 0")
+	// Add transliteration column if it doesn't exist (migration for existing DBs)
+	db.conn.Exec("ALTER TABLE providers ADD COLUMN transliteration BOOLEAN DEFAULT 0")
 
 	return nil
 }
@@ -1062,7 +1062,7 @@ type TTSProvider struct {
 	TTSWorkers                  int       `json:"tts_workers"`
 	MaxChunkSize                int       `json:"max_chunk_size"` // Maximum characters per TTS request
 	NormalizeNumbers            bool      `json:"normalize_numbers"`
-	TransliterateLatinToRussian bool      `json:"transliterate_latin_to_russian"` // Enable Latin-to-Russian letter transliteration
+	Transliteration bool      `json:"transliteration"` // Enable Latin-to-Russian letter transliteration
 	SSMLSupport                 bool      `json:"ssml_support"`
 	StressEnabled               bool      `json:"stress_enabled"` // Enable Russian stress marking via stress server
 	SampleRate                  int       `json:"sample_rate"`    // Output sample rate in Hz (e.g., 48000, 44100, 24000)
@@ -1078,7 +1078,7 @@ func (db *DB) CreateProvider(provider *TTSProvider) error {
 	defer db.mu.Unlock()
 
 	_, err := db.conn.Exec(`
-		INSERT INTO providers (id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, transliterate_latin_to_russian, ssml_support, stress_enabled, sample_rate, is_default, display_order, created_at, updated_at)
+		INSERT INTO providers (id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, transliteration, ssml_support, stress_enabled, sample_rate, is_default, display_order, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			name = excluded.name,
@@ -1090,7 +1090,7 @@ func (db *DB) CreateProvider(provider *TTSProvider) error {
 			tts_workers = excluded.tts_workers,
 			max_chunk_size = excluded.max_chunk_size,
 			normalize_numbers = excluded.normalize_numbers,
-			transliterate_latin_to_russian = excluded.transliterate_latin_to_russian,
+			transliteration = excluded.transliteration,
 			ssml_support = excluded.ssml_support,
 			stress_enabled = excluded.stress_enabled,
 			sample_rate = excluded.sample_rate,
@@ -1098,7 +1098,7 @@ func (db *DB) CreateProvider(provider *TTSProvider) error {
 			display_order = excluded.display_order,
 			updated_at = excluded.updated_at
 	`, provider.ID, provider.Name, provider.Type, provider.Enabled, provider.URL, provider.APIKey, provider.Region,
-		provider.TTSWorkers, provider.MaxChunkSize, provider.NormalizeNumbers, provider.TransliterateLatinToRussian, provider.SSMLSupport, provider.StressEnabled, provider.SampleRate, provider.IsDefault, provider.DisplayOrder,
+		provider.TTSWorkers, provider.MaxChunkSize, provider.NormalizeNumbers, provider.Transliteration, provider.SSMLSupport, provider.StressEnabled, provider.SampleRate, provider.IsDefault, provider.DisplayOrder,
 		provider.CreatedAt, provider.UpdatedAt)
 
 	return err
@@ -1111,10 +1111,10 @@ func (db *DB) UpdateProvider(provider *TTSProvider) error {
 
 	_, err := db.conn.Exec(`
 		UPDATE providers SET name = ?, type = ?, enabled = ?, url = ?, api_key = ?, region = ?, tts_workers = ?,
-			max_chunk_size = ?, normalize_numbers = ?, transliterate_latin_to_russian = ?, ssml_support = ?, stress_enabled = ?, sample_rate = ?, is_default = ?, display_order = ?, updated_at = ?
+			max_chunk_size = ?, normalize_numbers = ?, transliteration = ?, ssml_support = ?, stress_enabled = ?, sample_rate = ?, is_default = ?, display_order = ?, updated_at = ?
 		WHERE id = ?
 	`, provider.Name, provider.Type, provider.Enabled, provider.URL, provider.APIKey, provider.Region, provider.TTSWorkers,
-		provider.MaxChunkSize, provider.NormalizeNumbers, provider.TransliterateLatinToRussian, provider.SSMLSupport, provider.StressEnabled, provider.SampleRate, provider.IsDefault, provider.DisplayOrder, time.Now(), provider.ID)
+		provider.MaxChunkSize, provider.NormalizeNumbers, provider.Transliteration, provider.SSMLSupport, provider.StressEnabled, provider.SampleRate, provider.IsDefault, provider.DisplayOrder, time.Now(), provider.ID)
 
 	return err
 }
@@ -1126,10 +1126,10 @@ func (db *DB) GetProvider(id string) (*TTSProvider, error) {
 
 	provider := &TTSProvider{}
 	err := db.conn.QueryRow(`
-		SELECT id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, transliterate_latin_to_russian, ssml_support, stress_enabled, sample_rate, is_default, display_order, created_at, updated_at
+		SELECT id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, transliteration, ssml_support, stress_enabled, sample_rate, is_default, display_order, created_at, updated_at
 		FROM providers WHERE id = ?
 	`, id).Scan(&provider.ID, &provider.Name, &provider.Type, &provider.Enabled, &provider.URL, &provider.APIKey, &provider.Region,
-		&provider.TTSWorkers, &provider.MaxChunkSize, &provider.NormalizeNumbers, &provider.TransliterateLatinToRussian, &provider.SSMLSupport, &provider.StressEnabled, &provider.SampleRate, &provider.IsDefault, &provider.DisplayOrder,
+		&provider.TTSWorkers, &provider.MaxChunkSize, &provider.NormalizeNumbers, &provider.Transliteration, &provider.SSMLSupport, &provider.StressEnabled, &provider.SampleRate, &provider.IsDefault, &provider.DisplayOrder,
 		&provider.CreatedAt, &provider.UpdatedAt)
 
 	if err == sql.ErrNoRows {
@@ -1147,7 +1147,7 @@ func (db *DB) ListProviders(enabledOnly bool) ([]*TTSProvider, error) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 
-	query := `SELECT id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, transliterate_latin_to_russian, ssml_support, stress_enabled, sample_rate, is_default, display_order, created_at, updated_at FROM providers`
+	query := `SELECT id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, transliteration, ssml_support, stress_enabled, sample_rate, is_default, display_order, created_at, updated_at FROM providers`
 	if enabledOnly {
 		query += " WHERE enabled = 1"
 	}
@@ -1163,7 +1163,7 @@ func (db *DB) ListProviders(enabledOnly bool) ([]*TTSProvider, error) {
 	for rows.Next() {
 		provider := &TTSProvider{}
 		err := rows.Scan(&provider.ID, &provider.Name, &provider.Type, &provider.Enabled, &provider.URL, &provider.APIKey, &provider.Region,
-			&provider.TTSWorkers, &provider.MaxChunkSize, &provider.NormalizeNumbers, &provider.TransliterateLatinToRussian, &provider.SSMLSupport, &provider.StressEnabled, &provider.SampleRate, &provider.IsDefault, &provider.DisplayOrder,
+			&provider.TTSWorkers, &provider.MaxChunkSize, &provider.NormalizeNumbers, &provider.Transliteration, &provider.SSMLSupport, &provider.StressEnabled, &provider.SampleRate, &provider.IsDefault, &provider.DisplayOrder,
 			&provider.CreatedAt, &provider.UpdatedAt)
 		if err != nil {
 			return nil, err
@@ -1214,10 +1214,10 @@ func (db *DB) GetDefaultProvider() (*TTSProvider, error) {
 
 	provider := &TTSProvider{}
 	err := db.conn.QueryRow(`
-		SELECT id, name, type, enabled, url, api_key, region, tts_workers, normalize_numbers, transliterate_latin_to_russian, ssml_support, is_default, display_order, created_at, updated_at
+		SELECT id, name, type, enabled, url, api_key, region, tts_workers, normalize_numbers, transliteration, ssml_support, is_default, display_order, created_at, updated_at
 		FROM providers WHERE is_default = 1 LIMIT 1
 	`).Scan(&provider.ID, &provider.Name, &provider.Type, &provider.Enabled, &provider.URL, &provider.APIKey, &provider.Region,
-		&provider.TTSWorkers, &provider.NormalizeNumbers, &provider.TransliterateLatinToRussian, &provider.SSMLSupport, &provider.IsDefault, &provider.DisplayOrder,
+		&provider.TTSWorkers, &provider.NormalizeNumbers, &provider.Transliteration, &provider.SSMLSupport, &provider.IsDefault, &provider.DisplayOrder,
 		&provider.CreatedAt, &provider.UpdatedAt)
 
 	if err == sql.ErrNoRows {
@@ -1256,7 +1256,7 @@ func (db *DB) InitializeDefaultProviders() error {
 			TTSWorkers:             3,
 			MaxChunkSize:           5000,
 			NormalizeNumbers:       true,
-			TransliterateLatinToRussian: false,
+			Transliteration: false,
 			SSMLSupport:            false,
 			IsDefault:              true,
 			DisplayOrder:           0,
@@ -1274,7 +1274,7 @@ func (db *DB) InitializeDefaultProviders() error {
 			TTSWorkers:             3,
 			MaxChunkSize:           4000,
 			NormalizeNumbers:       false,
-			TransliterateLatinToRussian: false,
+			Transliteration: false,
 			SSMLSupport:            true,
 			IsDefault:              false,
 			DisplayOrder:           1,
@@ -1292,7 +1292,7 @@ func (db *DB) InitializeDefaultProviders() error {
 			TTSWorkers:             3,
 			MaxChunkSize:           4000,
 			NormalizeNumbers:       false,
-			TransliterateLatinToRussian: false,
+			Transliteration: false,
 			SSMLSupport:            false,
 			IsDefault:              false,
 			DisplayOrder:           2,
@@ -1310,7 +1310,7 @@ func (db *DB) InitializeDefaultProviders() error {
 			TTSWorkers:             3,
 			MaxChunkSize:           4000,
 			NormalizeNumbers:       false,
-			TransliterateLatinToRussian: false,
+			Transliteration: false,
 			SSMLSupport:            true,
 			IsDefault:              false,
 			DisplayOrder:           3,
@@ -1328,7 +1328,7 @@ func (db *DB) InitializeDefaultProviders() error {
 			TTSWorkers:             3,
 			MaxChunkSize:           2000,
 			NormalizeNumbers:       true,
-			TransliterateLatinToRussian: false,
+			Transliteration: false,
 			SSMLSupport:            false,
 			IsDefault:              false,
 			DisplayOrder:           4,
@@ -1346,7 +1346,7 @@ func (db *DB) InitializeDefaultProviders() error {
 			TTSWorkers:             3,
 			MaxChunkSize:           2000,
 			NormalizeNumbers:       true,
-			TransliterateLatinToRussian: false,
+			Transliteration: false,
 			SSMLSupport:            true,
 			IsDefault:              false,
 			DisplayOrder:           5,
@@ -1364,7 +1364,7 @@ func (db *DB) InitializeDefaultProviders() error {
 			TTSWorkers:             3,
 			MaxChunkSize:           900,
 			NormalizeNumbers:       true,
-			TransliterateLatinToRussian: false,
+			Transliteration: false,
 			SSMLSupport:            true,
 			IsDefault:              false,
 			DisplayOrder:           6,
@@ -1382,7 +1382,7 @@ func (db *DB) InitializeDefaultProviders() error {
 			TTSWorkers:             3,
 			MaxChunkSize:           2000,
 			NormalizeNumbers:       true,
-			TransliterateLatinToRussian: false,
+			Transliteration: false,
 			SSMLSupport:            false,
 			IsDefault:              false,
 			DisplayOrder:           7,

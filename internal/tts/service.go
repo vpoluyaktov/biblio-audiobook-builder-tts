@@ -33,7 +33,7 @@ type ProviderInfo struct {
 	Available                   bool   `json:"available"`
 	TTSWorkers                  int    `json:"tts_workers"`
 	NormalizeNumbers            bool   `json:"normalize_numbers"`
-	TransliterateLatinToRussian bool   `json:"transliterate_latin_to_russian"`
+	Transliteration bool   `json:"transliteration"`
 	SSMLSupport                 bool   `json:"ssml_support"`
 	StressEnabled               bool   `json:"stress_enabled"`
 	IsDefault                   bool   `json:"is_default"`
@@ -320,7 +320,7 @@ func (s *service) GetProviderInfo(providerID string) *ProviderInfo {
 		info.Enabled = dbProv.Enabled
 		info.TTSWorkers = dbProv.TTSWorkers
 		info.NormalizeNumbers = dbProv.NormalizeNumbers
-		info.TransliterateLatinToRussian = dbProv.TransliterateLatinToRussian
+		info.Transliteration = dbProv.Transliteration
 		info.SSMLSupport = dbProv.SSMLSupport
 		info.StressEnabled = dbProv.StressEnabled
 		info.IsDefault = dbProv.IsDefault
@@ -354,7 +354,7 @@ func (s *service) GetAllProviderInfos() []*ProviderInfo {
 					Enabled:                dbProv.Enabled,
 					TTSWorkers:             dbProv.TTSWorkers,
 					NormalizeNumbers:       dbProv.NormalizeNumbers,
-					TransliterateLatinToRussian: dbProv.TransliterateLatinToRussian,
+					Transliteration: dbProv.Transliteration,
 					SSMLSupport:            dbProv.SSMLSupport,
 					StressEnabled:          dbProv.StressEnabled,
 					IsDefault:              dbProv.IsDefault,

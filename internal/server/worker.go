@@ -458,12 +458,12 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 
 	// Get provider info BEFORE applying pronunciation rules to determine SSML support
 	needsNormalization := true // Default to true for safety
-	latinTransliterationEnabled := false
+	transliterationEnabled := false
 	stressEnabled := false
 	useSSML := false
 	if providerInfo := w.ttsService.GetProviderInfo(job.Provider); providerInfo != nil {
 		needsNormalization = providerInfo.NormalizeNumbers
-		latinTransliterationEnabled = providerInfo.TransliterateLatinToRussian
+		transliterationEnabled = providerInfo.Transliteration
 		stressEnabled = providerInfo.StressEnabled
 		useSSML = providerInfo.SSMLSupport
 	}
@@ -474,7 +474,7 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 	content = w.sanitizer.SanitizeWithOptions(content, lang, useSSML)
 
 	// Step 2: Apply Latin-to-Russian transliteration if enabled (for Russian text only)
-	if latinTransliterationEnabled && lang == "ru" {
+	if transliterationEnabled && lang == "ru" {
 		content = w.sanitizer.ConvertLatinToRussian(content)
 		logger.Debug("Applied Latin-to-Russian transliteration for provider %s", job.Provider)
 	}

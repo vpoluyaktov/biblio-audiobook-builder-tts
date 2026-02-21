@@ -770,7 +770,7 @@ type ProviderResponse struct {
 	IsDefault                   bool   `json:"is_default"`
 	TTSWorkers                  int    `json:"tts_workers"`
 	NormalizeNumbers            bool   `json:"normalize_numbers"`
-	TransliterateLatinToRussian bool   `json:"transliterate_latin_to_russian"`
+	Transliteration bool   `json:"transliteration"`
 	SSMLSupport                 bool   `json:"ssml_support"`
 	StressEnabled               bool   `json:"stress_enabled"`
 	VoiceCount                  int    `json:"voice_count"`
@@ -820,7 +820,7 @@ func (s *Server) handleProviders(w http.ResponseWriter, r *http.Request) {
 					IsDefault:              dbProv.IsDefault,
 					TTSWorkers:             dbProv.TTSWorkers,
 					NormalizeNumbers:       dbProv.NormalizeNumbers,
-					TransliterateLatinToRussian: dbProv.TransliterateLatinToRussian,
+					Transliteration: dbProv.Transliteration,
 					SSMLSupport:            dbProv.SSMLSupport,
 					StressEnabled:          dbProv.StressEnabled,
 					VoiceCount:             voiceCount,
@@ -954,7 +954,7 @@ func (s *Server) getProvider(w http.ResponseWriter, _ *http.Request, id string) 
 		IsDefault:              dbProv.IsDefault,
 		TTSWorkers:             dbProv.TTSWorkers,
 		NormalizeNumbers:       dbProv.NormalizeNumbers,
-		TransliterateLatinToRussian: dbProv.TransliterateLatinToRussian,
+		Transliteration: dbProv.Transliteration,
 		SSMLSupport:            dbProv.SSMLSupport,
 		StressEnabled:          dbProv.StressEnabled,
 		VoiceCount:             voiceCount,
@@ -975,7 +975,7 @@ type ProviderUpdateRequest struct {
 	TTSWorkers                  *int    `json:"tts_workers,omitempty"`
 	MaxChunkSize                *int    `json:"max_chunk_size,omitempty"`
 	NormalizeNumbers            *bool   `json:"normalize_numbers,omitempty"`
-	TransliterateLatinToRussian *bool   `json:"transliterate_latin_to_russian,omitempty"`
+	Transliteration *bool   `json:"transliteration,omitempty"`
 	SSMLSupport                 *bool   `json:"ssml_support,omitempty"`
 	StressEnabled               *bool   `json:"stress_enabled,omitempty"`
 	IsDefault                   *bool   `json:"is_default,omitempty"`
@@ -1026,8 +1026,8 @@ func (s *Server) updateProvider(w http.ResponseWriter, r *http.Request, id strin
 	if req.NormalizeNumbers != nil {
 		dbProv.NormalizeNumbers = *req.NormalizeNumbers
 	}
-	if req.TransliterateLatinToRussian != nil {
-		dbProv.TransliterateLatinToRussian = *req.TransliterateLatinToRussian
+	if req.Transliteration != nil {
+		dbProv.Transliteration = *req.Transliteration
 	}
 	if req.SSMLSupport != nil {
 		dbProv.SSMLSupport = *req.SSMLSupport
