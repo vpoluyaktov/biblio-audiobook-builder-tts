@@ -2,6 +2,7 @@ package storage
 
 import (
 	"biblio-audiobook-builder-tts/internal/logger"
+	"biblio-audiobook-builder-tts/internal/sanitize"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -1661,149 +1662,52 @@ func (db *DB) InitializeDefaultPronunciationRules() error {
 		return nil // Already initialized
 	}
 
-	logger.Info("Initializing pronunciation dictionary with default rules")
+	logger.Info("Initializing pronunciation dictionary with default rules from CSV data")
 
-	// Default pronunciation rules
-	defaults := []PronunciationRule{
-		{
-			Language:         "en",
-			Pattern:          `\bMr\.`,
-			ReplacementPlain: "Mister",
-			ReplacementSSML:  "Mister",
-			Comment:          "Expand Mr.",
-			Enabled:          true,
-		},
-		{
-			Language:         "en",
-			Pattern:          `\bMrs\.`,
-			ReplacementPlain: "Missus",
-			ReplacementSSML:  "Missus",
-			Comment:          "Expand Mrs.",
-			Enabled:          true,
-		},
-		{
-			Language:         "en",
-			Pattern:          `\bMs\.`,
-			ReplacementPlain: "Miss",
-			ReplacementSSML:  "Miss",
-			Comment:          "Expand Ms.",
-			Enabled:          true,
-		},
-		{
-			Language:         "en",
-			Pattern:          `\bDr\.`,
-			ReplacementPlain: "Doctor",
-			ReplacementSSML:  "Doctor",
-			Comment:          "Expand Dr.",
-			Enabled:          true,
-		},
-		{
-			Language:         "en",
-			Pattern:          `\bSt\.`,
-			ReplacementPlain: "Saint",
-			ReplacementSSML:  "Saint",
-			Comment:          "Expand St.",
-			Enabled:          true,
-		},
-		{
-			Language:         "en",
-			Pattern:          `\bvs\.`,
-			ReplacementPlain: "versus",
-			ReplacementSSML:  "versus",
-			Comment:          "Expand vs.",
-			Enabled:          true,
-		},
-		{
-			Language:         "en",
-			Pattern:          `\betc\.`,
-			ReplacementPlain: "etcetera",
-			ReplacementSSML:  "etcetera",
-			Comment:          "Expand etc.",
-			Enabled:          true,
-		},
-		{
-			Language:         "en",
-			Pattern:          `\be\.g\.`,
-			ReplacementPlain: "for example",
-			ReplacementSSML:  "for example",
-			Comment:          "Expand e.g.",
-			Enabled:          true,
-		},
-		{
-			Language:         "en",
-			Pattern:          `\bi\.e\.`,
-			ReplacementPlain: "that is",
-			ReplacementSSML:  "that is",
-			Comment:          "Expand i.e.",
-			Enabled:          true,
-		},
-		{
-			Language:         "en",
-			Pattern:          `\$(\d+)`,
-			ReplacementPlain: "$1 dollars",
-			ReplacementSSML:  "$1 dollars",
-			Comment:          "Dollar amounts",
-			Enabled:          true,
-		},
-		{
-			Language:         "en",
-			Pattern:          `(\d+)%`,
-			ReplacementPlain: "$1 percent",
-			ReplacementSSML:  "$1 percent",
-			Comment:          "Percentages",
-			Enabled:          true,
-		},
-		{
-			Language:         "en",
-			Pattern:          `&`,
-			ReplacementPlain: " and ",
-			ReplacementSSML:  " and ",
-			Comment:          "Ampersand",
-			Enabled:          true,
-		},
-		{
-			Language:         "en",
-			Pattern:          `(?i)\bCopyright\b`,
-			ReplacementPlain: "Copyright",
-			ReplacementSSML:  "Copyright",
-			Comment:          "Copyright word",
-			Enabled:          true,
-		},
-		{
-			Language:         "en",
-			Pattern:          `\(c\)`,
-			ReplacementPlain: "Copyright",
-			ReplacementSSML:  "Copyright",
-			Comment:          "Copyright symbol (c)",
-			Enabled:          true,
-		},
-		{
-			Language:         "en",
-			Pattern:          `©`,
-			ReplacementPlain: "Copyright",
-			ReplacementSSML:  "Copyright",
-			Comment:          "Copyright symbol ©",
-			Enabled:          true,
-		},
-		{
-			Language:         "en",
-			Pattern:          `(?i)\blinux\b`,
-			ReplacementPlain: "Linux",
-			ReplacementSSML:  "Linux",
-			Comment:          "Linux pronunciation",
-			Enabled:          true,
-		},
-		{
-			Language:         "en",
-			Pattern:          `(?i)\bgithub\b`,
-			ReplacementPlain: "GitHub",
-			ReplacementSSML:  "GitHub",
-			Comment:          "GitHub pronunciation",
-			Enabled:          true,
-		},
+	// Load default pronunciation rules from embedded CSV files
+	csvEntries, err := sanitize.LoadDefaultRulesFromCSV()
+	if err != nil {
+		logger.Warn("Failed to load default pronunciation rules from CSV: %v", err)
+		return err
 	}
 
-	for _, rule := range defaults {
+	// Detect language from CSV entries (en.csv → "en", ru.csv → "ru")
+	// For now, we'll infer language from the content or use a simple heuristic
+	// English rules are loaded first, then Russian
+	languageMap := make(map[string]string)
+	enCount := 0
+	ruCount := 0
+
+	for _, entry := range csvEntries {
+		var language string
+
+		// Simple heuristic: if replacement contains Cyrillic, it's Russian
+		if containsCyrillic(entry.ReplacementPlain) || containsCyrillic(entry.ReplacementSSML) {
+			language = "ru"
+			ruCount++
+		} else {
+			language = "en"
+			enCount++
+		}
+
+		languageMap[entry.Pattern] = language
+	}
+
+	logger.Info("Loaded %d English and %d Russian pronunciation rules from CSV", enCount, ruCount)
+
+	// Convert CSV entries to PronunciationRule structs
+	for _, entry := range csvEntries {
+		language := languageMap[entry.Pattern]
+
+		rule := PronunciationRule{
+			Language:         language,
+			Pattern:          entry.Pattern,
+			ReplacementPlain: entry.ReplacementPlain,
+			ReplacementSSML:  entry.ReplacementSSML,
+			Comment:          entry.Comment,
+			Enabled:          true,
+		}
+
 		_, err := db.conn.Exec(`
 			INSERT INTO pronunciation_dictionary (language, pattern, replacement_plain, replacement_ssml, comment, enabled, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -1814,4 +1718,58 @@ func (db *DB) InitializeDefaultPronunciationRules() error {
 	}
 
 	return nil
+}
+
+// containsCyrillic checks if a string contains Cyrillic characters
+func containsCyrillic(s string) bool {
+	for _, r := range s {
+		if (r >= 0x0400 && r <= 0x04FF) || (r >= 0x0500 && r <= 0x052F) {
+			return true
+		}
+	}
+	return false
+}
+
+// Deprecated: GetDefaultRules is no longer used. Default rules are now loaded from CSV files.
+// This function is kept for backward compatibility but returns an empty slice.
+func GetDefaultRules() []struct {
+	Pattern          string
+	ReplacementPlain string
+	ReplacementSSML  string
+	Comment          string
+} {
+	// Load from CSV instead
+	csvEntries, err := sanitize.LoadDefaultRulesFromCSV()
+	if err != nil {
+		return []struct {
+			Pattern          string
+			ReplacementPlain string
+			ReplacementSSML  string
+			Comment          string
+		}{}
+	}
+
+	// Convert to old format for compatibility
+	result := make([]struct {
+		Pattern          string
+		ReplacementPlain string
+		ReplacementSSML  string
+		Comment          string
+	}, len(csvEntries))
+
+	for i, entry := range csvEntries {
+		result[i] = struct {
+			Pattern          string
+			ReplacementPlain string
+			ReplacementSSML  string
+			Comment          string
+		}{
+			Pattern:          entry.Pattern,
+			ReplacementPlain: entry.ReplacementPlain,
+			ReplacementSSML:  entry.ReplacementSSML,
+			Comment:          entry.Comment,
+		}
+	}
+
+	return result
 }

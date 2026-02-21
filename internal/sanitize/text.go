@@ -334,8 +334,8 @@ func (d *PronunciationDictionary) AddRuleWithSSML(pattern, replacementPlain, rep
 
 	d.rules = append(d.rules, PronunciationRule{
 		Pattern:          re,
-		ReplacementPlain: strings.ToLower(replacementPlain),
-		ReplacementSSML:  strings.ToLower(replacementSSML),
+		ReplacementPlain: replacementPlain,
+		ReplacementSSML:  replacementSSML,
 		Language:         language,
 		Enabled:          enabled,
 	})
@@ -454,46 +454,50 @@ func (d *PronunciationDictionary) parseLine(line string) (PronunciationRule, err
 	return rule, nil
 }
 
-// GetDefaultRules returns common pronunciation fixes
+// GetDefaultRules returns common pronunciation fixes loaded from CSV files
+// Deprecated: This function is kept for backward compatibility.
+// New code should use LoadDefaultRulesFromCSV() directly.
 func GetDefaultRules() []struct {
 	Pattern          string
 	ReplacementPlain string
 	ReplacementSSML  string
 	Comment          string
 } {
-	return []struct {
+	// Load from CSV files
+	csvEntries, err := LoadDefaultRulesFromCSV()
+	if err != nil {
+		// Return empty slice on error
+		return []struct {
+			Pattern          string
+			ReplacementPlain string
+			ReplacementSSML  string
+			Comment          string
+		}{}
+	}
+
+	// Convert to old format for compatibility
+	result := make([]struct {
 		Pattern          string
 		ReplacementPlain string
 		ReplacementSSML  string
 		Comment          string
-	}{
-		// Common abbreviations
-		{`\bMr\.`, "Mister", "Mister", "Expand Mr."},
-		{`\bMrs\.`, "Missus", "Missus", "Expand Mrs."},
-		{`\bDr\.`, "Doctor", "Doctor", "Expand Dr."},
-		{`\bSt\.`, "Saint", "Saint", "Expand St."},
-		{`\bvs\.`, "versus", "versus", "Expand vs."},
-		{`\betc\.`, "etcetera", "etcetera", "Expand etc."},
-		{`\be\.g\.`, "for example", "for example", "Expand e.g."},
-		{`\bi\.e\.`, "that is", "that is", "Expand i.e."},
+	}, len(csvEntries))
 
-		// Numbers and symbols
-		{`\$(\d+)`, "$1 dollars", "$1 dollars", "Dollar amounts"},
-		{`(\d+)%`, "$1 percent", "$1 percent", "Percentages"},
-		{`&`, " and ", " and ", "Ampersand"},
-
-		// Copyright symbols
-		{`(?i)\bCopyright\b`, "Copyright", "Copyright", "Copyright word"},
-		{`\(c\)`, "Copyright", "Copyright", "Copyright symbol (c)"},
-		{`©`, "Copyright", "Copyright", "Copyright symbol ©"},
-
-		// Common mispronunciations
-		{`(?i)\blinux\b`, "Linux", "Linux", "Linux pronunciation"},
-		{`(?i)\bgithub\b`, "GitHub", "GitHub", "GitHub pronunciation"},
-
-		// Clean up multiple spaces (preserve newlines for paragraph breaks)
-		{`[ \t]+`, " ", " ", "Normalize horizontal whitespace"},
+	for i, entry := range csvEntries {
+		result[i] = struct {
+			Pattern          string
+			ReplacementPlain string
+			ReplacementSSML  string
+			Comment          string
+		}{
+			Pattern:          entry.Pattern,
+			ReplacementPlain: entry.ReplacementPlain,
+			ReplacementSSML:  entry.ReplacementSSML,
+			Comment:          entry.Comment,
+		}
 	}
+
+	return result
 }
 
 // TextSanitizer combines TTS sanitization with pronunciation dictionary

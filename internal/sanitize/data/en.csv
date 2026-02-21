@@ -1,0 +1,40 @@
+# English pronunciation dictionary
+# Format: pattern,replacement_plain,replacement_ssml,comment
+# pattern: regex pattern to match
+# replacement_plain: plain text replacement (for non-SSML providers)
+# replacement_ssml: SSML markup replacement (for SSML-capable providers)
+# comment: description of the rule
+#
+# Common abbreviations
+\bMr\.,Mister,Mister,Expand Mr.
+\bMrs\.,Missus,Missus,Expand Mrs.
+\bMs\.,Miss,Miss,Expand Ms.
+\bDr\.,Doctor,Doctor,Expand Dr.
+\bProf\.,Professor,Professor,Expand Prof.
+\bSt\.,Saint,Saint,Expand St.
+\bvs\.,versus,versus,Expand vs.
+\betc\.,etcetera,etcetera,Expand etc.
+\be\.g\.,for example,for example,Expand e.g.
+\bi\.e\.,that is,that is,Expand i.e.
+#
+# Numbers and symbols
+\$(\d+),$1 dollars,$1 dollars,Dollar amounts
+(\d+)%,$1 percent,$1 percent,Percentages
+&, and , and ,Ampersand
+#
+# Copyright symbols
+(?i)\bCopyright\b,Copyright,Copyright,Copyright word
+\(c\),Copyright,Copyright,Copyright symbol (c)
+©,Copyright,Copyright,Copyright symbol ©
+#
+# Common mispronunciations
+(?i)\blinux\b,Linux,Linux,Linux pronunciation
+(?i)\bgithub\b,GitHub,GitHub,GitHub pronunciation
+(?i)\bapi\b,A P I,A P I,API pronunciation
+(?i)\burl\b,U R L,U R L,URL pronunciation
+(?i)\bhtml\b,H T M L,H T M L,HTML pronunciation
+(?i)\bcss\b,C S S,C S S,CSS pronunciation
+(?i)\bsql\b,S Q L,S Q L,SQL pronunciation
+#
+# Clean up multiple spaces (preserve newlines for paragraph breaks)
+[ \t]+, , ,Normalize horizontal whitespace

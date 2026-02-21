@@ -303,6 +303,53 @@ TTS synthesis failed: '^'
 - Common technical terms (Linux, GitHub, etc.)
 - Copyright symbols
 
+### 2026-02-20: CSV-Based Pronunciation Dictionary Data
+
+**Feature**: Refactored pronunciation dictionary default entries to use CSV data files instead of hardcoded values.
+
+**Motivation**: The previous implementation had default pronunciation rules hardcoded in `internal/sanitize/text.go` and `internal/storage/db.go`. This made it difficult to maintain, extend, and organize rules by language. Following the successful pattern used in `internal/normalize/data/` for number normalization rules, we moved to a CSV-based approach.
+
+**Implementation**:
+- **CSV Data Files**: Created language-specific CSV files in `internal/sanitize/data/`:
+  - `en.csv` - English pronunciation rules (abbreviations, symbols, common mispronunciations)
+  - `ru.csv` - Russian pronunciation rules (abbreviations, symbols)
+  - Format: `pattern,replacement_plain,replacement_ssml,comment`
+
+- **CSV Loader**: New `internal/sanitize/dictionary.go` module:
+  - `LoadDefaultRulesFromCSV()` - Loads rules from embedded CSV files
+  - `loadEntriesFromReader()` - Parses CSV format with comment support
+  - `LoadRulesFromCSVFile()` - Supports loading from external CSV files
+  - Uses `//go:embed` to embed CSV files in the binary
+
+- **Database Initialization**: Updated `internal/storage/db.go`:
+  - `InitializeDefaultPronunciationRules()` now loads from CSV instead of hardcoded array
+  - Automatic language detection using Cyrillic character heuristic
+  - Logs count of English and Russian rules loaded
+
+- **Backward Compatibility**: 
+  - `GetDefaultRules()` in both `text.go` and `db.go` marked as deprecated
+  - Functions still work by loading from CSV internally
+  - Maintains existing API for compatibility
+
+**Benefits**:
+- **Maintainability**: Easy to add/modify pronunciation rules without code changes
+- **Organization**: Rules grouped by language in separate files
+- **Consistency**: Same pattern as number normalization data structure
+- **Extensibility**: Simple to add new languages by creating new CSV files
+- **Version Control**: CSV changes are easier to review in diffs
+- **Documentation**: Comments in CSV files explain each rule's purpose
+
+**CSV Format Example**:
+```csv
+# English pronunciation dictionary
+# Format: pattern,replacement_plain,replacement_ssml,comment
+\bMr\.,Mister,Mister,Expand Mr.
+\bMrs\.,Missus,Missus,Expand Mrs.
+(?i)\blinux\b,Linux,Linux,Linux pronunciation
+```
+
+**Migration**: Existing databases continue to work. On first run with empty pronunciation dictionary, the system loads defaults from CSV files. Users can still add custom rules via the UI.
+
 ---
 
 ### Future Enhancements
