@@ -68,56 +68,41 @@ biblio-audiobook-builder-tts/
 
 ## Recent Changes
 
+### 2026-02-20: Simplified Latin-to-Russian Transliteration
+
+**Changes**: Simplified the Latin-to-Russian conversion approach and removed abbreviation normalization feature.
+
+**What Changed**:
+1. **Removed CSV-based Latin pronunciation data** - Deleted `internal/sanitize/data/latin_ru.csv`
+2. **Simplified transliteration logic** - `internal/sanitize/latin_ru.go` now only does letter-by-letter transliteration for uppercase Latin sequences (2+ letters) in Russian context
+3. **Provider-level configuration** - Added `transliterate_latin_to_russian` toggle (replaces `normalize_abbreviations`)
+4. **Removed abbreviation normalization** - Completely removed from `internal/normalize` package (russian.go, english.go, processor.go, types.go)
+5. **Updated UI** - Settings now show "Latin→RU" toggle instead of "Abbrev" normalization
+
+**Rationale**: 
+- All abbreviations (both Latin and Cyrillic) should be handled by the pronunciation dictionary (`ru.csv`, `en.csv`)
+- Latin transliteration is only for simple letter-by-letter conversion (FBI → эф би ай, USB → ю эс би)
+- This separation of concerns makes the system cleaner and more maintainable
+
+**Implementation**:
+- Pattern: `\b[A-Z]{2,}\b` (uppercase Latin sequences, 2+ letters)
+- Context detection: Only applies in Russian text (20%+ Cyrillic characters)
+- Examples: FBI → эф би ай, CIA → си ай эй, USB → ю эс би
+
+---
+
 ### 2026-02-20: Fix Russian Pronunciation Dictionary Language Detection
 
 **Bug**: Russian pronunciation dictionary rules (like "США" → "сэ шэ а") were not being applied because all CSV rules were hardcoded as English language.
 
-**Root Cause**: The `LoadDefaultRules()` function in `internal/sanitize/text.go` was hardcoding all pronunciation rules with `language="en"`, even though the CSV loader correctly loaded both English and Russian rules from separate files.
-
 **Fix**:
 - Added `Language` field to `DictionaryEntry` struct
-- Updated `LoadDefaultRulesFromCSV()` to call `loadEntriesFromReaderWithLanguage()` with correct language ("en" for en.csv, "ru" for ru.csv)
-- Modified `LoadDefaultRules()` to preserve the language from CSV entries instead of hardcoding "en"
-- Updated `LoadRulesFromCSVFile()` to detect language from filename
+- Updated CSV loader to correctly assign language based on filename
+- Modified `LoadDefaultRules()` to preserve language from CSV entries
 
-**Impact**: Russian pronunciation dictionary rules from `ru.csv` now correctly apply to Russian text:
-- "США" → "сэ шэ а" (USA)
-- "МВД" → "эм вэ дэ" (Ministry of Internal Affairs)
-- "ООН" → "о о эн" (UN)
-- And 200+ other Russian abbreviations
-
-**Note**: This was a pre-existing bug in the main branch that prevented the Russian pronunciation dictionary from ever working correctly.
-
----
-
-### 2026-02-20: Latin Letter Pronunciation in Russian Text
-
-**Feature**: Automatic conversion of Latin letters and abbreviations to Russian pronunciation when they appear in Russian text.
+**Impact**: Russian pronunciation dictionary now works correctly for 200+ Russian abbreviations including "США", "МВД", "ООН", etc.
 
 **Motivation**: Russian TTS engines struggle with Latin letters and abbreviations (like "FBI", "USB", "DC-19") embedded in Russian text. These need to be converted to their Russian phonetic equivalents for proper narration.
-
-**Implementation**:
-- **Core Module**: New `internal/sanitize/latin_ru.go` with `LatinToRussianConverter`
-- **Context Detection**: Intelligent detection of Russian vs English text context using Cyrillic character ratio analysis
-- **Pattern Matching**: Regex-based detection of Latin abbreviations, including:
-  - Simple abbreviations: `FBI` → `эф би ай`
-  - Hyphenated models: `DC-19` → `ди си 19`, `L-3` → `эл 3`
-  - Complex patterns: `DC-19-A` → `ди си 19-эй`
-  - Number+letter: `5G` → `5 джи`, `4G` → `4 джи`
-  - Mixed case: `WiFi` → `дабл ю ай эф ай`, `GHz` → `джи эйч зет`
-
-**CSV Data**: 
-- Created `internal/sanitize/data/latin_ru.csv` with comprehensive Latin letter pronunciations
-- Includes common technology abbreviations (USB, HDMI, CPU, GPU, etc.)
-- Includes organizations (NASA, FBI, CIA, NATO, etc.)
-- Includes business/medical/scientific terms (CEO, PhD, DNA, RNA, etc.)
-
-**Context Detection Logic**:
-- Analyzes 50-character window around each abbreviation
-- Converts if Cyrillic characters present and either:
-  - More Cyrillic than Latin characters, OR
-  - Cyrillic represents at least 20% of total letters
-- Prevents false conversions in English text with occasional Russian words
 
 **Examples**:
 ```

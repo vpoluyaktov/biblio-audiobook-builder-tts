@@ -507,13 +507,15 @@ func GetDefaultRules() []struct {
 
 // TextSanitizer combines TTS sanitization with pronunciation dictionary
 type TextSanitizer struct {
-	dictionary *PronunciationDictionary
+	dictionary     *PronunciationDictionary
+	latinConverter *LatinToRussianConverter
 }
 
 // NewTextSanitizer creates a new text sanitizer
 func NewTextSanitizer() *TextSanitizer {
 	return &TextSanitizer{
-		dictionary: NewPronunciationDictionary(),
+		dictionary:     NewPronunciationDictionary(),
+		latinConverter: NewLatinToRussianConverter(),
 	}
 }
 
@@ -561,4 +563,9 @@ func (s *TextSanitizer) LoadDefaultRules() {
 		}
 		s.dictionary.AddRuleWithSSML(rule.Pattern, rule.ReplacementPlain, rule.ReplacementSSML, lang, true)
 	}
+}
+
+// ConvertLatinToRussian applies Latin-to-Russian letter transliteration
+func (s *TextSanitizer) ConvertLatinToRussian(text string) string {
+	return s.latinConverter.ConvertLatinInRussianText(text)
 }

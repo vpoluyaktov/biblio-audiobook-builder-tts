@@ -26,19 +26,19 @@ type Service interface {
 
 // ProviderInfo contains runtime information about a provider
 type ProviderInfo struct {
-	ID                     string `json:"id"`
-	Name                   string `json:"name"`
-	Type                   string `json:"type"`
-	Enabled                bool   `json:"enabled"`
-	Available              bool   `json:"available"`
-	TTSWorkers             int    `json:"tts_workers"`
-	NormalizeNumbers       bool   `json:"normalize_numbers"`
-	NormalizeAbbreviations bool   `json:"normalize_abbreviations"`
-	SSMLSupport            bool   `json:"ssml_support"`
-	StressEnabled          bool   `json:"stress_enabled"`
-	IsDefault              bool   `json:"is_default"`
-	VoiceCount             int    `json:"voice_count"`
-	Error                  string `json:"error,omitempty"`
+	ID                          string `json:"id"`
+	Name                        string `json:"name"`
+	Type                        string `json:"type"`
+	Enabled                     bool   `json:"enabled"`
+	Available                   bool   `json:"available"`
+	TTSWorkers                  int    `json:"tts_workers"`
+	NormalizeNumbers            bool   `json:"normalize_numbers"`
+	TransliterateLatinToRussian bool   `json:"transliterate_latin_to_russian"`
+	SSMLSupport                 bool   `json:"ssml_support"`
+	StressEnabled               bool   `json:"stress_enabled"`
+	IsDefault                   bool   `json:"is_default"`
+	VoiceCount                  int    `json:"voice_count"`
+	Error                       string `json:"error,omitempty"`
 }
 
 // ConversionOptions contains settings for TTS conversion
@@ -320,7 +320,7 @@ func (s *service) GetProviderInfo(providerID string) *ProviderInfo {
 		info.Enabled = dbProv.Enabled
 		info.TTSWorkers = dbProv.TTSWorkers
 		info.NormalizeNumbers = dbProv.NormalizeNumbers
-		info.NormalizeAbbreviations = dbProv.NormalizeAbbreviations
+		info.TransliterateLatinToRussian = dbProv.TransliterateLatinToRussian
 		info.SSMLSupport = dbProv.SSMLSupport
 		info.StressEnabled = dbProv.StressEnabled
 		info.IsDefault = dbProv.IsDefault
@@ -354,7 +354,7 @@ func (s *service) GetAllProviderInfos() []*ProviderInfo {
 					Enabled:                dbProv.Enabled,
 					TTSWorkers:             dbProv.TTSWorkers,
 					NormalizeNumbers:       dbProv.NormalizeNumbers,
-					NormalizeAbbreviations: dbProv.NormalizeAbbreviations,
+					TransliterateLatinToRussian: dbProv.TransliterateLatinToRussian,
 					SSMLSupport:            dbProv.SSMLSupport,
 					StressEnabled:          dbProv.StressEnabled,
 					IsDefault:              dbProv.IsDefault,

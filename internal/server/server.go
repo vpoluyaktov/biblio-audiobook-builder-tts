@@ -762,21 +762,21 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 // ProviderResponse represents a provider in API responses
 type ProviderResponse struct {
-	ID                     string `json:"id"`
-	Name                   string `json:"name"`
-	Type                   string `json:"type"`
-	Enabled                bool   `json:"enabled"`
-	Available              bool   `json:"available"`
-	IsDefault              bool   `json:"is_default"`
-	TTSWorkers             int    `json:"tts_workers"`
-	NormalizeNumbers       bool   `json:"normalize_numbers"`
-	NormalizeAbbreviations bool   `json:"normalize_abbreviations"`
-	SSMLSupport            bool   `json:"ssml_support"`
-	StressEnabled          bool   `json:"stress_enabled"`
-	VoiceCount             int    `json:"voice_count"`
-	URL                    string `json:"url,omitempty"`
-	APIKey                 string `json:"api_key,omitempty"`
-	Region                 string `json:"region,omitempty"`
+	ID                          string `json:"id"`
+	Name                        string `json:"name"`
+	Type                        string `json:"type"`
+	Enabled                     bool   `json:"enabled"`
+	Available                   bool   `json:"available"`
+	IsDefault                   bool   `json:"is_default"`
+	TTSWorkers                  int    `json:"tts_workers"`
+	NormalizeNumbers            bool   `json:"normalize_numbers"`
+	TransliterateLatinToRussian bool   `json:"transliterate_latin_to_russian"`
+	SSMLSupport                 bool   `json:"ssml_support"`
+	StressEnabled               bool   `json:"stress_enabled"`
+	VoiceCount                  int    `json:"voice_count"`
+	URL                         string `json:"url,omitempty"`
+	APIKey                      string `json:"api_key,omitempty"`
+	Region                      string `json:"region,omitempty"`
 }
 
 // handleProviders returns available TTS providers with detailed info
@@ -820,7 +820,7 @@ func (s *Server) handleProviders(w http.ResponseWriter, r *http.Request) {
 					IsDefault:              dbProv.IsDefault,
 					TTSWorkers:             dbProv.TTSWorkers,
 					NormalizeNumbers:       dbProv.NormalizeNumbers,
-					NormalizeAbbreviations: dbProv.NormalizeAbbreviations,
+					TransliterateLatinToRussian: dbProv.TransliterateLatinToRussian,
 					SSMLSupport:            dbProv.SSMLSupport,
 					StressEnabled:          dbProv.StressEnabled,
 					VoiceCount:             voiceCount,
@@ -954,7 +954,7 @@ func (s *Server) getProvider(w http.ResponseWriter, _ *http.Request, id string) 
 		IsDefault:              dbProv.IsDefault,
 		TTSWorkers:             dbProv.TTSWorkers,
 		NormalizeNumbers:       dbProv.NormalizeNumbers,
-		NormalizeAbbreviations: dbProv.NormalizeAbbreviations,
+		TransliterateLatinToRussian: dbProv.TransliterateLatinToRussian,
 		SSMLSupport:            dbProv.SSMLSupport,
 		StressEnabled:          dbProv.StressEnabled,
 		VoiceCount:             voiceCount,
@@ -968,17 +968,17 @@ func (s *Server) getProvider(w http.ResponseWriter, _ *http.Request, id string) 
 
 // ProviderUpdateRequest represents the request body for updating a provider
 type ProviderUpdateRequest struct {
-	Enabled                *bool   `json:"enabled,omitempty"`
-	URL                    *string `json:"url,omitempty"`
-	APIKey                 *string `json:"api_key,omitempty"`
-	Region                 *string `json:"region,omitempty"`
-	TTSWorkers             *int    `json:"tts_workers,omitempty"`
-	MaxChunkSize           *int    `json:"max_chunk_size,omitempty"`
-	NormalizeNumbers       *bool   `json:"normalize_numbers,omitempty"`
-	NormalizeAbbreviations *bool   `json:"normalize_abbreviations,omitempty"`
-	SSMLSupport            *bool   `json:"ssml_support,omitempty"`
-	StressEnabled          *bool   `json:"stress_enabled,omitempty"`
-	IsDefault              *bool   `json:"is_default,omitempty"`
+	Enabled                     *bool   `json:"enabled,omitempty"`
+	URL                         *string `json:"url,omitempty"`
+	APIKey                      *string `json:"api_key,omitempty"`
+	Region                      *string `json:"region,omitempty"`
+	TTSWorkers                  *int    `json:"tts_workers,omitempty"`
+	MaxChunkSize                *int    `json:"max_chunk_size,omitempty"`
+	NormalizeNumbers            *bool   `json:"normalize_numbers,omitempty"`
+	TransliterateLatinToRussian *bool   `json:"transliterate_latin_to_russian,omitempty"`
+	SSMLSupport                 *bool   `json:"ssml_support,omitempty"`
+	StressEnabled               *bool   `json:"stress_enabled,omitempty"`
+	IsDefault                   *bool   `json:"is_default,omitempty"`
 }
 
 // updateProvider updates a provider's configuration
@@ -1026,8 +1026,8 @@ func (s *Server) updateProvider(w http.ResponseWriter, r *http.Request, id strin
 	if req.NormalizeNumbers != nil {
 		dbProv.NormalizeNumbers = *req.NormalizeNumbers
 	}
-	if req.NormalizeAbbreviations != nil {
-		dbProv.NormalizeAbbreviations = *req.NormalizeAbbreviations
+	if req.TransliterateLatinToRussian != nil {
+		dbProv.TransliterateLatinToRussian = *req.TransliterateLatinToRussian
 	}
 	if req.SSMLSupport != nil {
 		dbProv.SSMLSupport = *req.SSMLSupport

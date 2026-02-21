@@ -117,22 +117,6 @@ func (p *Processor) Process(text, lang string) string {
 	return result
 }
 
-// NormalizeAbbreviations expands uppercase abbreviations to spoken letter names
-// using language-specific processors when available.
-func (p *Processor) NormalizeAbbreviations(text, lang string) string {
-	langProc := GetLanguageProcessor(lang)
-	if langProc == nil {
-		return text
-	}
-
-	abbrevProc, ok := langProc.(AbbreviationNormalizer)
-	if !ok {
-		return text
-	}
-
-	return abbrevProc.NormalizeAbbreviations(text)
-}
-
 // detectContext analyzes surrounding text to determine grammatical context.
 func (p *Processor) detectContext(text string, numStart, numEnd int, lang string) Context {
 	ctx := DefaultContext()
@@ -347,12 +331,6 @@ func ReplaceNumber(n int64, lang string, ctx Context) string {
 func NormalizeText(text, lang string) string {
 	p := NewProcessor()
 	return p.Process(text, lang)
-}
-
-// NormalizeTextAbbreviations is a convenience function for abbreviation normalization.
-func NormalizeTextAbbreviations(text, lang string) string {
-	p := NewProcessor()
-	return p.NormalizeAbbreviations(text, lang)
 }
 
 // NormalizeTextWithContext is a convenience function with explicit context.
