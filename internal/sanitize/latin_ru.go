@@ -45,18 +45,13 @@ func NewLatinToRussianConverter() *LatinToRussianConverter {
 }
 
 // ConvertLatinInRussianText converts Latin letters in Russian text to Russian pronunciation
-// Only performs letter-by-letter transliteration for uppercase Latin sequences in Russian context
-// Examples: "FBI" -> "эф би ай", "USB" -> "ю эс би"
+// Performs letter-by-letter transliteration for all Latin letter sequences
+// Examples: "FBI" -> "эф би ай", "USB" -> "ю эс би", "A" -> "эй"
 func (c *LatinToRussianConverter) ConvertLatinInRussianText(text string) string {
-	// Pattern to match uppercase Latin letter sequences (2+ letters)
-	pattern := regexp.MustCompile(`\b[A-Z]{2,}\b`)
+	// Pattern to match Latin letter sequences (1+ letters)
+	pattern := regexp.MustCompile(`\b[A-Za-z]+\b`)
 
 	result := pattern.ReplaceAllStringFunc(text, func(match string) string {
-		// Check if this is in Russian context
-		if !c.isInRussianContext(text, match) {
-			return match
-		}
-
 		// Convert each letter to Russian pronunciation
 		var converted []string
 		for _, r := range match {
@@ -72,55 +67,4 @@ func (c *LatinToRussianConverter) ConvertLatinInRussianText(text string) string 
 	})
 
 	return result
-}
-
-// isInRussianContext checks if a Latin sequence appears in Russian text context
-func (c *LatinToRussianConverter) isInRussianContext(fullText, match string) bool {
-	index := strings.Index(fullText, match)
-	if index == -1 {
-		return false
-	}
-
-	// Check characters before and after the match (within a window)
-	windowSize := 50
-	start := index - windowSize
-	if start < 0 {
-		start = 0
-	}
-	end := index + len(match) + windowSize
-	if end > len(fullText) {
-		end = len(fullText)
-	}
-
-	contextWindow := fullText[start:end]
-
-	// Count Cyrillic vs Latin characters in the context
-	cyrillicCount := 0
-	latinCount := 0
-
-	for _, r := range contextWindow {
-		if isCyrillic(r) {
-			cyrillicCount++
-		} else if isLatin(r) {
-			latinCount++
-		}
-	}
-
-	// Require at least some Cyrillic presence
-	if cyrillicCount == 0 {
-		return false
-	}
-
-	// If there are more Cyrillic than Latin, definitely Russian context
-	if cyrillicCount > latinCount {
-		return true
-	}
-
-	// If Cyrillic is at least 20% of total letters, consider it Russian context
-	totalLetters := cyrillicCount + latinCount
-	if totalLetters > 0 && float64(cyrillicCount)/float64(totalLetters) >= 0.2 {
-		return true
-	}
-
-	return false
 }
