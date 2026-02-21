@@ -462,6 +462,7 @@ func GetDefaultRules() []struct {
 	ReplacementPlain string
 	ReplacementSSML  string
 	Comment          string
+	Language         string
 } {
 	// Load from CSV files
 	csvEntries, err := LoadDefaultRulesFromCSV()
@@ -472,6 +473,7 @@ func GetDefaultRules() []struct {
 			ReplacementPlain string
 			ReplacementSSML  string
 			Comment          string
+			Language         string
 		}{}
 	}
 
@@ -481,6 +483,7 @@ func GetDefaultRules() []struct {
 		ReplacementPlain string
 		ReplacementSSML  string
 		Comment          string
+		Language         string
 	}, len(csvEntries))
 
 	for i, entry := range csvEntries {
@@ -489,11 +492,13 @@ func GetDefaultRules() []struct {
 			ReplacementPlain string
 			ReplacementSSML  string
 			Comment          string
+			Language         string
 		}{
 			Pattern:          entry.Pattern,
 			ReplacementPlain: entry.ReplacementPlain,
 			ReplacementSSML:  entry.ReplacementSSML,
 			Comment:          entry.Comment,
+			Language:         entry.Language,
 		}
 	}
 
@@ -549,6 +554,11 @@ func (s *TextSanitizer) SanitizeWithOptions(text string, language string, useSSM
 // LoadDefaultRules loads the default pronunciation rules into the dictionary
 func (s *TextSanitizer) LoadDefaultRules() {
 	for _, rule := range GetDefaultRules() {
-		s.dictionary.AddRuleWithSSML(rule.Pattern, rule.ReplacementPlain, rule.ReplacementSSML, "en", true)
+		// Use the language from the CSV entry instead of hardcoding "en"
+		lang := rule.Language
+		if lang == "" {
+			lang = "en" // Fallback to English if not specified
+		}
+		s.dictionary.AddRuleWithSSML(rule.Pattern, rule.ReplacementPlain, rule.ReplacementSSML, lang, true)
 	}
 }

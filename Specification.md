@@ -68,6 +68,28 @@ biblio-audiobook-builder-tts/
 
 ## Recent Changes
 
+### 2026-02-20: Fix Russian Pronunciation Dictionary Language Detection
+
+**Bug**: Russian pronunciation dictionary rules (like "США" → "сэ шэ а") were not being applied because all CSV rules were hardcoded as English language.
+
+**Root Cause**: The `LoadDefaultRules()` function in `internal/sanitize/text.go` was hardcoding all pronunciation rules with `language="en"`, even though the CSV loader correctly loaded both English and Russian rules from separate files.
+
+**Fix**:
+- Added `Language` field to `DictionaryEntry` struct
+- Updated `LoadDefaultRulesFromCSV()` to call `loadEntriesFromReaderWithLanguage()` with correct language ("en" for en.csv, "ru" for ru.csv)
+- Modified `LoadDefaultRules()` to preserve the language from CSV entries instead of hardcoding "en"
+- Updated `LoadRulesFromCSVFile()` to detect language from filename
+
+**Impact**: Russian pronunciation dictionary rules from `ru.csv` now correctly apply to Russian text:
+- "США" → "сэ шэ а" (USA)
+- "МВД" → "эм вэ дэ" (Ministry of Internal Affairs)
+- "ООН" → "о о эн" (UN)
+- And 200+ other Russian abbreviations
+
+**Note**: This was a pre-existing bug in the main branch that prevented the Russian pronunciation dictionary from ever working correctly.
+
+---
+
 ### 2026-02-20: Latin Letter Pronunciation in Russian Text
 
 **Feature**: Automatic conversion of Latin letters and abbreviations to Russian pronunciation when they appear in Russian text.
