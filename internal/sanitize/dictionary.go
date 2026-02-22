@@ -92,8 +92,8 @@ func parseCSVLine(line string, lineNum int) (DictionaryEntry, error) {
 	}
 
 	pattern := strings.TrimSpace(parts[0])
-	replacementPlain := strings.TrimSpace(parts[1])
-	replacementSSML := strings.TrimSpace(parts[2])
+	replacementPlain := parts[1]
+	replacementSSML := parts[2]
 	comment := strings.TrimSpace(parts[3])
 
 	// Validate regex pattern

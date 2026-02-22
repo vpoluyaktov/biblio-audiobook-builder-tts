@@ -3,6 +3,7 @@ package sanitize
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"regexp"
 	"strings"
@@ -353,6 +354,82 @@ func (d *PronunciationDictionary) ApplyWithMode(text string, useSSML bool) strin
 	return d.ApplyWithLanguage(text, useSSML, "")
 }
 
+// applyRuleUnicode applies a single pronunciation rule. It handles \b word
+// boundaries correctly for Unicode (Cyrillic, etc.) text: Go's regexp \b only
+// recognises ASCII word-character boundaries, so \b adjacent to Cyrillic letters
+// never fires. When the pattern contains both \b and non-ASCII characters, this
+// function strips the \b anchors and enforces Unicode word boundaries manually.
+func applyRuleUnicode(re *regexp.Regexp, text, replacement string) string {
+	patStr := re.String()
+	if !strings.Contains(patStr, `\b`) {
+		return re.ReplaceAllString(text, replacement)
+	}
+
+	// Only apply the custom path when the pattern contains non-ASCII characters.
+	hasNonASCII := false
+	for _, r := range patStr {
+		if r > 127 {
+			hasNonASCII = true
+			break
+		}
+	}
+	if !hasNonASCII {
+		return re.ReplaceAllString(text, replacement)
+	}
+
+	// Strip every \b from the pattern so FindAllStringIndex can find matches,
+	// then manually enforce letter/digit boundaries around each match.
+	stripped := strings.ReplaceAll(patStr, `\b`, ``)
+	strippedRe, err := regexp.Compile(stripped)
+	if err != nil {
+		return re.ReplaceAllString(text, replacement) // unexpected – fall back
+	}
+
+	// Build a byte-offset → rune-index map for O(1) boundary lookups.
+	runes := []rune(text)
+	byteToRune := make([]int, len(text)+1)
+	ri := 0
+	for bi := range text {
+		byteToRune[bi] = ri
+		ri++
+	}
+	byteToRune[len(text)] = len(runes)
+
+	var result strings.Builder
+	lastEnd := 0
+
+	for _, loc := range strippedRe.FindAllStringIndex(text, -1) {
+		start, end := loc[0], loc[1]
+		startRI := byteToRune[start]
+		endRI := byteToRune[end]
+
+		// Unicode word boundary before the match.
+		before := start == 0 || func() bool {
+			r := runes[startRI-1]
+			return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+		}()
+
+		// Unicode word boundary after the match.
+		after := end == len(text) || func() bool {
+			if endRI >= len(runes) {
+				return true
+			}
+			r := runes[endRI]
+			return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+		}()
+
+		result.WriteString(text[lastEnd:start])
+		if before && after {
+			result.WriteString(strippedRe.ReplaceAllString(text[start:end], replacement))
+		} else {
+			result.WriteString(text[start:end])
+		}
+		lastEnd = end
+	}
+	result.WriteString(text[lastEnd:])
+	return result.String()
+}
+
 // ApplyWithLanguage applies enabled pronunciation rules for a specific language
 func (d *PronunciationDictionary) ApplyWithLanguage(text string, useSSML bool, language string) string {
 	result := text
@@ -368,7 +445,7 @@ func (d *PronunciationDictionary) ApplyWithLanguage(text string, useSSML bool, l
 		if useSSML && rule.ReplacementSSML != "" {
 			replacement = rule.ReplacementSSML
 		}
-		result = rule.Pattern.ReplaceAllString(result, replacement)
+		result = applyRuleUnicode(rule.Pattern, result, replacement)
 	}
 	return result
 }
@@ -547,7 +624,18 @@ func (s *TextSanitizer) SanitizeWithOptions(text string, language string, useSSM
 
 	// Then apply pronunciation dictionary rules for the specified language
 	if s.dictionary != nil && s.dictionary.RuleCount() > 0 {
+		// Log dictionary application for debugging
+		if strings.Contains(result, "США") {
+			log.Printf("[SANITIZE] Found 'США' in text before dictionary application (lang=%s, useSSML=%v, rules=%d)", language, useSSML, s.dictionary.RuleCount())
+		}
 		result = s.dictionary.ApplyWithLanguage(result, useSSML, language)
+		if strings.Contains(result, "США") {
+			log.Printf("[SANITIZE] WARNING: 'США' still present after dictionary application!")
+		} else if strings.Contains(result, "сэ шэ") {
+			log.Printf("[SANITIZE] SUCCESS: 'США' was replaced with 'сэ шэ а'")
+		}
+	} else {
+		log.Printf("[SANITIZE] Dictionary not applied: dictionary=%v, ruleCount=%d", s.dictionary != nil, s.dictionary.RuleCount())
 	}
 
 	return result

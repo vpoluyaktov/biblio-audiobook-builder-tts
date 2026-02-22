@@ -58,9 +58,13 @@ func NewWorker(db JobDB, hub *Hub, ttsService tts.Service, cfg *config.Config) *
 	textSanitizer := sanitize.NewTextSanitizer()
 
 	// Load default rules if enabled
+	logger.Info("UseDefaultPronunciation setting: %v", cfg.UseDefaultPronunciation)
 	if cfg.UseDefaultPronunciation {
 		textSanitizer.LoadDefaultRules()
-		logger.Info("Loaded %d default pronunciation rules", textSanitizer.GetDictionary().RuleCount())
+		ruleCount := textSanitizer.GetDictionary().RuleCount()
+		logger.Info("Loaded %d default pronunciation rules from built-in CSV files", ruleCount)
+	} else {
+		logger.Warn("Default pronunciation rules NOT loaded (UseDefaultPronunciation is false)")
 	}
 
 	// Load custom dictionary if specified
@@ -159,7 +163,8 @@ func (w *Worker) loadPronunciationRulesFromDB() error {
 		}
 	}
 
-	logger.Debug("Reloaded %d pronunciation rules from database", len(dbRules))
+	totalRules := dict.RuleCount()
+	logger.Debug("Reloaded pronunciation rules: %d from database, %d total rules", len(dbRules), totalRules)
 	return nil
 }
 
@@ -224,6 +229,14 @@ func (w *Worker) processJob(job *Job) {
 	job.SetStatus(JobStatusConverting)
 	w.saveJob(job)
 	w.broadcastJobUpdate(job)
+
+	// Reload pronunciation rules from database once per job (before parallel
+	// chapter processing). Loading per-chapter would race: parallel workers
+	// share one PronunciationDictionary, and Clear()+reload in one goroutine
+	// would wipe rules out from under another goroutine's Apply call.
+	if err := w.loadPronunciationRulesFromDB(); err != nil {
+		logger.Warn("Failed to reload pronunciation rules from database: %v", err)
+	}
 
 	outputDir, chapterFiles, err := w.convertBook(job, book)
 	if err != nil {
