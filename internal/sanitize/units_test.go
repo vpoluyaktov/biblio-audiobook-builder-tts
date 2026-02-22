@@ -204,30 +204,36 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 			desc:     "Should replace full л.с. compound unit",
 		},
 
-		// Frequency units
+		// Frequency units - test ordering: compound units must match before simple Гц
 		{
-			name:     "hertz",
-			input:    "Частота 50 Гц",
-			expected: "Частота 50 герц",
-			desc:     "Should replace Hz after number",
-		},
-		{
-			name:     "kilohertz",
-			input:    "Частота 100 кГц",
-			expected: "Частота 100 килогерц",
-			desc:     "Should replace kHz after number",
+			name:     "gigahertz",
+			input:    "Процессор 3 ГГц",
+			expected: "Процессор 3 гигагерц",
+			desc:     "Should replace full GHz, not partial Г + герц",
 		},
 		{
 			name:     "megahertz",
 			input:    "Частота 2.4 МГц",
 			expected: "Частота 2.4 мегагерц",
-			desc:     "Should replace MHz after number",
+			desc:     "Should replace full MHz, not partial М + герц",
 		},
 		{
-			name:     "gigahertz",
-			input:    "Процессор 3 ГГц",
-			expected: "Процессор 3 гигагерц",
-			desc:     "Should replace GHz after number",
+			name:     "kilohertz",
+			input:    "Частота 100 кГц",
+			expected: "Частота 100 килогерц",
+			desc:     "Should replace full kHz, not partial к + герц",
+		},
+		{
+			name:     "hertz",
+			input:    "Частота 50 Гц",
+			expected: "Частота 50 герц",
+			desc:     "Should replace simple Hz after number",
+		},
+		{
+			name:     "mixed frequencies",
+			input:    "Процессор 3.5 ГГц, память 1600 МГц, звук 48 кГц, сеть 50 Гц",
+			expected: "Процессор 3.5 гигагерц, память 1600 мегагерц, звук 48 килогерц, сеть 50 герц",
+			desc:     "Should correctly replace all frequency units in mixed text",
 		},
 
 		// Time units
