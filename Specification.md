@@ -68,6 +68,43 @@ biblio-audiobook-builder-tts/
 
 ## Recent Changes
 
+### 2026-02-21: Fix Units of Measurement Context in Russian Dictionary
+
+**Issue**: Units of measurement in the Russian pronunciation dictionary (`ru.csv`) were replacing EVERY occurrence of single letters like `В` (volt) and `А` (ampere), not just when they appeared after numbers. This caused incorrect text transformations where regular Russian words containing these letters were being replaced.
+
+**Examples of incorrect behavior**:
+- Input: `В доме` (In the house)
+- Incorrect output: `вольт доме`
+- Correct output: `В доме` (no change)
+
+- Input: `А потом` (And then)
+- Incorrect output: `ампер потом`
+- Correct output: `А потом` (no change)
+
+**Root Cause**: The dictionary patterns used word boundaries (`\b`) without requiring preceding digits:
+```csv
+\bВ\b,вольт,в+ольт,В - вольт
+\bА\b,ампер,амп+ер,А - ампер
+```
+
+**Solution**: Updated all 29 units of measurement entries in `ru.csv` to require digits before the unit:
+```csv
+(\d+)\s*В\b,$1 вольт,$1 в+ольт,В - вольт
+(\d+)\s*А\b,$1 ампер,$1 амп+ер,А - ампер
+(\d+)\s*кг\b,$1 килограмм,$1 килогр+амм,кг - килограмм
+```
+
+**Pattern changes**:
+- Added `(\d+)\s*` prefix to match one or more digits followed by optional whitespace
+- Changed replacement to include `$1` to preserve the number
+- Applies to all units: kg, g, mg, t, m, km, cm, mm, l, ml, kV, V, mA, A, Hz, kHz, MHz, GHz, min, sec, h, etc.
+
+**Database cleanup**: Deleted all existing pronunciation dictionary entries from the database so they will be recreated with the corrected patterns on next application start.
+
+**Impact**: Units of measurement substitutions now only apply in the correct context (after numbers), preventing false replacements of common Russian letters and words.
+
+---
+
 ### 2026-02-20: Simplified Latin-to-Russian Transliteration
 
 **Changes**: Simplified the Latin-to-Russian conversion approach and removed abbreviation normalization feature.
