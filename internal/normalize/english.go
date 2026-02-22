@@ -1,7 +1,6 @@
 package normalize
 
 import (
-	"regexp"
 	"strings"
 )
 
@@ -42,35 +41,12 @@ var (
 		"fiftieth", "sixtieth", "seventieth", "eightieth", "ninetieth",
 	}
 
-	englishAbbreviationPattern = regexp.MustCompile(`\b[A-Z]{2,}\b`)
-
-	englishLetterNames = map[rune]string{
-		'A': "A",
-		'B': "BEE",
-		'C': "CEE",
-		'D': "DEE",
-		'E': "E",
-		'F': "EF",
-		'G': "GEE",
-		'H': "AITCH",
-		'I': "I",
-		'J': "JAY",
-		'K': "KAY",
-		'L': "EL",
-		'M': "EM",
-		'N': "EN",
-		'O': "O",
-		'P': "PEE",
-		'Q': "QUE",
-		'R': "AR",
-		'S': "ES",
-		'T': "TEE",
-		'U': "U",
-		'V': "VEE",
-		'W': "DOUBLE U",
-		'X': "EX",
-		'Y': "WHY",
-		'Z': "ZEE",
+	englishOrdinalSuffixes = []string{
+		"first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth",
+		"eleventh", "twelfth", "thirteenth", "fourteenth", "fifteenth", "sixteenth", "seventeenth", "eighteenth", "nineteenth", "twentieth",
+		"twenty-first", "twenty-second", "twenty-third", "twenty-fourth", "twenty-fifth", "twenty-sixth", "twenty-seventh", "twenty-eighth", "twenty-ninth", "thirtieth",
+		"thirty-first", "fortieth",
+		"fiftieth", "sixtieth", "seventieth", "eightieth", "ninetieth",
 	}
 )
 
@@ -211,21 +187,6 @@ func (p *EnglishProcessor) GetChapterGender() Gender {
 	return Masculine
 }
 
-// NormalizeAbbreviations expands uppercase abbreviations to spoken letter names.
-// Example: "USSR" -> "U ES ES AR".
-func (p *EnglishProcessor) NormalizeAbbreviations(text string) string {
-	return englishAbbreviationPattern.ReplaceAllStringFunc(text, func(match string) string {
-		parts := make([]string, 0, len(match))
-		for _, ch := range match {
-			if name, ok := englishLetterNames[ch]; ok {
-				parts = append(parts, name)
-			} else {
-				parts = append(parts, string(ch))
-			}
-		}
-		return strings.Join(parts, " ")
-	})
-}
 
 // toOrdinal converts a number to ordinal words (first, second, third).
 func (e *EnglishConverter) toOrdinal(n int64) string {

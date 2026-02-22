@@ -224,7 +224,7 @@ func (db *DB) migrate() error {
 		tts_workers INTEGER DEFAULT 3,
 		max_chunk_size INTEGER DEFAULT 900,
 		normalize_numbers BOOLEAN DEFAULT 1,
-		normalize_abbreviations BOOLEAN DEFAULT 0,
+		transliteration BOOLEAN DEFAULT 0,
 		ssml_support BOOLEAN DEFAULT 0,
 		stress_enabled BOOLEAN DEFAULT 0,
 		sample_rate INTEGER DEFAULT 48000,
@@ -294,8 +294,8 @@ func (db *DB) migrate() error {
 	// Add stress_enabled column if it doesn't exist (migration for existing DBs)
 	db.conn.Exec("ALTER TABLE providers ADD COLUMN stress_enabled BOOLEAN DEFAULT 0")
 
-	// Add normalize_abbreviations column if it doesn't exist (migration for existing DBs)
-	db.conn.Exec("ALTER TABLE providers ADD COLUMN normalize_abbreviations BOOLEAN DEFAULT 0")
+	// Add transliteration column if it doesn't exist (migration for existing DBs)
+	db.conn.Exec("ALTER TABLE providers ADD COLUMN transliteration BOOLEAN DEFAULT 0")
 
 	return nil
 }
@@ -1052,24 +1052,24 @@ func (db *DB) DeleteOPDSSource(id string) error {
 
 // TTSProvider represents a TTS provider configuration stored in the database
 type TTSProvider struct {
-	ID                     string    `json:"id"`
-	Name                   string    `json:"name"`
-	Type                   string    `json:"type"` // "local", "cloud", "self-hosted"
-	Enabled                bool      `json:"enabled"`
-	URL                    string    `json:"url"`
-	APIKey                 string    `json:"api_key"`
-	Region                 string    `json:"region"`
-	TTSWorkers             int       `json:"tts_workers"`
-	MaxChunkSize           int       `json:"max_chunk_size"` // Maximum characters per TTS request
-	NormalizeNumbers       bool      `json:"normalize_numbers"`
-	NormalizeAbbreviations bool      `json:"normalize_abbreviations"`
-	SSMLSupport            bool      `json:"ssml_support"`
-	StressEnabled          bool      `json:"stress_enabled"` // Enable Russian stress marking via stress server
-	SampleRate             int       `json:"sample_rate"`    // Output sample rate in Hz (e.g., 48000, 44100, 24000)
-	IsDefault              bool      `json:"is_default"`
-	DisplayOrder           int       `json:"display_order"`
-	CreatedAt              time.Time `json:"created_at"`
-	UpdatedAt              time.Time `json:"updated_at"`
+	ID               string    `json:"id"`
+	Name             string    `json:"name"`
+	Type             string    `json:"type"` // "local", "cloud", "self-hosted"
+	Enabled          bool      `json:"enabled"`
+	URL              string    `json:"url"`
+	APIKey           string    `json:"api_key"`
+	Region           string    `json:"region"`
+	TTSWorkers       int       `json:"tts_workers"`
+	MaxChunkSize     int       `json:"max_chunk_size"` // Maximum characters per TTS request
+	NormalizeNumbers bool      `json:"normalize_numbers"`
+	Transliteration  bool      `json:"transliteration"` // Enable Latin-to-Russian letter transliteration
+	SSMLSupport      bool      `json:"ssml_support"`
+	StressEnabled    bool      `json:"stress_enabled"` // Enable Russian stress marking via stress server
+	SampleRate       int       `json:"sample_rate"`    // Output sample rate in Hz (e.g., 48000, 44100, 24000)
+	IsDefault        bool      `json:"is_default"`
+	DisplayOrder     int       `json:"display_order"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 // CreateProvider creates a new provider in the database
@@ -1078,7 +1078,7 @@ func (db *DB) CreateProvider(provider *TTSProvider) error {
 	defer db.mu.Unlock()
 
 	_, err := db.conn.Exec(`
-		INSERT INTO providers (id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, normalize_abbreviations, ssml_support, stress_enabled, sample_rate, is_default, display_order, created_at, updated_at)
+		INSERT INTO providers (id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, transliteration, ssml_support, stress_enabled, sample_rate, is_default, display_order, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			name = excluded.name,
@@ -1090,7 +1090,7 @@ func (db *DB) CreateProvider(provider *TTSProvider) error {
 			tts_workers = excluded.tts_workers,
 			max_chunk_size = excluded.max_chunk_size,
 			normalize_numbers = excluded.normalize_numbers,
-			normalize_abbreviations = excluded.normalize_abbreviations,
+			transliteration = excluded.transliteration,
 			ssml_support = excluded.ssml_support,
 			stress_enabled = excluded.stress_enabled,
 			sample_rate = excluded.sample_rate,
@@ -1098,7 +1098,7 @@ func (db *DB) CreateProvider(provider *TTSProvider) error {
 			display_order = excluded.display_order,
 			updated_at = excluded.updated_at
 	`, provider.ID, provider.Name, provider.Type, provider.Enabled, provider.URL, provider.APIKey, provider.Region,
-		provider.TTSWorkers, provider.MaxChunkSize, provider.NormalizeNumbers, provider.NormalizeAbbreviations, provider.SSMLSupport, provider.StressEnabled, provider.SampleRate, provider.IsDefault, provider.DisplayOrder,
+		provider.TTSWorkers, provider.MaxChunkSize, provider.NormalizeNumbers, provider.Transliteration, provider.SSMLSupport, provider.StressEnabled, provider.SampleRate, provider.IsDefault, provider.DisplayOrder,
 		provider.CreatedAt, provider.UpdatedAt)
 
 	return err
@@ -1111,10 +1111,10 @@ func (db *DB) UpdateProvider(provider *TTSProvider) error {
 
 	_, err := db.conn.Exec(`
 		UPDATE providers SET name = ?, type = ?, enabled = ?, url = ?, api_key = ?, region = ?, tts_workers = ?,
-			max_chunk_size = ?, normalize_numbers = ?, normalize_abbreviations = ?, ssml_support = ?, stress_enabled = ?, sample_rate = ?, is_default = ?, display_order = ?, updated_at = ?
+			max_chunk_size = ?, normalize_numbers = ?, transliteration = ?, ssml_support = ?, stress_enabled = ?, sample_rate = ?, is_default = ?, display_order = ?, updated_at = ?
 		WHERE id = ?
 	`, provider.Name, provider.Type, provider.Enabled, provider.URL, provider.APIKey, provider.Region, provider.TTSWorkers,
-		provider.MaxChunkSize, provider.NormalizeNumbers, provider.NormalizeAbbreviations, provider.SSMLSupport, provider.StressEnabled, provider.SampleRate, provider.IsDefault, provider.DisplayOrder, time.Now(), provider.ID)
+		provider.MaxChunkSize, provider.NormalizeNumbers, provider.Transliteration, provider.SSMLSupport, provider.StressEnabled, provider.SampleRate, provider.IsDefault, provider.DisplayOrder, time.Now(), provider.ID)
 
 	return err
 }
@@ -1126,10 +1126,10 @@ func (db *DB) GetProvider(id string) (*TTSProvider, error) {
 
 	provider := &TTSProvider{}
 	err := db.conn.QueryRow(`
-		SELECT id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, normalize_abbreviations, ssml_support, stress_enabled, sample_rate, is_default, display_order, created_at, updated_at
+		SELECT id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, transliteration, ssml_support, stress_enabled, sample_rate, is_default, display_order, created_at, updated_at
 		FROM providers WHERE id = ?
 	`, id).Scan(&provider.ID, &provider.Name, &provider.Type, &provider.Enabled, &provider.URL, &provider.APIKey, &provider.Region,
-		&provider.TTSWorkers, &provider.MaxChunkSize, &provider.NormalizeNumbers, &provider.NormalizeAbbreviations, &provider.SSMLSupport, &provider.StressEnabled, &provider.SampleRate, &provider.IsDefault, &provider.DisplayOrder,
+		&provider.TTSWorkers, &provider.MaxChunkSize, &provider.NormalizeNumbers, &provider.Transliteration, &provider.SSMLSupport, &provider.StressEnabled, &provider.SampleRate, &provider.IsDefault, &provider.DisplayOrder,
 		&provider.CreatedAt, &provider.UpdatedAt)
 
 	if err == sql.ErrNoRows {
@@ -1147,7 +1147,7 @@ func (db *DB) ListProviders(enabledOnly bool) ([]*TTSProvider, error) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 
-	query := `SELECT id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, normalize_abbreviations, ssml_support, stress_enabled, sample_rate, is_default, display_order, created_at, updated_at FROM providers`
+	query := `SELECT id, name, type, enabled, url, api_key, region, tts_workers, max_chunk_size, normalize_numbers, transliteration, ssml_support, stress_enabled, sample_rate, is_default, display_order, created_at, updated_at FROM providers`
 	if enabledOnly {
 		query += " WHERE enabled = 1"
 	}
@@ -1163,7 +1163,7 @@ func (db *DB) ListProviders(enabledOnly bool) ([]*TTSProvider, error) {
 	for rows.Next() {
 		provider := &TTSProvider{}
 		err := rows.Scan(&provider.ID, &provider.Name, &provider.Type, &provider.Enabled, &provider.URL, &provider.APIKey, &provider.Region,
-			&provider.TTSWorkers, &provider.MaxChunkSize, &provider.NormalizeNumbers, &provider.NormalizeAbbreviations, &provider.SSMLSupport, &provider.StressEnabled, &provider.SampleRate, &provider.IsDefault, &provider.DisplayOrder,
+			&provider.TTSWorkers, &provider.MaxChunkSize, &provider.NormalizeNumbers, &provider.Transliteration, &provider.SSMLSupport, &provider.StressEnabled, &provider.SampleRate, &provider.IsDefault, &provider.DisplayOrder,
 			&provider.CreatedAt, &provider.UpdatedAt)
 		if err != nil {
 			return nil, err
@@ -1214,10 +1214,10 @@ func (db *DB) GetDefaultProvider() (*TTSProvider, error) {
 
 	provider := &TTSProvider{}
 	err := db.conn.QueryRow(`
-		SELECT id, name, type, enabled, url, api_key, region, tts_workers, normalize_numbers, normalize_abbreviations, ssml_support, is_default, display_order, created_at, updated_at
+		SELECT id, name, type, enabled, url, api_key, region, tts_workers, normalize_numbers, transliteration, ssml_support, is_default, display_order, created_at, updated_at
 		FROM providers WHERE is_default = 1 LIMIT 1
 	`).Scan(&provider.ID, &provider.Name, &provider.Type, &provider.Enabled, &provider.URL, &provider.APIKey, &provider.Region,
-		&provider.TTSWorkers, &provider.NormalizeNumbers, &provider.NormalizeAbbreviations, &provider.SSMLSupport, &provider.IsDefault, &provider.DisplayOrder,
+		&provider.TTSWorkers, &provider.NormalizeNumbers, &provider.Transliteration, &provider.SSMLSupport, &provider.IsDefault, &provider.DisplayOrder,
 		&provider.CreatedAt, &provider.UpdatedAt)
 
 	if err == sql.ErrNoRows {
@@ -1246,148 +1246,148 @@ func (db *DB) InitializeDefaultProviders() error {
 	now := time.Now()
 	defaults := []TTSProvider{
 		{
-			ID:                     "espeak",
-			Name:                   "eSpeak",
-			Type:                   "local",
-			Enabled:                true,
-			URL:                    "",
-			APIKey:                 "",
-			Region:                 "",
-			TTSWorkers:             3,
-			MaxChunkSize:           5000,
-			NormalizeNumbers:       true,
-			NormalizeAbbreviations: false,
-			SSMLSupport:            false,
-			IsDefault:              true,
-			DisplayOrder:           0,
-			CreatedAt:              now,
-			UpdatedAt:              now,
+			ID:               "espeak",
+			Name:             "eSpeak",
+			Type:             "local",
+			Enabled:          true,
+			URL:              "",
+			APIKey:           "",
+			Region:           "",
+			TTSWorkers:       3,
+			MaxChunkSize:     5000,
+			NormalizeNumbers: true,
+			Transliteration:  false,
+			SSMLSupport:      false,
+			IsDefault:        true,
+			DisplayOrder:     0,
+			CreatedAt:        now,
+			UpdatedAt:        now,
 		},
 		{
-			ID:                     "google",
-			Name:                   "Google Cloud TTS",
-			Type:                   "cloud",
-			Enabled:                false,
-			URL:                    "",
-			APIKey:                 "",
-			Region:                 "",
-			TTSWorkers:             3,
-			MaxChunkSize:           4000,
-			NormalizeNumbers:       false,
-			NormalizeAbbreviations: false,
-			SSMLSupport:            true,
-			IsDefault:              false,
-			DisplayOrder:           1,
-			CreatedAt:              now,
-			UpdatedAt:              now,
+			ID:               "google",
+			Name:             "Google Cloud TTS",
+			Type:             "cloud",
+			Enabled:          false,
+			URL:              "",
+			APIKey:           "",
+			Region:           "",
+			TTSWorkers:       3,
+			MaxChunkSize:     4000,
+			NormalizeNumbers: false,
+			Transliteration:  false,
+			SSMLSupport:      true,
+			IsDefault:        false,
+			DisplayOrder:     1,
+			CreatedAt:        now,
+			UpdatedAt:        now,
 		},
 		{
-			ID:                     "openai",
-			Name:                   "OpenAI TTS",
-			Type:                   "cloud",
-			Enabled:                false,
-			URL:                    "",
-			APIKey:                 "",
-			Region:                 "",
-			TTSWorkers:             3,
-			MaxChunkSize:           4000,
-			NormalizeNumbers:       false,
-			NormalizeAbbreviations: false,
-			SSMLSupport:            false,
-			IsDefault:              false,
-			DisplayOrder:           2,
-			CreatedAt:              now,
-			UpdatedAt:              now,
+			ID:               "openai",
+			Name:             "OpenAI TTS",
+			Type:             "cloud",
+			Enabled:          false,
+			URL:              "",
+			APIKey:           "",
+			Region:           "",
+			TTSWorkers:       3,
+			MaxChunkSize:     4000,
+			NormalizeNumbers: false,
+			Transliteration:  false,
+			SSMLSupport:      false,
+			IsDefault:        false,
+			DisplayOrder:     2,
+			CreatedAt:        now,
+			UpdatedAt:        now,
 		},
 		{
-			ID:                     "azure",
-			Name:                   "Azure TTS",
-			Type:                   "cloud",
-			Enabled:                false,
-			URL:                    "",
-			APIKey:                 "",
-			Region:                 "",
-			TTSWorkers:             3,
-			MaxChunkSize:           4000,
-			NormalizeNumbers:       false,
-			NormalizeAbbreviations: false,
-			SSMLSupport:            true,
-			IsDefault:              false,
-			DisplayOrder:           3,
-			CreatedAt:              now,
-			UpdatedAt:              now,
+			ID:               "azure",
+			Name:             "Azure TTS",
+			Type:             "cloud",
+			Enabled:          false,
+			URL:              "",
+			APIKey:           "",
+			Region:           "",
+			TTSWorkers:       3,
+			MaxChunkSize:     4000,
+			NormalizeNumbers: false,
+			Transliteration:  false,
+			SSMLSupport:      true,
+			IsDefault:        false,
+			DisplayOrder:     3,
+			CreatedAt:        now,
+			UpdatedAt:        now,
 		},
 		{
-			ID:                     "opentts",
-			Name:                   "OpenTTS",
-			Type:                   "self-hosted",
-			Enabled:                false,
-			URL:                    "",
-			APIKey:                 "",
-			Region:                 "",
-			TTSWorkers:             3,
-			MaxChunkSize:           2000,
-			NormalizeNumbers:       true,
-			NormalizeAbbreviations: false,
-			SSMLSupport:            false,
-			IsDefault:              false,
-			DisplayOrder:           4,
-			CreatedAt:              now,
-			UpdatedAt:              now,
+			ID:               "opentts",
+			Name:             "OpenTTS",
+			Type:             "self-hosted",
+			Enabled:          false,
+			URL:              "",
+			APIKey:           "",
+			Region:           "",
+			TTSWorkers:       3,
+			MaxChunkSize:     2000,
+			NormalizeNumbers: true,
+			Transliteration:  false,
+			SSMLSupport:      false,
+			IsDefault:        false,
+			DisplayOrder:     4,
+			CreatedAt:        now,
+			UpdatedAt:        now,
 		},
 		{
-			ID:                     "rhvoice",
-			Name:                   "RHVoice",
-			Type:                   "self-hosted",
-			Enabled:                false,
-			URL:                    "",
-			APIKey:                 "",
-			Region:                 "",
-			TTSWorkers:             3,
-			MaxChunkSize:           2000,
-			NormalizeNumbers:       true,
-			NormalizeAbbreviations: false,
-			SSMLSupport:            true,
-			IsDefault:              false,
-			DisplayOrder:           5,
-			CreatedAt:              now,
-			UpdatedAt:              now,
+			ID:               "rhvoice",
+			Name:             "RHVoice",
+			Type:             "self-hosted",
+			Enabled:          false,
+			URL:              "",
+			APIKey:           "",
+			Region:           "",
+			TTSWorkers:       3,
+			MaxChunkSize:     2000,
+			NormalizeNumbers: true,
+			Transliteration:  false,
+			SSMLSupport:      true,
+			IsDefault:        false,
+			DisplayOrder:     5,
+			CreatedAt:        now,
+			UpdatedAt:        now,
 		},
 		{
-			ID:                     "silero",
-			Name:                   "Silero TTS",
-			Type:                   "self-hosted",
-			Enabled:                false,
-			URL:                    "",
-			APIKey:                 "",
-			Region:                 "",
-			TTSWorkers:             3,
-			MaxChunkSize:           900,
-			NormalizeNumbers:       true,
-			NormalizeAbbreviations: false,
-			SSMLSupport:            true,
-			IsDefault:              false,
-			DisplayOrder:           6,
-			CreatedAt:              now,
-			UpdatedAt:              now,
+			ID:               "silero",
+			Name:             "Silero TTS",
+			Type:             "self-hosted",
+			Enabled:          false,
+			URL:              "",
+			APIKey:           "",
+			Region:           "",
+			TTSWorkers:       3,
+			MaxChunkSize:     900,
+			NormalizeNumbers: true,
+			Transliteration:  false,
+			SSMLSupport:      true,
+			IsDefault:        false,
+			DisplayOrder:     6,
+			CreatedAt:        now,
+			UpdatedAt:        now,
 		},
 		{
-			ID:                     "openvoice",
-			Name:                   "OpenVoice TTS",
-			Type:                   "self-hosted",
-			Enabled:                false,
-			URL:                    "",
-			APIKey:                 "",
-			Region:                 "",
-			TTSWorkers:             3,
-			MaxChunkSize:           2000,
-			NormalizeNumbers:       true,
-			NormalizeAbbreviations: false,
-			SSMLSupport:            false,
-			IsDefault:              false,
-			DisplayOrder:           7,
-			CreatedAt:              now,
-			UpdatedAt:              now,
+			ID:               "openvoice",
+			Name:             "OpenVoice TTS",
+			Type:             "self-hosted",
+			Enabled:          false,
+			URL:              "",
+			APIKey:           "",
+			Region:           "",
+			TTSWorkers:       3,
+			MaxChunkSize:     2000,
+			NormalizeNumbers: true,
+			Transliteration:  false,
+			SSMLSupport:      false,
+			IsDefault:        false,
+			DisplayOrder:     7,
+			CreatedAt:        now,
+			UpdatedAt:        now,
 		},
 	}
 

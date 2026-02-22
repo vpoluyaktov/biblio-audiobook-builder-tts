@@ -19,6 +19,7 @@ type DictionaryEntry struct {
 	ReplacementPlain string
 	ReplacementSSML  string
 	Comment          string
+	Language         string
 }
 
 // LoadDefaultRulesFromCSV loads pronunciation rules from embedded CSV files
@@ -27,7 +28,7 @@ func LoadDefaultRulesFromCSV() ([]DictionaryEntry, error) {
 
 	// Load English rules
 	if data, err := embeddedData.Open("data/en.csv"); err == nil {
-		entries, err := loadEntriesFromReader(data)
+		entries, err := loadEntriesFromReaderWithLanguage(data, "en")
 		data.Close()
 		if err != nil {
 			return nil, fmt.Errorf("failed to load English rules: %w", err)
@@ -37,7 +38,7 @@ func LoadDefaultRulesFromCSV() ([]DictionaryEntry, error) {
 
 	// Load Russian rules
 	if data, err := embeddedData.Open("data/ru.csv"); err == nil {
-		entries, err := loadEntriesFromReader(data)
+		entries, err := loadEntriesFromReaderWithLanguage(data, "ru")
 		data.Close()
 		if err != nil {
 			return nil, fmt.Errorf("failed to load Russian rules: %w", err)
@@ -48,9 +49,9 @@ func LoadDefaultRulesFromCSV() ([]DictionaryEntry, error) {
 	return allEntries, nil
 }
 
-// loadEntriesFromReader loads pronunciation dictionary entries from a CSV reader
+// loadEntriesFromReaderWithLanguage loads pronunciation dictionary entries from a CSV reader
 // CSV format: pattern,replacement_plain,replacement_ssml,comment
-func loadEntriesFromReader(r io.Reader) ([]DictionaryEntry, error) {
+func loadEntriesFromReaderWithLanguage(r io.Reader, language string) ([]DictionaryEntry, error) {
 	var entries []DictionaryEntry
 
 	scanner := bufio.NewScanner(r)
@@ -71,6 +72,8 @@ func loadEntriesFromReader(r io.Reader) ([]DictionaryEntry, error) {
 			continue
 		}
 
+		// Set the language for this entry
+		entry.Language = language
 		entries = append(entries, entry)
 	}
 
@@ -89,8 +92,8 @@ func parseCSVLine(line string, lineNum int) (DictionaryEntry, error) {
 	}
 
 	pattern := strings.TrimSpace(parts[0])
-	replacementPlain := strings.TrimSpace(parts[1])
-	replacementSSML := strings.TrimSpace(parts[2])
+	replacementPlain := parts[1]
+	replacementSSML := parts[2]
 	comment := strings.TrimSpace(parts[3])
 
 	// Validate regex pattern
@@ -107,11 +110,18 @@ func parseCSVLine(line string, lineNum int) (DictionaryEntry, error) {
 }
 
 // LoadRulesFromCSVFile loads pronunciation rules from an external CSV file
+// Language is detected from filename if possible (e.g., "ru.csv" -> "ru"), otherwise defaults to "en"
 func LoadRulesFromCSVFile(filePath string) ([]DictionaryEntry, error) {
 	file, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
-	return loadEntriesFromReader(strings.NewReader(string(file)))
+	// Try to detect language from filename
+	lang := "en" // default
+	if strings.Contains(filePath, "ru.csv") || strings.Contains(filePath, "/ru/") {
+		lang = "ru"
+	}
+
+	return loadEntriesFromReaderWithLanguage(strings.NewReader(string(file)), lang)
 }

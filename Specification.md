@@ -68,6 +68,75 @@ biblio-audiobook-builder-tts/
 
 ## Recent Changes
 
+### 2026-02-20: Simplified Latin-to-Russian Transliteration
+
+**Changes**: Simplified the Latin-to-Russian conversion approach and removed abbreviation normalization feature.
+
+**What Changed**:
+1. **Removed CSV-based Latin pronunciation data** - Deleted `internal/sanitize/data/latin_ru.csv`
+2. **Simplified transliteration logic** - `internal/sanitize/latin_ru.go` now only does letter-by-letter transliteration for uppercase Latin sequences (2+ letters) in Russian context
+3. **Provider-level configuration** - Added `transliterate_latin_to_russian` toggle (replaces `normalize_abbreviations`)
+4. **Removed abbreviation normalization** - Completely removed from `internal/normalize` package (russian.go, english.go, processor.go, types.go)
+5. **Updated UI** - Settings now show "Latin→RU" toggle instead of "Abbrev" normalization
+
+**Rationale**: 
+- All abbreviations (both Latin and Cyrillic) should be handled by the pronunciation dictionary (`ru.csv`, `en.csv`)
+- Latin transliteration is only for simple letter-by-letter conversion (FBI → эф би ай, USB → ю эс би)
+- This separation of concerns makes the system cleaner and more maintainable
+
+**Implementation**:
+- Pattern: `\b[A-Z]{2,}\b` (uppercase Latin sequences, 2+ letters)
+- Context detection: Only applies in Russian text (20%+ Cyrillic characters)
+- Examples: FBI → эф би ай, CIA → си ай эй, USB → ю эс би
+
+---
+
+### 2026-02-20: Fix Russian Pronunciation Dictionary Language Detection
+
+**Bug**: Russian pronunciation dictionary rules (like "США" → "сэ шэ а") were not being applied because all CSV rules were hardcoded as English language.
+
+**Fix**:
+- Added `Language` field to `DictionaryEntry` struct
+- Updated CSV loader to correctly assign language based on filename
+- Modified `LoadDefaultRules()` to preserve language from CSV entries
+
+**Impact**: Russian pronunciation dictionary now works correctly for 200+ Russian abbreviations including "США", "МВД", "ООН", etc.
+
+**Motivation**: Russian TTS engines struggle with Latin letters and abbreviations (like "FBI", "USB", "DC-19") embedded in Russian text. These need to be converted to their Russian phonetic equivalents for proper narration.
+
+**Examples**:
+```
+Input:  "Агентство FBI использует технологию AI"
+Output: "Агентство эф би ай использует технологию эй ай"
+
+Input:  "Самолет DC-10 совершил посадку"
+Output: "Самолет ди си 10 совершил посадку"
+
+Input:  "Подключите USB устройство"
+Output: "Подключите ю эс би устройство"
+
+Input:  "Процессор CPU работает на частоте 3 GHz"
+Output: "Процессор си пи ю работает на частоте 3 джи эйч зет"
+```
+
+**Testing**: Comprehensive test suite with 50+ test cases covering:
+- Simple abbreviations (2-3 letters)
+- Single letters (A, B, C)
+- Hyphenated patterns (DC-19, L-3, DC-19-A)
+- Number+letter patterns (5G, 4G)
+- Mixed case (WiFi, PhD, HTML, CSS)
+- Context detection (Russian vs English text)
+- Edge cases (punctuation, newlines, special characters)
+- Real-world examples (technical docs, news articles, aviation, medical, IT)
+
+**Benefits**:
+- Proper Russian narration of technical terms and abbreviations
+- Automatic handling without manual text preprocessing
+- Context-aware to avoid false conversions in English text
+- Extensible via CSV data files for new abbreviations
+
+---
+
 ### 2026-02-19: Fix Russian Date Normalization to Use Genitive Case
 
 **Issue**: Russian dates with month names were incorrectly using nominative case instead of genitive case:

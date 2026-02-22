@@ -4,8 +4,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 )
 
 // RussianConverter converts numbers to Russian words with gender and case support.
@@ -117,46 +115,6 @@ var RussianYearOfBirthPattern = regexp.MustCompile(`(\d+)\s*г\.\s*р\.`)
 // Both numbers should be converted to ordinal neuter (for dates)
 // Example: "6-16 августа" → "шестое, тире, шестнадцатое августа"
 var RussianDateRangePattern = regexp.MustCompile(`(\d+)-(\d+)\s+(января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)`)
-
-// RussianAbbreviationPattern matches uppercase Cyrillic abbreviations (2+ letters).
-// Note: boundary checks are done in code because regexp \b is ASCII-only in Go.
-var RussianAbbreviationPattern = regexp.MustCompile(`[А-ЯЁ]{2,}`)
-
-var russianLetterNames = map[rune]string{
-	'А': "А",
-	'Б': "БЭ",
-	'В': "ВЭ",
-	'Г': "ГЭ",
-	'Д': "ДЭ",
-	'Е': "Е",
-	'Ё': "Ё",
-	'Ж': "ЖЭ",
-	'З': "ЗЭ",
-	'И': "И",
-	'Й': "Й",
-	'К': "КА",
-	'Л': "ЭЛЬ",
-	'М': "ЭМ",
-	'Н': "ЭН",
-	'О': "О",
-	'П': "ПЭ",
-	'Р': "ЭР",
-	'С': "ЭС",
-	'Т': "ТЭ",
-	'У': "У",
-	'Ф': "ЭФ",
-	'Х': "ХА",
-	'Ц': "ЦЭ",
-	'Ч': "ЧЭ",
-	'Ш': "ША",
-	'Щ': "ЩА",
-	'Ъ': "ТВЁРДЫЙ ЗНАК",
-	'Ы': "Ы",
-	'Ь': "МЯГКИЙ ЗНАК",
-	'Э': "Э",
-	'Ю': "Ю",
-	'Я': "Я",
-}
 
 // GenderFromSuffix determines grammatical gender from Russian ordinal suffix
 func GenderFromSuffix(suffix string) Gender {
@@ -1059,56 +1017,6 @@ func (p *RussianProcessor) PostProcessContext(words string, ctx Context) string 
 		return TransformOrdinalCase(words, ctx.Case, ctx.Gender)
 	}
 	return words
-}
-
-// NormalizeAbbreviations expands uppercase abbreviations to spoken letter names.
-// Example: "МВД" -> "ЭМ ВЭ ДЭ".
-func (p *RussianProcessor) NormalizeAbbreviations(text string) string {
-	matches := RussianAbbreviationPattern.FindAllStringIndex(text, -1)
-	if len(matches) == 0 {
-		return text
-	}
-
-	result := text
-	for i := len(matches) - 1; i >= 0; i-- {
-		start, end := matches[i][0], matches[i][1]
-		if !isWordBoundary(result, start, end) {
-			continue
-		}
-
-		match := result[start:end]
-		parts := make([]string, 0, len(match))
-		for _, ch := range match {
-			if name, ok := russianLetterNames[ch]; ok {
-				parts = append(parts, name)
-			} else {
-				parts = append(parts, string(ch))
-			}
-		}
-
-		replacement := strings.Join(parts, " ")
-		result = result[:start] + replacement + result[end:]
-	}
-
-	return result
-}
-
-func isWordBoundary(text string, start, end int) bool {
-	if start > 0 {
-		r, _ := utf8.DecodeLastRuneInString(text[:start])
-		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' {
-			return false
-		}
-	}
-
-	if end < len(text) {
-		r, _ := utf8.DecodeRuneInString(text[end:])
-		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' {
-			return false
-		}
-	}
-
-	return true
 }
 
 // GetChapterGender returns Feminine because "глава" (chapter) is feminine in Russian.
