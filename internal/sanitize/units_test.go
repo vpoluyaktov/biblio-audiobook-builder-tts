@@ -170,20 +170,18 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 			desc:     "Should replace ha after number",
 		},
 
-		// Speed units - Note: Due to rule ordering, simpler patterns match first
-		// So "100 км/ч" becomes "100 километр/ч" (км matched, but not км/ч)
-		// This is a known limitation - compound units need special handling
+		// Speed units - compound units now match correctly due to proper ordering
 		{
-			name:     "kilometers per hour partial",
+			name:     "kilometers per hour",
 			input:    "Скорость 100 км/ч",
-			expected: "Скорость 100 километр/ч",
-			desc:     "Currently replaces km but not full km/h due to rule ordering",
+			expected: "Скорость 100 километров в час",
+			desc:     "Should replace full km/h compound unit",
 		},
 		{
-			name:     "meters per second partial",
+			name:     "meters per second",
 			input:    "Скорость 10 м/с",
-			expected: "Скорость 10 метр/с",
-			desc:     "Currently replaces m but not full m/s due to rule ordering",
+			expected: "Скорость 10 метров в секунду",
+			desc:     "Should replace full m/s compound unit",
 		},
 
 		// Power units
@@ -200,10 +198,10 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 			desc:     "Should replace kW after number",
 		},
 		{
-			name:     "horsepower partial",
+			name:     "horsepower",
 			input:    "Двигатель 150 л.с.",
-			expected: "Двигатель 150 литр.с.",
-			desc:     "Currently replaces л but not full л.с. due to rule ordering",
+			expected: "Двигатель 150 лошадиных сил",
+			desc:     "Should replace full л.с. compound unit",
 		},
 
 		// Frequency units
@@ -274,8 +272,8 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "distance and speed",
 			input:    "Расстояние 100 км, скорость 80 км/ч",
-			expected: "Расстояние 100 километр, скорость 80 километр/ч",
-			desc:     "Replaces km in both cases, but km/h gets partial replacement",
+			expected: "Расстояние 100 километр, скорость 80 километров в час",
+			desc:     "Should replace both km and full km/h correctly",
 		},
 		{
 			name:     "dimensions",
