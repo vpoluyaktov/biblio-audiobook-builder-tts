@@ -20,8 +20,7 @@ type SettingsRequest struct {
 	LogFile     string `json:"log_file"`
 
 	// TTS - Pronunciation
-	UseDefaultPronunciation bool   `json:"use_default_pronunciation"`
-	PronunciationDictFile   string `json:"pronunciation_dict_file"`
+	UseDefaultPronunciation bool `json:"use_default_pronunciation"`
 
 	// TTS - Pauses & Gaps
 	SentenceBreakMs     int     `json:"sentence_break_ms"`
@@ -75,7 +74,6 @@ func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
 
 		// TTS - Pronunciation
 		UseDefaultPronunciation: s.cfg.UseDefaultPronunciation,
-		PronunciationDictFile:   s.cfg.PronunciationDictFile,
 
 		// TTS - Pauses & Gaps
 		SentenceBreakMs:     s.cfg.SentenceBreakMs,
@@ -155,9 +153,6 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 	if wasProvided("use_default_pronunciation") {
 		s.cfg.UseDefaultPronunciation = req.UseDefaultPronunciation
 	}
-	if wasProvided("pronunciation_dict_file") {
-		s.cfg.PronunciationDictFile = req.PronunciationDictFile
-	}
 
 	// TTS - Pauses & Gaps
 	if wasProvided("sentence_break_ms") {
@@ -221,7 +216,6 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 			"server_host":               {req.ServerHost, wasProvided("server_host")},
 			"open_browser":              {fmt.Sprintf("%t", req.OpenBrowser), wasProvided("open_browser")},
 			"use_default_pronunciation": {fmt.Sprintf("%t", req.UseDefaultPronunciation), wasProvided("use_default_pronunciation")},
-			"pronunciation_dict_file":   {req.PronunciationDictFile, wasProvided("pronunciation_dict_file")},
 			"sentence_break_ms":         {fmt.Sprintf("%d", req.SentenceBreakMs), wasProvided("sentence_break_ms")},
 			"paragraph_break_ms":        {fmt.Sprintf("%d", req.ParagraphBreakMs), wasProvided("paragraph_break_ms")},
 			"dash_break_duration_ms":    {fmt.Sprintf("%d", req.DashBreakDurationMs), wasProvided("dash_break_duration_ms")},

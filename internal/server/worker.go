@@ -67,15 +67,6 @@ func NewWorker(db JobDB, hub *Hub, ttsService tts.Service, cfg *config.Config) *
 		logger.Warn("Default pronunciation rules NOT loaded (UseDefaultPronunciation is false)")
 	}
 
-	// Load custom dictionary if specified
-	if cfg.PronunciationDictFile != "" {
-		if err := textSanitizer.GetDictionary().LoadFromFile(cfg.PronunciationDictFile); err != nil {
-			logger.Warn("Failed to load pronunciation dictionary: %v", err)
-		} else {
-			logger.Info("Loaded pronunciation dictionary from %s", cfg.PronunciationDictFile)
-		}
-	}
-
 	// Note: Database pronunciation rules are loaded per-chapter to allow
 	// real-time updates without service restart
 
@@ -141,13 +132,6 @@ func (w *Worker) loadPronunciationRulesFromDB() error {
 	// Reload default rules if enabled
 	if w.cfg.UseDefaultPronunciation {
 		w.sanitizer.LoadDefaultRules()
-	}
-
-	// Reload file-based rules if specified
-	if w.cfg.PronunciationDictFile != "" {
-		if err := dict.LoadFromFile(w.cfg.PronunciationDictFile); err != nil {
-			logger.Warn("Failed to reload pronunciation dictionary from file: %v", err)
-		}
 	}
 
 	// Load database rules

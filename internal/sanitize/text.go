@@ -1,10 +1,7 @@
 package sanitize
 
 import (
-	"bufio"
-	"fmt"
 	"log"
-	"os"
 	"regexp"
 	"strings"
 	"unicode"
@@ -425,77 +422,6 @@ func (d *PronunciationDictionary) RuleCount() int {
 // Clear removes all rules
 func (d *PronunciationDictionary) Clear() {
 	d.rules = make([]PronunciationRule, 0)
-}
-
-// LoadFromFile loads pronunciation rules from a file
-// Format: pattern -> replacement # optional comment
-// Lines starting with # are comments
-// Empty lines are ignored
-func (d *PronunciationDictionary) LoadFromFile(filePath string) error {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to open pronunciation file: %w", err)
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	lineNum := 0
-
-	for scanner.Scan() {
-		lineNum++
-		line := strings.TrimSpace(scanner.Text())
-
-		// Skip empty lines and comments
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		rule, err := d.parseLine(line)
-		if err != nil {
-			return fmt.Errorf("line %d: %w", lineNum, err)
-		}
-
-		d.rules = append(d.rules, rule)
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("error reading file: %w", err)
-	}
-
-	return nil
-}
-
-// parseLine parses a single rule line
-func (d *PronunciationDictionary) parseLine(line string) (PronunciationRule, error) {
-	var rule PronunciationRule
-
-	// Extract comment if present
-	if idx := strings.Index(line, " # "); idx != -1 {
-		rule.Comment = strings.TrimSpace(line[idx+3:])
-		line = line[:idx]
-	}
-
-	// Split by arrow
-	parts := strings.SplitN(line, " -> ", 2)
-	if len(parts) != 2 {
-		return rule, fmt.Errorf("invalid format, expected 'pattern -> replacement'")
-	}
-
-	pattern := strings.TrimSpace(parts[0])
-	replacement := strings.TrimSpace(parts[1])
-
-	// Compile regex
-	re, err := regexp.Compile(pattern)
-	if err != nil {
-		return rule, fmt.Errorf("invalid regex pattern '%s': %w", pattern, err)
-	}
-
-	rule.Pattern = re
-	rule.ReplacementPlain = replacement
-	rule.ReplacementSSML = replacement
-	rule.Enabled = true
-
-	return rule, nil
 }
 
 // GetDefaultRules returns common pronunciation fixes loaded from CSV files
