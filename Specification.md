@@ -113,8 +113,8 @@ biblio-audiobook-builder-tts/
 ### Pronunciation Dictionary Patterns
 
 **Pattern requirements**:
-- Measurement units must include `(\d+)\s*` prefix and `(?:[\s\.\,\)]|$)` suffix (non-capturing group)
-  - Pattern: `"(\d+)\s*м(?:[\s\.\,\)]|$)"` (quoted to handle comma in character class)
+- Measurement units must include `(\d+)\s*` prefix and `(?:[\s.,)]|$)` suffix (non-capturing group)
+  - Pattern: `"(\d+)\s*м(?:[\s.,)]|$)"` (quoted to handle comma in character class)
   - Replacement: `$1 метров` (simple replacement, no capture group references)
   - **Non-capturing group `(?:...)` is used** so delimiter doesn't create a capture group
   - **Go code automatically adds a space after replacement** for patterns with this suffix

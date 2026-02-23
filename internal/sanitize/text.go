@@ -359,13 +359,13 @@ func (d *PronunciationDictionary) ApplyWithMode(text string, useSSML bool) strin
 // recognises ASCII word-character boundaries, so \b adjacent to Cyrillic letters
 // never fires. When the pattern contains both \b and non-ASCII characters, this
 // function strips the \b anchors and enforces Unicode word boundaries manually.
-// For patterns with delimiter suffix (?:[\s\.\,\)]|$), a space is automatically added
+// For patterns with delimiter suffix (?:[\s.,)]|$), a space is automatically added
 // after replacement to handle the consumed delimiter.
 func applyRuleUnicode(re *regexp.Regexp, text, replacement string) string {
 	patStr := re.String()
 	if !strings.Contains(patStr, `\b`) {
 		// Check if pattern has delimiter suffix - if so, add space after replacement
-		if strings.Contains(patStr, `(?:[\s\.\,\)]|$)`) {
+		if strings.Contains(patStr, `(?:[\s.,)]|$)`) {
 			return re.ReplaceAllStringFunc(text, func(match string) string {
 				expanded := re.ReplaceAllString(match, replacement)
 				return expanded + " "
