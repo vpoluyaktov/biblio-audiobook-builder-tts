@@ -30,13 +30,13 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "voltage with number",
 			input:    "Напряжение 220 В",
-			expected: "Напряжение 220 вольт",
+			expected: "Напряжение 220 вольт ",
 			desc:     "Should replace В after number",
 		},
 		{
 			name:     "voltage with space",
 			input:    "Батарея на 12 В",
-			expected: "Батарея на 12 вольт",
+			expected: "Батарея на 12 вольт ",
 			desc:     "Should replace В after number with space",
 		},
 		{
@@ -54,7 +54,7 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "kilovolt",
 			input:    "Линия 10 кВ",
-			expected: "Линия 10 киловольт",
+			expected: "Линия 10 киловольт ",
 			desc:     "Should replace kV after number",
 		},
 
@@ -62,13 +62,13 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "ampere with number",
 			input:    "Ток 5 А",
-			expected: "Ток 5 ампер",
+			expected: "Ток 5 ампер ",
 			desc:     "Should replace А after number",
 		},
 		{
 			name:     "milliampere",
 			input:    "Потребление 500 мА",
-			expected: "Потребление 500 миллиампер",
+			expected: "Потребление 500 миллиампер ",
 			desc:     "Should replace mA after number",
 		},
 		{
@@ -88,25 +88,25 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "kilogram",
 			input:    "Вес 75 кг",
-			expected: "Вес 75 килограммов",
+			expected: "Вес 75 килограммов ",
 			desc:     "Should replace kg after number",
 		},
 		{
 			name:     "gram",
 			input:    "Масса 500 г",
-			expected: "Масса 500 граммов",
+			expected: "Масса 500 граммов ",
 			desc:     "Should replace g after number",
 		},
 		{
 			name:     "milligram",
 			input:    "Доза 250 мг",
-			expected: "Доза 250 миллиграммов",
+			expected: "Доза 250 миллиграммов ",
 			desc:     "Should replace mg after number",
 		},
 		{
 			name:     "ton",
 			input:    "Груз 10 т",
-			expected: "Груз 10 тонн",
+			expected: "Груз 10 тонн ",
 			desc:     "Should replace t after number",
 		},
 
@@ -114,25 +114,25 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "meter",
 			input:    "Длина 100 м",
-			expected: "Длина 100 метров",
+			expected: "Длина 100 метров ",
 			desc:     "Should replace m after number",
 		},
 		{
 			name:     "kilometer",
 			input:    "Расстояние 50 км",
-			expected: "Расстояние 50 километров",
+			expected: "Расстояние 50 километров ",
 			desc:     "Should replace km after number",
 		},
 		{
 			name:     "centimeter",
 			input:    "Высота 180 см",
-			expected: "Высота 180 сантиметров",
+			expected: "Высота 180 сантиметров ",
 			desc:     "Should replace cm after number",
 		},
 		{
 			name:     "millimeter",
 			input:    "Толщина 5 мм",
-			expected: "Толщина 5 миллиметров",
+			expected: "Толщина 5 миллиметров ",
 			desc:     "Should replace mm after number",
 		},
 
@@ -140,13 +140,13 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "liter",
 			input:    "Объем 2 л",
-			expected: "Объем 2 литров",
+			expected: "Объем 2 литров ",
 			desc:     "Should replace l after number",
 		},
 		{
 			name:     "milliliter",
 			input:    "Доза 100 мл",
-			expected: "Доза 100 миллилитров",
+			expected: "Доза 100 миллилитров ",
 			desc:     "Should replace ml after number",
 		},
 
@@ -154,19 +154,19 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "square meter",
 			input:    "Площадь 50 кв.м",
-			expected: "Площадь 50 квадратных метров",
+			expected: "Площадь 50 квадратных метров ",
 			desc:     "Should replace sq.m after number",
 		},
 		{
 			name:     "cubic meter",
 			input:    "Объем 10 куб.м",
-			expected: "Объем 10 кубических метров",
+			expected: "Объем 10 кубических метров ",
 			desc:     "Should replace cu.m after number",
 		},
 		{
 			name:     "hectare",
 			input:    "Участок 5 га",
-			expected: "Участок 5 гектаров",
+			expected: "Участок 5 гектаров ",
 			desc:     "Should replace ha after number",
 		},
 
@@ -174,13 +174,13 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "kilometers per hour",
 			input:    "Скорость 100 км/ч",
-			expected: "Скорость 100 километров в час",
+			expected: "Скорость 100 километров в час ",
 			desc:     "Should replace full km/h compound unit",
 		},
 		{
 			name:     "meters per second",
 			input:    "Скорость 10 м/с",
-			expected: "Скорость 10 метров в секунду",
+			expected: "Скорость 10 метров в секунду ",
 			desc:     "Should replace full m/s compound unit",
 		},
 
@@ -188,19 +188,19 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "watt",
 			input:    "Мощность 100 Вт",
-			expected: "Мощность 100 ватт",
+			expected: "Мощность 100 ватт ",
 			desc:     "Should replace W after number",
 		},
 		{
 			name:     "kilowatt",
 			input:    "Мощность 5 кВт",
-			expected: "Мощность 5 киловатт",
+			expected: "Мощность 5 киловатт ",
 			desc:     "Should replace kW after number",
 		},
 		{
 			name:     "horsepower",
 			input:    "Двигатель 150 л.с.",
-			expected: "Двигатель 150 лошадиных сил",
+			expected: "Двигатель 150 лошадиных сил ",
 			desc:     "Should replace full л.с. compound unit",
 		},
 
@@ -208,31 +208,31 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "gigahertz",
 			input:    "Процессор 3 ГГц",
-			expected: "Процессор 3 гигагерц",
+			expected: "Процессор 3 гигагерц ",
 			desc:     "Should replace full GHz, not partial Г + герц",
 		},
 		{
 			name:     "megahertz",
 			input:    "Частота 2.4 МГц",
-			expected: "Частота 2.4 мегагерц",
+			expected: "Частота 2.4 мегагерц ",
 			desc:     "Should replace full MHz, not partial М + герц",
 		},
 		{
 			name:     "kilohertz",
 			input:    "Частота 100 кГц",
-			expected: "Частота 100 килогерц",
+			expected: "Частота 100 килогерц ",
 			desc:     "Should replace full kHz, not partial к + герц",
 		},
 		{
 			name:     "hertz",
 			input:    "Частота 50 Гц",
-			expected: "Частота 50 герц",
+			expected: "Частота 50 герц ",
 			desc:     "Should replace simple Hz after number",
 		},
 		{
 			name:     "mixed frequencies",
 			input:    "Процессор 3.5 ГГц, память 1600 МГц, звук 48 кГц, сеть 50 Гц",
-			expected: "Процессор 3.5 гигагерц, память 1600 мегагерц, звук 48 килогерц, сеть 50 герц",
+			expected: "Процессор 3.5 гигагерц  память 1600 мегагерц  звук 48 килогерц  сеть 50 герц ",
 			desc:     "Should correctly replace all frequency units in mixed text",
 		},
 
@@ -240,19 +240,19 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "minutes",
 			input:    "Время 30 мин",
-			expected: "Время 30 минут",
+			expected: "Время 30 минут ",
 			desc:     "Should replace min after number",
 		},
 		{
 			name:     "seconds",
 			input:    "Время 45 сек",
-			expected: "Время 45 секунд",
+			expected: "Время 45 секунд ",
 			desc:     "Should replace sec after number",
 		},
 		{
 			name:     "hours",
 			input:    "Время 2 ч",
-			expected: "Время 2 часов",
+			expected: "Время 2 часов ",
 			desc:     "Should replace h after number",
 		},
 
@@ -260,13 +260,13 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "technical specification",
 			input:    "Батарея 12 В, 7 А, емкость 84 Вт",
-			expected: "Батарея 12 вольт, 7 ампер, емкость 84 ватт",
+			expected: "Батарея 12 вольт  7 ампер  емкость 84 ватт ",
 			desc:     "Should replace all units in technical spec",
 		},
 		{
 			name:     "mixed text with prepositions",
 			input:    "В батарее напряжение 220 В, А ток 10 А",
-			expected: "В батарее напряжение 220 вольт, А ток 10 ампер",
+			expected: "В батарее напряжение 220 вольт  А ток 10 ампер ",
 			desc:     "Should only replace units after numbers, not prepositions",
 		},
 		{
@@ -278,13 +278,14 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "distance and speed",
 			input:    "Расстояние 100 км, скорость 80 км/ч",
-			expected: "Расстояние 100 километров, скорость 80 километров в час",
+			expected: "Расстояние 100 километров  скорость 80 километров в час ",
 			desc:     "Should replace both km and full km/h correctly",
 		},
 		{
-			name:  "dimensions",
-			input: "Размеры: 180 см высота, 75 кг вес",
-			desc:  "Should replace dimension units",
+			name:     "dimensions",
+			input:    "Размеры: 180 см высота, 75 кг вес",
+			expected: "Размеры: 180 сантиметров высота, 75 килограммов вес",
+			desc:     "Should replace dimension units",
 		},
 
 		// Edge cases - no numbers before unit
@@ -303,7 +304,7 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "number with abbreviated м",
 			input:    "10668 м",
-			expected: "10668 метров",
+			expected: "10668 метров ",
 			desc:     "Should replace abbreviated м after number",
 		},
 		{

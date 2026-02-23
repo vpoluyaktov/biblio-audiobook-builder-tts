@@ -38,7 +38,6 @@ type Config struct {
 	ParenthesesBreakMs      int     `mapstructure:"parentheses_break_ms"`      // Duration of break around parenthetical text in ms (default 250)
 	ColonBreakMs            int     `mapstructure:"colon_break_ms"`            // Duration of break replacing ':' in ms (default 250)
 	TitleBreakMs            int     `mapstructure:"title_break_ms"`            // SSML break duration after titles (default 500ms)
-	PronunciationDictFile   string  `mapstructure:"pronunciation_dict_file"`   // Path to pronunciation dictionary
 	UseDefaultPronunciation bool    `mapstructure:"use_default_pronunciation"` // Use built-in pronunciation rules
 	MaxFileSizeMB           int     `mapstructure:"max_file_size_mb"`          // Max M4B file size before splitting
 	ConcurrentEncoders      int     `mapstructure:"concurrent_encoders"`       // Number of parallel M4B encoders
@@ -210,9 +209,6 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 		cfg.TitleBreakMs = int(v)
 	} else if v, ok := dbConfig["title_break_ms"].(int); ok {
 		cfg.TitleBreakMs = v
-	}
-	if v, ok := dbConfig["pronunciation_dict_file"].(string); ok {
-		cfg.PronunciationDictFile = v
 	}
 	if v, ok := dbConfig["use_default_pronunciation"].(bool); ok {
 		cfg.UseDefaultPronunciation = v

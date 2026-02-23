@@ -1,10 +1,6 @@
 package sanitize
 
 import (
-	"bufio"
-	"fmt"
-	"log"
-	"os"
 	"regexp"
 	"strings"
 	"unicode"
@@ -354,80 +350,47 @@ func (d *PronunciationDictionary) ApplyWithMode(text string, useSSML bool) strin
 	return d.ApplyWithLanguage(text, useSSML, "")
 }
 
-// applyRuleUnicode applies a single pronunciation rule. It handles \b word
-// boundaries correctly for Unicode (Cyrillic, etc.) text: Go's regexp \b only
-// recognises ASCII word-character boundaries, so \b adjacent to Cyrillic letters
-// never fires. When the pattern contains both \b and non-ASCII characters, this
-// function strips the \b anchors and enforces Unicode word boundaries manually.
+// applyRuleUnicode applies a single pronunciation rule with automatic boundary wrapping.
+// All patterns from CSV are automatically wrapped with (?:^|\s) prefix and (?:[\s.,)]|$) suffix.
+// A space is always added after replacement.
 func applyRuleUnicode(re *regexp.Regexp, text, replacement string) string {
-	patStr := re.String()
-	if !strings.Contains(patStr, `\b`) {
-		return re.ReplaceAllString(text, replacement)
-	}
-
-	// Only apply the custom path when the pattern contains non-ASCII characters.
-	hasNonASCII := false
-	for _, r := range patStr {
-		if r > 127 {
-			hasNonASCII = true
-			break
-		}
-	}
-	if !hasNonASCII {
-		return re.ReplaceAllString(text, replacement)
-	}
-
-	// Strip every \b from the pattern so FindAllStringIndex can find matches,
-	// then manually enforce letter/digit boundaries around each match.
-	stripped := strings.ReplaceAll(patStr, `\b`, ``)
-	strippedRe, err := regexp.Compile(stripped)
+	// Wrap pattern: (?:^|\s) at start for word boundary, pattern in capture group, (?:[\s.,)]|$) at end
+	// This ensures we only match complete words/units, not parts of larger words
+	wrappedPattern := `(?:^|\s)(` + re.String() + `)(?:[\s.,)]|$)`
+	wrappedRe, err := regexp.Compile(wrappedPattern)
 	if err != nil {
-		return re.ReplaceAllString(text, replacement) // unexpected – fall back
+		// If wrapping fails, fall back to original pattern
+		return re.ReplaceAllString(text, replacement)
 	}
 
-	// Build a byte-offset → rune-index map for O(1) boundary lookups.
-	runes := []rune(text)
-	byteToRune := make([]int, len(text)+1)
-	ri := 0
-	for bi := range text {
-		byteToRune[bi] = ri
-		ri++
+	// Find all matches with their positions
+	matches := wrappedRe.FindAllStringSubmatchIndex(text, -1)
+	if len(matches) == 0 {
+		return text
 	}
-	byteToRune[len(text)] = len(runes)
 
-	var result strings.Builder
-	lastEnd := 0
+	// Build result by replacing matches in reverse order (to maintain correct positions)
+	result := text
+	for i := len(matches) - 1; i >= 0; i-- {
+		match := matches[i]
+		fullStart, fullEnd := match[0], match[1]
+		coreStart, coreEnd := match[2], match[3]
 
-	for _, loc := range strippedRe.FindAllStringIndex(text, -1) {
-		start, end := loc[0], loc[1]
-		startRI := byteToRune[start]
-		endRI := byteToRune[end]
+		// Extract the core pattern match
+		core := text[coreStart:coreEnd]
+		expanded := re.ReplaceAllString(core, replacement)
 
-		// Unicode word boundary before the match.
-		before := start == 0 || func() bool {
-			r := runes[startRI-1]
-			return !unicode.IsLetter(r) && !unicode.IsDigit(r)
-		}()
-
-		// Unicode word boundary after the match.
-		after := end == len(text) || func() bool {
-			if endRI >= len(runes) {
-				return true
-			}
-			r := runes[endRI]
-			return !unicode.IsLetter(r) && !unicode.IsDigit(r)
-		}()
-
-		result.WriteString(text[lastEnd:start])
-		if before && after {
-			result.WriteString(strippedRe.ReplaceAllString(text[start:end], replacement))
-		} else {
-			result.WriteString(text[start:end])
+		// Preserve leading space if present
+		leadingSpace := ""
+		if fullStart < coreStart {
+			leadingSpace = " "
 		}
-		lastEnd = end
+
+		// Replace: everything before + leading space + replacement + space + everything after
+		result = result[:fullStart] + leadingSpace + expanded + " " + result[fullEnd:]
 	}
-	result.WriteString(text[lastEnd:])
-	return result.String()
+
+	return result
 }
 
 // ApplyWithLanguage applies enabled pronunciation rules for a specific language
@@ -458,77 +421,6 @@ func (d *PronunciationDictionary) RuleCount() int {
 // Clear removes all rules
 func (d *PronunciationDictionary) Clear() {
 	d.rules = make([]PronunciationRule, 0)
-}
-
-// LoadFromFile loads pronunciation rules from a file
-// Format: pattern -> replacement # optional comment
-// Lines starting with # are comments
-// Empty lines are ignored
-func (d *PronunciationDictionary) LoadFromFile(filePath string) error {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to open pronunciation file: %w", err)
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	lineNum := 0
-
-	for scanner.Scan() {
-		lineNum++
-		line := strings.TrimSpace(scanner.Text())
-
-		// Skip empty lines and comments
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		rule, err := d.parseLine(line)
-		if err != nil {
-			return fmt.Errorf("line %d: %w", lineNum, err)
-		}
-
-		d.rules = append(d.rules, rule)
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("error reading file: %w", err)
-	}
-
-	return nil
-}
-
-// parseLine parses a single rule line
-func (d *PronunciationDictionary) parseLine(line string) (PronunciationRule, error) {
-	var rule PronunciationRule
-
-	// Extract comment if present
-	if idx := strings.Index(line, " # "); idx != -1 {
-		rule.Comment = strings.TrimSpace(line[idx+3:])
-		line = line[:idx]
-	}
-
-	// Split by arrow
-	parts := strings.SplitN(line, " -> ", 2)
-	if len(parts) != 2 {
-		return rule, fmt.Errorf("invalid format, expected 'pattern -> replacement'")
-	}
-
-	pattern := strings.TrimSpace(parts[0])
-	replacement := strings.TrimSpace(parts[1])
-
-	// Compile regex
-	re, err := regexp.Compile(pattern)
-	if err != nil {
-		return rule, fmt.Errorf("invalid regex pattern '%s': %w", pattern, err)
-	}
-
-	rule.Pattern = re
-	rule.ReplacementPlain = replacement
-	rule.ReplacementSSML = replacement
-	rule.Enabled = true
-
-	return rule, nil
 }
 
 // GetDefaultRules returns common pronunciation fixes loaded from CSV files
@@ -624,18 +516,7 @@ func (s *TextSanitizer) SanitizeWithOptions(text string, language string, useSSM
 
 	// Then apply pronunciation dictionary rules for the specified language
 	if s.dictionary != nil && s.dictionary.RuleCount() > 0 {
-		// Log dictionary application for debugging
-		if strings.Contains(result, "США") {
-			log.Printf("[SANITIZE] Found 'США' in text before dictionary application (lang=%s, useSSML=%v, rules=%d)", language, useSSML, s.dictionary.RuleCount())
-		}
 		result = s.dictionary.ApplyWithLanguage(result, useSSML, language)
-		if strings.Contains(result, "США") {
-			log.Printf("[SANITIZE] WARNING: 'США' still present after dictionary application!")
-		} else if strings.Contains(result, "сэ шэ") {
-			log.Printf("[SANITIZE] SUCCESS: 'США' was replaced with 'сэ шэ а'")
-		}
-	} else {
-		log.Printf("[SANITIZE] Dictionary not applied: dictionary=%v, ruleCount=%d", s.dictionary != nil, s.dictionary.RuleCount())
 	}
 
 	return result

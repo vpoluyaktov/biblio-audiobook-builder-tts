@@ -47,7 +47,6 @@ type Config struct {
 	ParenthesesBreakMs      int     `json:"parentheses_break_ms"`
 	ColonBreakMs            int     `json:"colon_break_ms"`
 	TitleBreakMs            int     `json:"title_break_ms"`
-	PronunciationDictFile   string  `json:"pronunciation_dict_file"`
 	UseDefaultPronunciation bool    `json:"use_default_pronunciation"`
 	MaxFileSizeMB           int     `json:"max_file_size_mb"`
 
@@ -405,9 +404,6 @@ func (db *DB) GetAllConfig() (*Config, error) {
 	if v, ok := configMap["title_break_ms"]; ok {
 		fmt.Sscanf(v, "%d", &cfg.TitleBreakMs)
 	}
-	if v, ok := configMap["pronunciation_dict_file"]; ok {
-		cfg.PronunciationDictFile = v
-	}
 	if v, ok := configMap["use_default_pronunciation"]; ok {
 		cfg.UseDefaultPronunciation = v == "true"
 	}
@@ -473,7 +469,6 @@ func (db *DB) SaveAllConfig(cfg *Config) error {
 		"parentheses_break_ms":      fmt.Sprintf("%d", cfg.ParenthesesBreakMs),
 		"colon_break_ms":            fmt.Sprintf("%d", cfg.ColonBreakMs),
 		"title_break_ms":            fmt.Sprintf("%d", cfg.TitleBreakMs),
-		"pronunciation_dict_file":   cfg.PronunciationDictFile,
 		"use_default_pronunciation": fmt.Sprintf("%t", cfg.UseDefaultPronunciation),
 		"max_file_size_mb":          fmt.Sprintf("%d", cfg.MaxFileSizeMB),
 		"concurrent_encoders":       fmt.Sprintf("%d", cfg.ConcurrentEncoders),
@@ -514,7 +509,6 @@ func DefaultConfig() *Config {
 		ParenthesesBreakMs:      250,
 		ColonBreakMs:            250,
 		TitleBreakMs:            500,
-		PronunciationDictFile:   "",
 		UseDefaultPronunciation: true,
 		MaxFileSizeMB:           250,
 		ConcurrentEncoders:      2,
@@ -1517,7 +1511,6 @@ func (c *Config) ToAppConfig() map[string]interface{} {
 		"parentheses_break_ms":      c.ParenthesesBreakMs,
 		"colon_break_ms":            c.ColonBreakMs,
 		"title_break_ms":            c.TitleBreakMs,
-		"pronunciation_dict_file":   c.PronunciationDictFile,
 		"use_default_pronunciation": c.UseDefaultPronunciation,
 		"max_file_size_mb":          c.MaxFileSizeMB,
 		"concurrent_encoders":       c.ConcurrentEncoders,
