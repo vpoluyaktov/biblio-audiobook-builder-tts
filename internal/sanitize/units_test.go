@@ -232,7 +232,7 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "mixed frequencies",
 			input:    "Процессор 3.5 ГГц, память 1600 МГц, звук 48 кГц, сеть 50 Гц",
-			expected: "Процессор 3.5 гигагерц память 1600 мегагерц звук 48 килогерц сеть 50 герц ",
+			expected: "Процессор 3.5 гигагерц  память 1600 мегагерц  звук 48 килогерц  сеть 50 герц ",
 			desc:     "Should correctly replace all frequency units in mixed text",
 		},
 
@@ -260,13 +260,13 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "technical specification",
 			input:    "Батарея 12 В, 7 А, емкость 84 Вт",
-			expected: "Батарея 12 вольт 7 ампер емкость 84 ватт ",
+			expected: "Батарея 12 вольт  7 ампер  емкость 84 ватт ",
 			desc:     "Should replace all units in technical spec",
 		},
 		{
 			name:     "mixed text with prepositions",
 			input:    "В батарее напряжение 220 В, А ток 10 А",
-			expected: "В батарее напряжение 220 вольт А ток 10 ампер ",
+			expected: "В батарее напряжение 220 вольт  А ток 10 ампер ",
 			desc:     "Should only replace units after numbers, not prepositions",
 		},
 		{
@@ -278,7 +278,7 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "distance and speed",
 			input:    "Расстояние 100 км, скорость 80 км/ч",
-			expected: "Расстояние 100 километров скорость 80 километров в час ",
+			expected: "Расстояние 100 километров  скорость 80 километров в час ",
 			desc:     "Should replace both km and full km/h correctly",
 		},
 		{

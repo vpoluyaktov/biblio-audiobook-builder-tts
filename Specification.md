@@ -112,27 +112,27 @@ biblio-audiobook-builder-tts/
 
 ### Pronunciation Dictionary Patterns
 
-**Pattern requirements**:
-- Measurement units must include `(\d+)\s*` prefix and `(?:[\s.,)]|$)` suffix (non-capturing group)
-  - Pattern: `"(\d+)\s*м(?:[\s.,)]|$)"` (quoted to handle comma in character class)
-  - Replacement: `$1 метров` (simple replacement, no capture group references)
-  - **Non-capturing group `(?:...)` is used** so delimiter doesn't create a capture group
-  - **Go code automatically adds a space after replacement** for patterns with this suffix
-  - This ensures the unit is only replaced after numbers, and spacing is handled consistently
+**Simplified approach - boundary logic in Go code**:
+- **CSV patterns are simple** - no `\b` word boundaries or delimiter suffixes needed
+  - Pattern: `(\d+)\s*м` (just the core pattern)
+  - Replacement: `$1 метров` (simple replacement)
+  - **Go code automatically wraps ALL patterns** with `(?:^|\s)` prefix and `(?:[\s.,)]|$)` suffix
+  - **Go code always adds a space after replacement**
+- Frequency units support decimals: `(\d+\.?\d*)\s*ГГц` matches both "3.5 ГГц" and "1600 МГц"
 - Year of birth (г.р.) must come BEFORE weight units (г) in ru.csv
 - **Compound units must come BEFORE simple units** (critical for correct matching)
   - `км/ч` (kilometers per hour) must come before `км` (kilometers)
   - `м/с` (meters per second) must come before `м` (meters)
+  - `мл` (milliliters) must come before `м` (meters)
   - Pattern order in CSV determines matching priority since Go regexp doesn't support lookahead
-- **CSV patterns with commas must be quoted** to prevent breaking CSV parsing
-  - The CSV parser uses proper `encoding/csv` to handle quoted fields
-- Context-specific patterns prevent false matches
 
 **Implementation details**:
-- `applyRuleUnicode` in `text.go` detects patterns containing `(?:[\s\.\,\)]|$)`
-- For such patterns, a space is automatically appended after replacement
-- Non-capturing groups keep CSV patterns simple (only `$1` needed, no `$2`)
-- May result in double spaces where delimiters were consumed, but this is acceptable
+- `applyRuleUnicode` in `text.go` wraps every pattern: `(?:^|\s)(PATTERN)(?:[\s.,)]|$)`
+- This ensures patterns only match complete words/units at word boundaries
+- Matches are processed in reverse order to avoid position shifts
+- A space is always added after replacement
+- May result in double spaces after commas (e.g., "12 В, 7 А" → "12 вольт  7 ампер")
+- Double/triple spaces are acceptable and will be normalized later in the pipeline
 
 ---
 

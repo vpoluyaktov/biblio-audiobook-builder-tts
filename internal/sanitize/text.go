@@ -354,90 +354,47 @@ func (d *PronunciationDictionary) ApplyWithMode(text string, useSSML bool) strin
 	return d.ApplyWithLanguage(text, useSSML, "")
 }
 
-// applyRuleUnicode applies a single pronunciation rule. It handles \b word
-// boundaries correctly for Unicode (Cyrillic, etc.) text: Go's regexp \b only
-// recognises ASCII word-character boundaries, so \b adjacent to Cyrillic letters
-// never fires. When the pattern contains both \b and non-ASCII characters, this
-// function strips the \b anchors and enforces Unicode word boundaries manually.
-// For patterns with delimiter suffix (?:[\s.,)]|$), a space is automatically added
-// after replacement to handle the consumed delimiter.
+// applyRuleUnicode applies a single pronunciation rule with automatic boundary wrapping.
+// All patterns from CSV are automatically wrapped with (?:^|\s) prefix and (?:[\s.,)]|$) suffix.
+// A space is always added after replacement.
 func applyRuleUnicode(re *regexp.Regexp, text, replacement string) string {
-	patStr := re.String()
-	if !strings.Contains(patStr, `\b`) {
-		// Check if pattern has delimiter suffix - if so, add space after replacement
-		if strings.Contains(patStr, `(?:[\s.,)]|$)`) {
-			return re.ReplaceAllStringFunc(text, func(match string) string {
-				expanded := re.ReplaceAllString(match, replacement)
-				return expanded + " "
-			})
-		}
-		// Normal replacement without adding space
-		return re.ReplaceAllString(text, replacement)
-	}
-
-	// Only apply the custom path when the pattern contains non-ASCII characters.
-	hasNonASCII := false
-	for _, r := range patStr {
-		if r > 127 {
-			hasNonASCII = true
-			break
-		}
-	}
-	if !hasNonASCII {
-		return re.ReplaceAllString(text, replacement)
-	}
-
-	// Strip every \b from the pattern so FindAllStringIndex can find matches,
-	// then manually enforce letter/digit boundaries around each match.
-	stripped := strings.ReplaceAll(patStr, `\b`, ``)
-	strippedRe, err := regexp.Compile(stripped)
+	// Wrap pattern: (?:^|\s) at start for word boundary, pattern in capture group, (?:[\s.,)]|$) at end
+	// This ensures we only match complete words/units, not parts of larger words
+	wrappedPattern := `(?:^|\s)(` + re.String() + `)(?:[\s.,)]|$)`
+	wrappedRe, err := regexp.Compile(wrappedPattern)
 	if err != nil {
-		return re.ReplaceAllString(text, replacement) // unexpected – fall back
+		// If wrapping fails, fall back to original pattern
+		return re.ReplaceAllString(text, replacement)
 	}
 
-	// Build a byte-offset → rune-index map for O(1) boundary lookups.
-	runes := []rune(text)
-	byteToRune := make([]int, len(text)+1)
-	ri := 0
-	for bi := range text {
-		byteToRune[bi] = ri
-		ri++
+	// Find all matches with their positions
+	matches := wrappedRe.FindAllStringSubmatchIndex(text, -1)
+	if len(matches) == 0 {
+		return text
 	}
-	byteToRune[len(text)] = len(runes)
 
-	var result strings.Builder
-	lastEnd := 0
+	// Build result by replacing matches in reverse order (to maintain correct positions)
+	result := text
+	for i := len(matches) - 1; i >= 0; i-- {
+		match := matches[i]
+		fullStart, fullEnd := match[0], match[1]
+		coreStart, coreEnd := match[2], match[3]
 
-	for _, loc := range strippedRe.FindAllStringIndex(text, -1) {
-		start, end := loc[0], loc[1]
-		startRI := byteToRune[start]
-		endRI := byteToRune[end]
+		// Extract the core pattern match
+		core := text[coreStart:coreEnd]
+		expanded := re.ReplaceAllString(core, replacement)
 
-		// Unicode word boundary before the match.
-		before := start == 0 || func() bool {
-			r := runes[startRI-1]
-			return !unicode.IsLetter(r) && !unicode.IsDigit(r)
-		}()
-
-		// Unicode word boundary after the match.
-		after := end == len(text) || func() bool {
-			if endRI >= len(runes) {
-				return true
-			}
-			r := runes[endRI]
-			return !unicode.IsLetter(r) && !unicode.IsDigit(r)
-		}()
-
-		result.WriteString(text[lastEnd:start])
-		if before && after {
-			result.WriteString(strippedRe.ReplaceAllString(text[start:end], replacement))
-		} else {
-			result.WriteString(text[start:end])
+		// Preserve leading space if present
+		leadingSpace := ""
+		if fullStart < coreStart {
+			leadingSpace = " "
 		}
-		lastEnd = end
+
+		// Replace: everything before + leading space + replacement + space + everything after
+		result = result[:fullStart] + leadingSpace + expanded + " " + result[fullEnd:]
 	}
-	result.WriteString(text[lastEnd:])
-	return result.String()
+
+	return result
 }
 
 // ApplyWithLanguage applies enabled pronunciation rules for a specific language
