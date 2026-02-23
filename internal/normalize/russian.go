@@ -245,26 +245,26 @@ func genderFromPluralEnding(word string, runes []rune) (Gender, bool) {
 
 	// -а after consonant → Could be:
 	// - Neuter genitive singular (окна from окно)
-	// - Feminine nominative singular (кошка, Москва)
-	// - Masculine genitive singular (стола from стол)
+	// - Feminine nominative singular (кошка, Москва, вода)
+	// - Masculine genitive singular (стола from стол, ребёнка from ребёнок)
 	//
-	// Neuter gen.sg pattern: short words (3-4 chars) like окна, яйца
-	// Feminine nom.sg: longer words ending in -ка, -ва, -на, etc.
-	// Only match neuter for very short words that look like gen.sg of neuter nouns
+	// Strategy: Be conservative and default to feminine. Masculine genitive forms
+	// should be added to the noun database (ru.csv) for accurate detection.
+	// Only detect clear neuter and feminine patterns here.
 	case lastRune == 'а' && len(runes) >= 3:
-		// Only match as neuter plural if word is very short (3-4 chars)
-		// and has consonant cluster before -а (like "окна" from "окно")
-		if len(runes) <= 4 {
-			prevRune := runes[len(runes)-2]
-			if !isRussianVowel(prevRune) && len(runes) >= 4 {
-				thirdLast := runes[len(runes)-3]
-				// Pattern like "окна" - consonant + consonant + а
-				if !isRussianVowel(thirdLast) {
-					return Neuter, true
-				}
+		prevRune := runes[len(runes)-2]
+
+		// Check for neuter genitive singular: short words with consonant cluster
+		// Pattern like "окна" - consonant + consonant + а
+		if len(runes) <= 4 && !isRussianVowel(prevRune) && len(runes) >= 4 {
+			thirdLast := runes[len(runes)-3]
+			if !isRussianVowel(thirdLast) {
+				return Neuter, true
 			}
 		}
-		// For longer words or other patterns, don't match - let singular detection handle
+
+		// Default to feminine for -а endings
+		// Masculine genitive singular forms (стола, ребёнка) should be in noun database
 		return Feminine, false
 
 	// -я after consonant → Could be Neuter genitive singular (моря, поля)
