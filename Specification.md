@@ -117,6 +117,10 @@ biblio-audiobook-builder-tts/
   - Correct: `(\d+)\s*м[\s\.],$1 метров`
   - Wrong: `\bм\b,метр` (matches words like "метр")
 - Year of birth (г.р.) must come BEFORE weight units (г) in ru.csv
+- **Compound units must come BEFORE simple units** (critical for correct matching)
+  - `км/ч` (kilometers per hour) must come before `км` (kilometers)
+  - `м/с` (meters per second) must come before `м` (meters)
+  - Pattern order in CSV determines matching priority since Go regexp doesn't support lookahead
 - Context-specific patterns prevent false matches
 
 ---
