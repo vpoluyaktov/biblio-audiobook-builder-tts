@@ -246,25 +246,34 @@ func genderFromPluralEnding(word string, runes []rune) (Gender, bool) {
 	// -а after consonant → Could be:
 	// - Neuter genitive singular (окна from окно)
 	// - Feminine nominative singular (кошка, Москва)
-	// - Masculine genitive singular (стола from стол)
+	// - Masculine genitive singular (стола from стол, ребёнка from ребёнок)
 	//
-	// Neuter gen.sg pattern: short words (3-4 chars) like окна, яйца
-	// Feminine nom.sg: longer words ending in -ка, -ва, -на, etc.
-	// Only match neuter for very short words that look like gen.sg of neuter nouns
+	// Strategy: Detect common feminine patterns first, then default to masculine
+	// Feminine patterns: -ка, -га, -ха, -ча, -ща, -жа (кошка, книга, муха, дача, роща, лужа)
+	// Masculine genitive: other consonant + а (стола, ребёнка, дома, города)
 	case lastRune == 'а' && len(runes) >= 3:
-		// Only match as neuter plural if word is very short (3-4 chars)
-		// and has consonant cluster before -а (like "окна" from "окно")
-		if len(runes) <= 4 {
-			prevRune := runes[len(runes)-2]
-			if !isRussianVowel(prevRune) && len(runes) >= 4 {
-				thirdLast := runes[len(runes)-3]
-				// Pattern like "окна" - consonant + consonant + а
-				if !isRussianVowel(thirdLast) {
-					return Neuter, true
-				}
+		prevRune := runes[len(runes)-2]
+
+		// Check for neuter genitive singular: short words with consonant cluster
+		// Pattern like "окна" - consonant + consonant + а
+		if len(runes) <= 4 && !isRussianVowel(prevRune) && len(runes) >= 4 {
+			thirdLast := runes[len(runes)-3]
+			if !isRussianVowel(thirdLast) {
+				return Neuter, true
 			}
 		}
-		// For longer words or other patterns, don't match - let singular detection handle
+
+		// Check for common feminine nominative patterns
+		if !isRussianVowel(prevRune) {
+			// Feminine patterns: -ка, -га, -ха, -ча, -ща, -жа, -ша
+			switch prevRune {
+			case 'к', 'г', 'х', 'ч', 'щ', 'ж', 'ш':
+				return Feminine, true
+			}
+			// Default: consonant + а after numbers is likely masculine genitive singular
+			return Masculine, true
+		}
+		// Vowel + а: likely feminine nominative (like "идея")
 		return Feminine, false
 
 	// -я after consonant → Could be Neuter genitive singular (моря, поля)

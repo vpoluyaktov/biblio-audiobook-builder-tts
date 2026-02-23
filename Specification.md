@@ -68,6 +68,36 @@ biblio-audiobook-builder-tts/
 
 ## Recent Changes
 
+### 2026-02-22: Fix Russian Gender Detection for Numbers with Masculine Nouns
+
+**Issue**: Numbers ending in 2 (like 52, 22, 32) were using incorrect gender forms with masculine nouns in genitive singular:
+- Input: `52 ребёнка` (52 children)
+- Incorrect output: `пятьдесят две ребёнка` (feminine "две")
+- Correct output: `пятьдесят два ребёнка` (masculine "два")
+
+**Root Cause**: 
+1. "ребёнок" (child) was not in the noun database (`ru.csv`)
+2. Gender detection heuristic incorrectly identified "ребёнка" (genitive singular ending in -а) as feminine
+3. In Russian, masculine nouns in genitive singular end in -а (стол → стола, ребёнок → ребёнка), which the heuristic confused with feminine nominative singular (кошка, книга)
+
+**Solution**:
+1. **Added "ребёнок" to noun database** (`internal/normalize/data/ru.csv`):
+   - Added base form: `ребёнок,m,c,ребёнок,ребёнка|детей`
+   - Added genitive singular: `ребёнка,m,c,ребёнка,ребёнка|детей`
+   - Added genitive plural: `детей,m,c,детей,детей|детей`
+
+2. **Improved gender detection heuristic** (`internal/normalize/russian.go`):
+   - Enhanced detection of masculine genitive singular forms ending in -а
+   - Distinguishes between feminine nominative patterns (-ка, -га, -ха, -ча, -ща, -жа, -ша) and masculine genitive
+   - Defaults to masculine for consonant + а patterns (стола, ребёнка, дома, города)
+
+**Impact**: 
+- Correct gender agreement for numbers with masculine nouns in genitive singular
+- Proper narration: "52 ребёнка" → "пятьдесят два ребёнка"
+- Improved handling of other masculine nouns not in database (дом, город, стол, etc.)
+
+---
+
 ### 2026-02-22: Fix Measurement Units Pattern Matching and Plural Forms
 
 **Issue**: Two problems with measurement unit abbreviations in the Russian pronunciation dictionary (`ru.csv`):
