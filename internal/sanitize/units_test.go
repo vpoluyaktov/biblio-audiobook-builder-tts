@@ -88,25 +88,25 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "kilogram",
 			input:    "Вес 75 кг",
-			expected: "Вес 75 килограмм",
+			expected: "Вес 75 килограммов",
 			desc:     "Should replace kg after number",
 		},
 		{
 			name:     "gram",
 			input:    "Масса 500 г",
-			expected: "Масса 500 грамм",
+			expected: "Масса 500 граммов",
 			desc:     "Should replace g after number",
 		},
 		{
 			name:     "milligram",
 			input:    "Доза 250 мг",
-			expected: "Доза 250 миллиграмм",
+			expected: "Доза 250 миллиграммов",
 			desc:     "Should replace mg after number",
 		},
 		{
 			name:     "ton",
 			input:    "Груз 10 т",
-			expected: "Груз 10 тонна",
+			expected: "Груз 10 тонн",
 			desc:     "Should replace t after number",
 		},
 
@@ -114,25 +114,25 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "meter",
 			input:    "Длина 100 м",
-			expected: "Длина 100 метр",
+			expected: "Длина 100 метров",
 			desc:     "Should replace m after number",
 		},
 		{
 			name:     "kilometer",
 			input:    "Расстояние 50 км",
-			expected: "Расстояние 50 километр",
+			expected: "Расстояние 50 километров",
 			desc:     "Should replace km after number",
 		},
 		{
 			name:     "centimeter",
 			input:    "Высота 180 см",
-			expected: "Высота 180 сантиметр",
+			expected: "Высота 180 сантиметров",
 			desc:     "Should replace cm after number",
 		},
 		{
 			name:     "millimeter",
 			input:    "Толщина 5 мм",
-			expected: "Толщина 5 миллиметр",
+			expected: "Толщина 5 миллиметров",
 			desc:     "Should replace mm after number",
 		},
 
@@ -140,13 +140,13 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "liter",
 			input:    "Объем 2 л",
-			expected: "Объем 2 литр",
+			expected: "Объем 2 литров",
 			desc:     "Should replace l after number",
 		},
 		{
 			name:     "milliliter",
 			input:    "Доза 100 мл",
-			expected: "Доза 100 миллилитр",
+			expected: "Доза 100 миллилитров",
 			desc:     "Should replace ml after number",
 		},
 
@@ -154,19 +154,19 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "square meter",
 			input:    "Площадь 50 кв.м",
-			expected: "Площадь 50 квадратный метр",
+			expected: "Площадь 50 квадратных метров",
 			desc:     "Should replace sq.m after number",
 		},
 		{
 			name:     "cubic meter",
 			input:    "Объем 10 куб.м",
-			expected: "Объем 10 кубический метр",
+			expected: "Объем 10 кубических метров",
 			desc:     "Should replace cu.m after number",
 		},
 		{
 			name:     "hectare",
 			input:    "Участок 5 га",
-			expected: "Участок 5 гектар",
+			expected: "Участок 5 гектаров",
 			desc:     "Should replace ha after number",
 		},
 
@@ -272,19 +272,19 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 		{
 			name:     "recipe measurements",
 			input:    "Добавить 500 г муки, 250 мл воды",
-			expected: "Добавить 500 грамм муки, 250 миллилитр воды",
+			expected: "Добавить 500 граммов муки, 250 миллилитров воды",
 			desc:     "Should replace cooking measurements",
 		},
 		{
 			name:     "distance and speed",
 			input:    "Расстояние 100 км, скорость 80 км/ч",
-			expected: "Расстояние 100 километр, скорость 80 километров в час",
+			expected: "Расстояние 100 километров, скорость 80 километров в час",
 			desc:     "Should replace both km and full km/h correctly",
 		},
 		{
 			name:     "dimensions",
 			input:    "Размеры: 180 см высота, 75 кг вес",
-			expected: "Размеры: 180 сантиметр высота, 75 килограмм вес",
+			expected: "Размеры: 180 сантиметров высота, 75 килограммов вес",
 			desc:     "Should replace dimension units",
 		},
 
