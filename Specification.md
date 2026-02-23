@@ -121,6 +121,10 @@ biblio-audiobook-builder-tts/
   - `км/ч` (kilometers per hour) must come before `км` (kilometers)
   - `м/с` (meters per second) must come before `м` (meters)
   - Pattern order in CSV determines matching priority since Go regexp doesn't support lookahead
+- **SSML replacement must use full word form** (critical to avoid conflicts with number normalization)
+  - Correct: Plain `$1 метров` → SSML `$1 метр+ов` (both use full word)
+  - Wrong: Plain `$1 метров` → SSML `$1 м+етров` (abbreviation causes duplication)
+  - The SSML pattern is applied first, then number normalization converts numbers to words
 - Context-specific patterns prevent false matches
 
 ---
