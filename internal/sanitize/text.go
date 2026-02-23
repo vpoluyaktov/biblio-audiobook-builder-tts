@@ -1,7 +1,6 @@
 package sanitize
 
 import (
-	"log"
 	"regexp"
 	"strings"
 	"unicode"
@@ -517,18 +516,7 @@ func (s *TextSanitizer) SanitizeWithOptions(text string, language string, useSSM
 
 	// Then apply pronunciation dictionary rules for the specified language
 	if s.dictionary != nil && s.dictionary.RuleCount() > 0 {
-		// Log dictionary application for debugging
-		if strings.Contains(result, "США") {
-			log.Printf("[SANITIZE] Found 'США' in text before dictionary application (lang=%s, useSSML=%v, rules=%d)", language, useSSML, s.dictionary.RuleCount())
-		}
 		result = s.dictionary.ApplyWithLanguage(result, useSSML, language)
-		if strings.Contains(result, "США") {
-			log.Printf("[SANITIZE] WARNING: 'США' still present after dictionary application!")
-		} else if strings.Contains(result, "сэ шэ") {
-			log.Printf("[SANITIZE] SUCCESS: 'США' was replaced with 'сэ шэ а'")
-		}
-	} else {
-		log.Printf("[SANITIZE] Dictionary not applied: dictionary=%v, ruleCount=%d", s.dictionary != nil, s.dictionary.RuleCount())
 	}
 
 	return result
