@@ -113,10 +113,11 @@ biblio-audiobook-builder-tts/
 ### Pronunciation Dictionary Patterns
 
 **Pattern requirements**:
-- Measurement units must include `(\d+)\s*` prefix and `([\s\.\,\)]|$)` suffix to match delimiters or end-of-string
-  - Pattern: `"(\d+)\s*м([\s\.\,\)]|$)"` (quoted to handle comma in character class)
-  - Replacement: `$1 метров` (simple replacement without delimiter preservation)
-  - **Go code automatically adds a space after each replacement** for patterns containing `[\s\.\,\)]|$`
+- Measurement units must include `(\d+)\s*` prefix and `(?:[\s\.\,\)]|$)` suffix (non-capturing group)
+  - Pattern: `"(\d+)\s*м(?:[\s\.\,\)]|$)"` (quoted to handle comma in character class)
+  - Replacement: `$1 метров` (simple replacement, no capture group references)
+  - **Non-capturing group `(?:...)` is used** so delimiter doesn't create a capture group
+  - **Go code automatically adds a space after replacement** for patterns with this suffix
   - This ensures the unit is only replaced after numbers, and spacing is handled consistently
 - Year of birth (г.р.) must come BEFORE weight units (г) in ru.csv
 - **Compound units must come BEFORE simple units** (critical for correct matching)
@@ -128,9 +129,9 @@ biblio-audiobook-builder-tts/
 - Context-specific patterns prevent false matches
 
 **Implementation details**:
-- `applyRuleUnicode` in `text.go` detects patterns with delimiter capture groups
+- `applyRuleUnicode` in `text.go` detects patterns containing `(?:[\s\.\,\)]|$)`
 - For such patterns, a space is automatically appended after replacement
-- This simplifies CSV patterns (no need for `$2` in replacements)
+- Non-capturing groups keep CSV patterns simple (only `$1` needed, no `$2`)
 - May result in double spaces where delimiters were consumed, but this is acceptable
 
 ---
