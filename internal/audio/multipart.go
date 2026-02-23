@@ -192,7 +192,7 @@ func buildSinglePartWithEncoderProgress(part Part, allParts []Part, outputDir st
 
 	// Adjust title for multi-part (keep Album as base book title for ABS metadata)
 	if len(allParts) > 1 {
-		partOptions.Title = fmt.Sprintf("%s, Part %d", options.Title, part.Number)
+		partOptions.Title = fmt.Sprintf("%s, Part %03d", options.Title, part.Number)
 	}
 
 	// Create builder
@@ -217,7 +217,7 @@ func buildSinglePartWithEncoderProgress(part Part, allParts []Part, outputDir st
 	// Build M4B file
 	var m4bFileName string
 	if len(allParts) > 1 {
-		m4bFileName = fmt.Sprintf("%s, Part %d.m4b", baseFileName, part.Number)
+		m4bFileName = fmt.Sprintf("%s, Part %03d.m4b", baseFileName, part.Number)
 	} else {
 		m4bFileName = baseFileName + ".m4b"
 	}

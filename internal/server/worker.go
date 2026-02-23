@@ -530,7 +530,7 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 	// This allows proper chunking of long chapters before SSML tags are added
 
 	// Save chapter text file for debugging
-	textFileName := fmt.Sprintf("%02d_%s.txt", index+1, sanitizeFileName(chapter.Title))
+	textFileName := fmt.Sprintf("%04d_%s.txt", index+1, sanitizeFileName(chapter.Title))
 	textFilePath := filepath.Join(outputDir, textFileName)
 	if err := os.WriteFile(textFilePath, []byte(content), 0644); err != nil {
 		logger.Warn("Failed to save chapter text file '%s': %v", textFileName, err)
@@ -543,7 +543,7 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		logger.Info("Chapter %d (%s) has no speakable content for language '%s' - generating 1 second of silence", index+1, chapter.Title, lang)
 
 		// Generate a 1-second silent WAV file to maintain chapter alignment
-		chapterFileName := fmt.Sprintf("%02d_%s.wav", index+1, sanitizeFileName(chapter.Title))
+		chapterFileName := fmt.Sprintf("%04d_%s.wav", index+1, sanitizeFileName(chapter.Title))
 		outputPath := filepath.Join(outputDir, chapterFileName)
 
 		// Get provider's sample rate, default to 48000 if not available
@@ -584,7 +584,7 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 			ColonBreakMs:          w.cfg.ColonBreakMs,
 			TitleBreakMs:          w.cfg.TitleBreakMs,
 		})
-		ssmlFileName := fmt.Sprintf("%02d_%s.ssml.txt", index+1, sanitizeFileName(chapter.Title))
+		ssmlFileName := fmt.Sprintf("%04d_%s.ssml.txt", index+1, sanitizeFileName(chapter.Title))
 		ssmlFilePath := filepath.Join(outputDir, ssmlFileName)
 		if err := os.WriteFile(ssmlFilePath, []byte(ssmlText), 0644); err != nil {
 			logger.Warn("Failed to save SSML debug file '%s': %v", ssmlFileName, err)
@@ -625,7 +625,7 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 	}
 
 	// Save audio file
-	chapterFileName := fmt.Sprintf("%02d_%s.wav", index+1, sanitizeFileName(chapter.Title))
+	chapterFileName := fmt.Sprintf("%04d_%s.wav", index+1, sanitizeFileName(chapter.Title))
 	outputPath := filepath.Join(outputDir, chapterFileName)
 
 	outputFile, err := os.Create(outputPath)
@@ -668,7 +668,7 @@ func (w *Worker) convertChapterWithParts(job *Job, chapter parser.Chapter, conte
 			DashBreakDurationMs:   w.cfg.DashBreakDurationMs,
 			TitleBreakMs:          w.cfg.TitleBreakMs,
 		})
-		ssmlFileName := fmt.Sprintf("%02d_%s.ssml.txt", index+1, sanitizeFileName(chapter.Title))
+		ssmlFileName := fmt.Sprintf("%04d_%s.ssml.txt", index+1, sanitizeFileName(chapter.Title))
 		ssmlFilePath := filepath.Join(outputDir, ssmlFileName)
 		if err := os.WriteFile(ssmlFilePath, []byte(ssmlText), 0644); err != nil {
 			logger.Warn("Failed to save SSML debug file '%s': %v", ssmlFileName, err)
@@ -695,7 +695,7 @@ func (w *Worker) convertChapterWithParts(job *Job, chapter parser.Chapter, conte
 	}
 
 	// Create temp directory for part files
-	partsDir := filepath.Join(outputDir, fmt.Sprintf("chapter_%02d_parts", index+1))
+	partsDir := filepath.Join(outputDir, fmt.Sprintf("chapter_%04d_parts", index+1))
 	if err := os.MkdirAll(partsDir, 0755); err != nil {
 		result.Error = fmt.Errorf("failed to create parts directory: %v", err)
 		return result
@@ -784,7 +784,7 @@ func (w *Worker) convertChapterWithParts(job *Job, chapter parser.Chapter, conte
 
 	// If no audio files were generated, create a silent placeholder
 	if len(audioFiles) == 0 {
-		chapterFileName := fmt.Sprintf("%02d_%s.wav", index+1, sanitizeFileName(chapter.Title))
+		chapterFileName := fmt.Sprintf("%04d_%s.wav", index+1, sanitizeFileName(chapter.Title))
 		outputPath := filepath.Join(outputDir, chapterFileName)
 		if err := audio.GenerateSilentWAV(1*time.Second, outputPath, sampleRate); err != nil {
 			result.Error = fmt.Errorf("failed to generate silent audio: %v", err)
@@ -796,7 +796,7 @@ func (w *Worker) convertChapterWithParts(job *Job, chapter parser.Chapter, conte
 	}
 
 	// Concatenate all parts into final chapter audio
-	chapterFileName := fmt.Sprintf("%02d_%s.wav", index+1, sanitizeFileName(chapter.Title))
+	chapterFileName := fmt.Sprintf("%04d_%s.wav", index+1, sanitizeFileName(chapter.Title))
 	outputPath := filepath.Join(outputDir, chapterFileName)
 
 	if err := audio.ConcatWAVFiles(audioFiles, outputPath); err != nil {
