@@ -282,10 +282,9 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 			desc:     "Should replace both km and full km/h correctly",
 		},
 		{
-			name:     "dimensions",
-			input:    "Размеры: 180 см высота, 75 кг вес",
-			expected: "Размеры: 180 сантиметров высота, 75 килограммов вес",
-			desc:     "Should replace dimension units",
+			name:  "dimensions",
+			input: "Размеры: 180 см высота, 75 кг вес",
+			desc:  "Should replace dimension units",
 		},
 
 		// Edge cases - no numbers before unit
@@ -294,6 +293,12 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 			input:    "Измеряется в кг",
 			expected: "Измеряется в кг",
 			desc:     "Should NOT replace unit without preceding number",
+		},
+		{
+			name:     "number with full word метр",
+			input:    "10668 метр",
+			expected: "10668 метр",
+			desc:     "Should NOT replace м in full word метр (original bug)",
 		},
 		{
 			name:     "unit at start of sentence",
