@@ -301,6 +301,12 @@ func TestPronunciationDictionary_RussianUnitsOfMeasurement(t *testing.T) {
 			desc:     "Should NOT replace м in full word метр (original bug)",
 		},
 		{
+			name:     "number with abbreviated м",
+			input:    "10668 м",
+			expected: "10668 метров",
+			desc:     "Should replace abbreviated м after number",
+		},
+		{
 			name:     "unit at start of sentence",
 			input:    "В - это вольт",
 			expected: "В - это вольт",
