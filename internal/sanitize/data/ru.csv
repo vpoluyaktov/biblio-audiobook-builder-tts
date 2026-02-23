@@ -173,7 +173,7 @@
 #
 # Units of measurement (require digits before units)
 # NOTE: Compound units MUST come before their simple components to match correctly
-# Speed and compound units first
+# Speed and compound units first (use explicit character matching since Go regexp doesn't support lookahead)
 (\d+)\s*км/ч\b,$1 километров в час,$1 килом+етров в ч+ас,км/ч - километров в час
 (\d+)\s*м/с\b,$1 метров в секунду,$1 м+етров в сек+унду,м/с - метров в секунду
 (\d+)\s*л\.?\s*с\.?\b,$1 лошадиных сил,$1 лош+адиных с+ил,л.с. - лошадиных сил
@@ -186,7 +186,7 @@
 (\d+)\s*мг\b,$1 миллиграммов,$1 миллигр+аммов,мг - миллиграммов
 (\d+)\s*г\b,$1 граммов,$1 гр+аммов,г - граммов
 (\d+)\s*т\b,$1 тонн,$1 т+онн,т - тонн
-# Length units
+# Length units (must come AFTER compound units like км/ч to avoid partial matching)
 (\d+)\s*км\b,$1 километров,$1 килом+етров,км - километров
 (\d+)\s*см\b,$1 сантиметров,$1 сантим+етров,см - сантиметров
 (\d+)\s*мм\b,$1 миллиметров,$1 миллим+етров,мм - миллиметров
