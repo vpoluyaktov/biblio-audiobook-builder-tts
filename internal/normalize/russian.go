@@ -837,6 +837,22 @@ func (p *RussianProcessor) processDateRanges(text string, converter NumberConver
 	return result
 }
 
+// processTimePatterns handles time formats with dots or colons.
+// It replaces dots and colons with spaces so numbers are normalized without punctuation.
+// Examples: "23.35.10" → "23 35 10", "23:50" → "23 50", "23:50:10" → "23 50 10"
+func (p *RussianProcessor) processTimePatterns(text string) string {
+	// Pattern matches time formats: HH:MM, HH:MM:SS, HH.MM, HH.MM.SS
+	// where HH, MM, SS are 1-2 digit numbers
+	timePattern := regexp.MustCompile(`\b(\d{1,2})[:.](\d{1,2})(?:[:.](\d{1,2}))?\b`)
+
+	return timePattern.ReplaceAllStringFunc(text, func(match string) string {
+		// Replace all dots and colons with spaces
+		result := strings.ReplaceAll(match, ":", " ")
+		result = strings.ReplaceAll(result, ".", " ")
+		return result
+	})
+}
+
 // processYearOfBirth handles the "г.р." (года рождения - year of birth) abbreviation.
 // It converts the year to genitive ordinal case and expands "г.р." to "года рождения".
 // Example: "1968 г. р." → "одна тысяча девятьсот шестьдесят восьмого года рождения"
@@ -894,6 +910,10 @@ func (p *RussianProcessor) PreProcess(text string, converter NumberConverter) st
 
 	// Process date ranges like "6-16 августа" → "шестое, тире, шестнадцатое августа"
 	result = p.processDateRanges(result, converter)
+
+	// Process time patterns - replace dots and colons with spaces
+	// Examples: "23.35.10" → "23 35 10", "23:50" → "23 50", "23:50:10" → "23 50 10"
+	result = p.processTimePatterns(result)
 
 	// Find all ordinal suffix matches from end to start
 	matches := RussianOrdinalSuffixPattern.FindAllStringSubmatchIndex(result, -1)

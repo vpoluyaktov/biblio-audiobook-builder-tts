@@ -68,6 +68,33 @@ biblio-audiobook-builder-tts/
 
 ## Recent Changes
 
+### 2026-02-22: Fix Russian Time Normalization
+
+**Issue**: Time formats with dots or colons were being normalized with punctuation preserved between numbers:
+- Input: `23.35.10`
+- Incorrect output: `двадцать три.тридцать пять.десять` (dots preserved)
+- Correct output: `двадцать три тридцать пять десять` (no dots)
+- Same issue with colons: `23:50` → `двадцать три:пятьдесят` instead of `двадцать три пятьдесят`
+
+**Root Cause**: 
+The number normalization pattern `\d+` matched each number separately (23, 35, 10), but the dots and colons between them were left unchanged in the text.
+
+**Solution**:
+Added `processTimePatterns` method to Russian preprocessor (`internal/normalize/russian.go`):
+- Detects time patterns: `HH:MM`, `HH:MM:SS`, `HH.MM`, `HH.MM.SS` (1-2 digit numbers)
+- Replaces dots and colons with spaces before number normalization
+- Pattern: `\b(\d{1,2})[:.](\d{1,2})(?:[:.](\d{1,2}))?\b`
+
+**Impact**: 
+- Correct time normalization without punctuation
+- Examples:
+  - `23.35.10` → `двадцать три тридцать пять десять`
+  - `23:50` → `двадцать три пятьдесят`
+  - `23:50:10` → `двадцать три пятьдесят десять`
+- Pattern only matches 1-2 digit numbers, so large numbers like `100.200.300` are unaffected
+
+---
+
 ### 2026-02-22: Fix Russian Gender Detection for Numbers with Masculine Nouns
 
 **Issue**: Numbers ending in 2 (like 52, 22, 32) were using incorrect gender forms with masculine nouns in genitive singular:
