@@ -68,6 +68,39 @@ biblio-audiobook-builder-tts/
 
 ## Recent Changes
 
+### 2026-02-22: Fix Year of Birth Abbreviation (г.р.)
+
+**Issue**: "г.р." (года рождения - year of birth) was being incorrectly expanded:
+- Input: `1950 г.р.`
+- Incorrect output: `1950 грамм.р.` (matched as weight unit "граммов")
+- Correct output: `1950 года рождения`
+
+**Root Cause**: 
+The pronunciation dictionary pattern for weight units `(\d+)\s*г\b` was matching "г" in "г.р." before the year of birth pattern could be processed. The dictionary is applied before the normalize preprocessor, so the weight unit pattern took precedence.
+
+**Solution**:
+Added "г.р." pattern to pronunciation dictionary (`internal/sanitize/data/ru.csv`) **before** weight units:
+```
+(\d+)\s*г\.?\s*р\.?\b,$1 года рождения,$1 г+ода рожд+ения,г.р. - года рождения
+```
+
+**Key Points**:
+- Pattern placed before weight units to ensure correct matching order
+- Supports variations: "г.р.", "г. р.", "г р"
+- Preserves weight unit functionality (500 г → 500 граммов)
+
+**Impact**:
+- Correct expansion of year of birth abbreviation
+- Examples:
+  - `1950 г.р.` → `1950 года рождения`
+  - `1968 г. р.` → `1968 года рождения`
+  - `Родился в 1950 г.р.` → `Родился в 1950 года рождения`
+- Weight units continue to work correctly:
+  - `500 г` → `500 граммов`
+  - `2 кг` → `2 килограммов`
+
+---
+
 ### 2026-02-22: Enhance Latin-to-Russian Transliteration with Mixed-Case Support
 
 **Issue**: All Latin letters were being converted letter-by-letter regardless of case:
