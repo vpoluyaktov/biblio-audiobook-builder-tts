@@ -3,6 +3,7 @@ package sanitize
 import (
 	"bufio"
 	"embed"
+	"encoding/csv"
 	"fmt"
 	"io"
 	"os"
@@ -86,7 +87,15 @@ func loadEntriesFromReaderWithLanguage(r io.Reader, language string) ([]Dictiona
 
 // parseCSVLine parses a single CSV line into a DictionaryEntry
 func parseCSVLine(line string, lineNum int) (DictionaryEntry, error) {
-	parts := strings.Split(line, ",")
+	// Use proper CSV parser to handle quoted fields
+	r := csv.NewReader(strings.NewReader(line))
+	r.FieldsPerRecord = -1 // Allow variable number of fields
+
+	parts, err := r.Read()
+	if err != nil {
+		return DictionaryEntry{}, fmt.Errorf("line %d: failed to parse CSV: %w", lineNum, err)
+	}
+
 	if len(parts) < 4 {
 		return DictionaryEntry{}, fmt.Errorf("line %d: expected 4 fields (pattern,replacement_plain,replacement_ssml,comment), got %d", lineNum, len(parts))
 	}

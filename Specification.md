@@ -113,14 +113,17 @@ biblio-audiobook-builder-tts/
 ### Pronunciation Dictionary Patterns
 
 **Pattern requirements**:
-- Measurement units must include `(\d+)\s*` prefix and `[\s\.]` suffix
-  - Correct: `(\d+)\s*м[\s\.],$1 метров`
-  - Wrong: `\bм\b,метр` (matches words like "метр")
+- Measurement units must include `(\d+)\s*` prefix and `([\s\.\,\)]|$)` suffix to match delimiters or end-of-string
+  - Pattern: `"(\d+)\s*м([\s\.\,\)]|$)"` (quoted to handle comma in character class)
+  - Replacement: `$1 метров$2` (preserves the matched delimiter using `$2`)
+  - This ensures the unit is only replaced after numbers and the delimiter is preserved
 - Year of birth (г.р.) must come BEFORE weight units (г) in ru.csv
 - **Compound units must come BEFORE simple units** (critical for correct matching)
   - `км/ч` (kilometers per hour) must come before `км` (kilometers)
   - `м/с` (meters per second) must come before `м` (meters)
   - Pattern order in CSV determines matching priority since Go regexp doesn't support lookahead
+- **CSV patterns with commas must be quoted** to prevent breaking CSV parsing
+  - The CSV parser uses proper `encoding/csv` to handle quoted fields
 - Context-specific patterns prevent false matches
 
 ---
