@@ -68,6 +68,53 @@ biblio-audiobook-builder-tts/
 
 ## Recent Changes
 
+### 2026-02-22: Fix Measurement Units Pattern Matching and Plural Forms
+
+**Issue**: Two problems with measurement unit abbreviations in the Russian pronunciation dictionary (`ru.csv`):
+
+1. **Incorrect pattern matching**: Units like `м` (meter), `в` (volt), `а` (ampere) were being expanded even when not followed by space or dot, causing incorrect substitutions:
+   - Input: `10668 метр` (10668 meter - word "метр")
+   - Incorrect output: `десять тысяч шестьсот шестьдесят восемь метрметр`
+   - Correct output: `десять тысяч шестьсот шестьдесят восемь метр` (no substitution)
+
+2. **Incorrect grammatical forms**: Substituted values were in singular form instead of plural genitive:
+   - Input: `100 м.` (100 meters)
+   - Incorrect output: `100 метр`
+   - Correct output: `100 метров`
+
+**Root Cause**: 
+1. Patterns used `\b` word boundary which matched units even when followed by word characters (like "метр")
+2. Replacement values used singular forms (метр, литр, километр) instead of plural genitive (метров, литров, километров)
+
+**Solution**: Updated all measurement unit patterns in `ru.csv`:
+1. Changed pattern suffix from `\b` to `[\s\.]` to require space or dot after the unit abbreviation
+2. Converted all replacement values to plural genitive forms:
+   - `метр` → `метров`
+   - `литр` → `литров`
+   - `километр` → `километров`
+   - `грамм` → `граммов`
+   - `килограмм` → `килограммов`
+   - `сантиметр` → `сантиметров`
+   - And all other measurement units
+
+**Pattern changes**:
+```csv
+# Before:
+(\d+)\s*м\b,$1 метр,$1 м+етр,м - метр
+(\d+)\s*л\b,$1 литр,$1 л+итр,л - литр
+
+# After:
+(\d+)\s*м[\s\.],$1 метров,$1 м+етров,м - метров
+(\d+)\s*л[\s\.],$1 литров,$1 л+итров,л - литров
+```
+
+**Impact**: 
+- Measurement units only expand when properly abbreviated (followed by space or dot)
+- Grammatically correct plural genitive forms for all numeric measurements
+- Prevents false matches with regular Russian words containing unit letters
+
+---
+
 ### 2026-02-21: Fix Units of Measurement Context in Russian Dictionary
 
 **Issue**: Units of measurement in the Russian pronunciation dictionary (`ru.csv`) were replacing EVERY occurrence of single letters like `В` (volt) and `А` (ampere), not just when they appeared after numbers. This caused incorrect text transformations where regular Russian words containing these letters were being replaced.
