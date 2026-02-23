@@ -115,8 +115,9 @@ biblio-audiobook-builder-tts/
 **Pattern requirements**:
 - Measurement units must include `(\d+)\s*` prefix and `([\s\.\,\)]|$)` suffix to match delimiters or end-of-string
   - Pattern: `"(\d+)\s*м([\s\.\,\)]|$)"` (quoted to handle comma in character class)
-  - Replacement: `$1 метров$2` (preserves the matched delimiter using `$2`)
-  - This ensures the unit is only replaced after numbers and the delimiter is preserved
+  - Replacement: `$1 метров` (simple replacement without delimiter preservation)
+  - **Go code automatically adds a space after each replacement** for patterns containing `[\s\.\,\)]|$`
+  - This ensures the unit is only replaced after numbers, and spacing is handled consistently
 - Year of birth (г.р.) must come BEFORE weight units (г) in ru.csv
 - **Compound units must come BEFORE simple units** (critical for correct matching)
   - `км/ч` (kilometers per hour) must come before `км` (kilometers)
@@ -125,6 +126,12 @@ biblio-audiobook-builder-tts/
 - **CSV patterns with commas must be quoted** to prevent breaking CSV parsing
   - The CSV parser uses proper `encoding/csv` to handle quoted fields
 - Context-specific patterns prevent false matches
+
+**Implementation details**:
+- `applyRuleUnicode` in `text.go` detects patterns with delimiter capture groups
+- For such patterns, a space is automatically appended after replacement
+- This simplifies CSV patterns (no need for `$2` in replacements)
+- May result in double spaces where delimiters were consumed, but this is acceptable
 
 ---
 
