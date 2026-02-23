@@ -245,12 +245,12 @@ func genderFromPluralEnding(word string, runes []rune) (Gender, bool) {
 
 	// -а after consonant → Could be:
 	// - Neuter genitive singular (окна from окно)
-	// - Feminine nominative singular (кошка, Москва)
+	// - Feminine nominative singular (кошка, Москва, вода)
 	// - Masculine genitive singular (стола from стол, ребёнка from ребёнок)
 	//
-	// Strategy: Detect common feminine patterns first, then default to masculine
-	// Feminine patterns: -ка, -га, -ха, -ча, -ща, -жа (кошка, книга, муха, дача, роща, лужа)
-	// Masculine genitive: other consonant + а (стола, ребёнка, дома, города)
+	// Strategy: Be conservative and default to feminine. Masculine genitive forms
+	// should be added to the noun database (ru.csv) for accurate detection.
+	// Only detect clear neuter and feminine patterns here.
 	case lastRune == 'а' && len(runes) >= 3:
 		prevRune := runes[len(runes)-2]
 
@@ -263,17 +263,8 @@ func genderFromPluralEnding(word string, runes []rune) (Gender, bool) {
 			}
 		}
 
-		// Check for common feminine nominative patterns
-		if !isRussianVowel(prevRune) {
-			// Feminine patterns: -ка, -га, -ха, -ча, -ща, -жа, -ша
-			switch prevRune {
-			case 'к', 'г', 'х', 'ч', 'щ', 'ж', 'ш':
-				return Feminine, true
-			}
-			// Default: consonant + а after numbers is likely masculine genitive singular
-			return Masculine, true
-		}
-		// Vowel + а: likely feminine nominative (like "идея")
+		// Default to feminine for -а endings
+		// Masculine genitive singular forms (стола, ребёнка) should be in noun database
 		return Feminine, false
 
 	// -я after consonant → Could be Neuter genitive singular (моря, поля)
