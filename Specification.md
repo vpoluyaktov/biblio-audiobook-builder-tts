@@ -68,6 +68,49 @@ biblio-audiobook-builder-tts/
 
 ## Recent Changes
 
+### 2026-02-22: Enhance Latin-to-Russian Transliteration with Mixed-Case Support
+
+**Issue**: All Latin letters were being converted letter-by-letter regardless of case:
+- Input: `TSAC desent`
+- Old output: `ти эс эй си ди и эс и эн ти` (all letter-by-letter)
+- Desired output: `ти эс эй си десент` (uppercase=letters, lowercase=words)
+
+**Requirement**:
+- **Uppercase-only words** (e.g., "FBI", "TSAC") → letter-by-letter pronunciation
+- **Lowercase/mixed-case words** (e.g., "desent", "iPhone", "Microsoft") → phonetic transliteration
+
+**Solution**:
+Enhanced `LatinToRussianConverter` in `internal/sanitize/latin_ru.go`:
+
+1. **Case Detection**: Check if word is all uppercase
+   - All uppercase → use `convertLetterByLetter` method
+   - Contains lowercase → use `transliterateWord` method
+
+2. **Letter-by-Letter Conversion** (uppercase only):
+   - Maps each letter to Russian pronunciation
+   - Example: "FBI" → "эф би ай", "TSAC" → "ти эс эй си"
+
+3. **Phonetic Transliteration** (lowercase/mixed-case):
+   - Added `phoneticMap` for character-to-character mapping
+   - Special combinations: "ch"→"ч", "sh"→"ш", "th"→"т", "ph"→"ф", "ck"→"к"
+   - Examples:
+     - "desent" → "десент"
+     - "Microsoft" → "микрософт"
+     - "iPhone" → "ифоне"
+     - "chat" → "чат"
+     - "shop" → "шоп"
+
+**Impact**:
+- More natural pronunciation for English words in Russian text
+- Preserves letter-by-letter pronunciation for abbreviations
+- Examples:
+  - `TSAC desent` → `ти эс эй си десент`
+  - `FBI и Microsoft` → `эф би ай и микрософт`
+  - `Устройство iPhone` → `Устройство ифоне`
+- All existing uppercase abbreviation tests continue to pass
+
+---
+
 ### 2026-02-22: Fix Russian Time Normalization
 
 **Issue**: Time formats with dots or colons were being normalized with punctuation preserved between numbers:
