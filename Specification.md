@@ -68,6 +68,31 @@ biblio-audiobook-builder-tts/
 
 ## Recent Changes
 
+### 2026-02-22: Fix Chapter and Part Numbering for Books with 100+ Chapters
+
+**Issue**: Temporary files and multi-part audiobooks had insufficient digit padding causing incorrect sorting:
+- Chapter files used 2-digit prefixes: `01_Chapter1.txt`, `99_Chapter99.txt`, `100_Chapter100.txt`
+- This caused incorrect alphabetical ordering: `100_` comes before `99_` in file listings
+- Part files used 1-digit suffixes: `Part 1.m4b`, `Part 10.m4b` (same sorting issue)
+
+**Solution**:
+Updated file naming patterns to use sufficient digit padding:
+- **Chapter files**: Changed from `%02d` to `%04d` (supports up to 9,999 chapters)
+  - Examples: `0001_Chapter1.txt`, `0001_Chapter1.wav`, `0001_Chapter1.ssml.txt`
+  - Ensures correct sorting even for books with hundreds of chapters
+- **Part files**: Changed from `%d` to `%03d` (supports up to 999 parts)
+  - Example: `Book_Title, Part 001.m4b`
+  - Ensures correct sorting for multi-part audiobooks
+
+**Files Modified**:
+- `internal/server/worker.go`: Updated chapter file naming (txt, wav, ssml.txt files)
+- `internal/audio/multipart.go`: Updated part file naming and titles
+
+**Impact**:
+- Correct file ordering in file systems and audiobook players
+- Better support for large books (100+ chapters)
+- Consistent naming across all temporary and output files
+
 ### 2026-02-22: Fix Year of Birth Abbreviation (г.р.)
 
 **Issue**: "г.р." (года рождения - year of birth) was being incorrectly expanded:
