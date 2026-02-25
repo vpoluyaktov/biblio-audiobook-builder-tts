@@ -293,6 +293,7 @@ func TextForTTS(text string) string {
 // PronunciationRule represents a single pronunciation replacement rule
 type PronunciationRule struct {
 	Pattern          *regexp.Regexp
+	WrappedPattern   *regexp.Regexp // Pre-compiled wrapped pattern for efficiency
 	ReplacementPlain string
 	ReplacementSSML  string
 	Language         string
@@ -329,8 +330,18 @@ func (d *PronunciationDictionary) AddRuleWithSSML(pattern, replacementPlain, rep
 		language = "en"
 	}
 
+	// Pre-compile wrapped pattern for efficiency
+	// Wrap pattern: (?:^|\s) at start for word boundary, pattern in capture group, (?:[\s.,)]|$) at end
+	wrappedPattern := `(?:^|\s)(` + re.String() + `)(?:[\s.,)]|$)`
+	wrappedRe, err := regexp.Compile(wrappedPattern)
+	if err != nil {
+		// If wrapping fails, use nil and fall back to original pattern
+		wrappedRe = nil
+	}
+
 	d.rules = append(d.rules, PronunciationRule{
 		Pattern:          re,
+		WrappedPattern:   wrappedRe,
 		ReplacementPlain: replacementPlain,
 		ReplacementSSML:  replacementSSML,
 		Language:         language,
@@ -353,13 +364,10 @@ func (d *PronunciationDictionary) ApplyWithMode(text string, useSSML bool) strin
 // applyRuleUnicode applies a single pronunciation rule with automatic boundary wrapping.
 // All patterns from CSV are automatically wrapped with (?:^|\s) prefix and (?:[\s.,)]|$) suffix.
 // A space is always added after replacement.
-func applyRuleUnicode(re *regexp.Regexp, text, replacement string) string {
-	// Wrap pattern: (?:^|\s) at start for word boundary, pattern in capture group, (?:[\s.,)]|$) at end
-	// This ensures we only match complete words/units, not parts of larger words
-	wrappedPattern := `(?:^|\s)(` + re.String() + `)(?:[\s.,)]|$)`
-	wrappedRe, err := regexp.Compile(wrappedPattern)
-	if err != nil {
-		// If wrapping fails, fall back to original pattern
+// Uses pre-compiled wrapped pattern if available for better performance.
+func applyRuleUnicode(re *regexp.Regexp, wrappedRe *regexp.Regexp, text, replacement string) string {
+	// Use pre-compiled wrapped pattern if available, otherwise fall back to original
+	if wrappedRe == nil {
 		return re.ReplaceAllString(text, replacement)
 	}
 
@@ -408,7 +416,7 @@ func (d *PronunciationDictionary) ApplyWithLanguage(text string, useSSML bool, l
 		if useSSML && rule.ReplacementSSML != "" {
 			replacement = rule.ReplacementSSML
 		}
-		result = applyRuleUnicode(rule.Pattern, result, replacement)
+		result = applyRuleUnicode(rule.Pattern, rule.WrappedPattern, result, replacement)
 	}
 	return result
 }
