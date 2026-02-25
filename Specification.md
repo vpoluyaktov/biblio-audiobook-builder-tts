@@ -66,6 +66,103 @@ biblio-audiobook-builder-tts/
 
 ---
 
+## Self-Hosted TTS Models Evaluation
+
+### Recommended Models for CPU-Only Deployment with SSML Support
+
+**Evaluation Criteria:**
+- CPU-only inference capability
+- SSML support (prosody, breaks, emphasis)
+- English language quality
+- Self-hosted deployment ease
+- Active maintenance and community
+
+**Top Candidates (Ranked by Quality/Performance):**
+
+#### 1. **Piper TTS** ⭐⭐⭐⭐⭐
+- **Quality**: Excellent (neural, natural-sounding)
+- **Speed**: Very fast on CPU (real-time or faster)
+- **SSML**: Limited (basic breaks, some prosody via phonemes)
+- **Voices**: 50+ English voices (US, GB, various styles)
+- **Deployment**: Single binary, minimal dependencies
+- **License**: MIT
+- **Links**:
+  - GitHub: https://github.com/rhasspy/piper
+  - Samples: https://rhasspy.github.io/piper-samples/
+  - Models: https://huggingface.co/rhasspy/piper-voices
+- **Notes**: Best balance of quality/speed for CPU. Uses VITS architecture. Excellent for audiobook production.
+
+#### 2. **Coqui TTS (XTTS v2)** ⭐⭐⭐⭐
+- **Quality**: Excellent (state-of-the-art neural)
+- **Speed**: Moderate on CPU (slower than Piper)
+- **SSML**: Good support (prosody, breaks, emphasis)
+- **Voices**: Multiple high-quality English voices
+- **Deployment**: Python package, moderate complexity
+- **License**: MPL 2.0
+- **Links**:
+  - GitHub: https://github.com/coqui-ai/TTS
+  - Samples: https://github.com/coqui-ai/TTS#-implemented-models
+  - Docs: https://tts.readthedocs.io/
+- **Notes**: More resource-intensive but higher quality. Good SSML support. Community fork active after Coqui shutdown.
+
+#### 3. **Mimic 3** ⭐⭐⭐⭐
+- **Quality**: Very good (neural, Larynx/VITS-based)
+- **Speed**: Fast on CPU
+- **SSML**: Good support (standard SSML tags)
+- **Voices**: Multiple English voices
+- **Deployment**: Docker or Python, easy setup
+- **License**: AGPL 3.0
+- **Links**:
+  - GitHub: https://github.com/MycroftAI/mimic3
+  - Samples: https://mycroftai.github.io/mimic3-voices/
+  - Web Demo: https://mimic3.mycroft.ai/
+- **Notes**: Mycroft AI project. Good SSML compliance. Docker deployment simplifies setup.
+
+#### 4. **Sherpa-ONNX TTS** ⭐⭐⭐⭐
+- **Quality**: Very good (VITS/VITS2 models)
+- **Speed**: Very fast (ONNX optimized)
+- **SSML**: Limited (basic support)
+- **Voices**: Multiple English models available
+- **Deployment**: C++ library with Python bindings
+- **License**: Apache 2.0
+- **Links**:
+  - GitHub: https://github.com/k2-fsa/sherpa-onnx
+  - Samples: https://k2-fsa.github.io/sherpa/onnx/tts/index.html
+  - Models: https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models
+- **Notes**: Highly optimized for CPU inference. Cross-platform. Good for production.
+
+#### 5. **eSpeak-NG** ⭐⭐⭐
+- **Quality**: Good (formant synthesis, robotic but clear)
+- **Speed**: Extremely fast
+- **SSML**: Excellent support (full SSML 1.1)
+- **Voices**: Multiple English variants
+- **Deployment**: Single binary, minimal resources
+- **License**: GPL 3.0
+- **Links**:
+  - GitHub: https://github.com/espeak-ng/espeak-ng
+  - Samples: https://github.com/espeak-ng/espeak-ng/blob/master/docs/languages.md
+- **Notes**: Not neural but very reliable. Best SSML support. Good fallback option.
+
+### Comparison Matrix
+
+| Model | Quality | CPU Speed | SSML Support | Deployment | Best For |
+|-------|---------|-----------|--------------|------------|----------|
+| Piper | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | Production audiobooks |
+| Coqui TTS | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ | High-quality output |
+| Mimic 3 | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | Docker deployments |
+| Sherpa-ONNX | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ | Performance-critical |
+| eSpeak-NG | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | Fallback/testing |
+
+### Recommendation for ABB-TTS
+
+**Primary**: **Piper TTS** - Best balance of quality, speed, and ease of deployment for CPU-only audiobook production.
+
+**Secondary**: **Mimic 3** - Good alternative with better SSML support if needed.
+
+**High-Quality Option**: **Coqui TTS** - When quality is more important than speed.
+
+---
+
 ## Key Implementation Notes
 
 ### Text Processing Pipeline
