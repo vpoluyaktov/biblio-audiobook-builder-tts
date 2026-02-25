@@ -61,6 +61,178 @@ func isLatin(r rune) bool {
 		(r >= 0x0100 && r <= 0x017F) // Latin Extended-A
 }
 
+// ttsReplacer is a pre-built strings.Replacer for efficient character replacement
+// This is initialized once and reused for all TextForTTS calls
+var ttsReplacer = strings.NewReplacer(
+	// ASCII special characters that cause TTS engines to crash
+	// These often appear in censored text, broken formatting, or encoding artifacts
+	"$", "", // Dollar sign
+	"%", "", // Percent sign
+	"#", "", // Hash/pound sign
+	"^", "", // Caret
+	"*", "", // Asterisk (often used for censoring)
+	"@", "", // At sign
+	"~", "", // Tilde
+	"|", "", // Pipe
+	"\\", "", // Backslash
+	"/", "", // Forward slash
+	"<", "", // Less than
+	">", "", // Greater than
+	"{", "", // Left brace
+	"}", "", // Right brace
+	"[", "", // Left bracket
+	"]", "", // Right bracket
+	"_", " ", // Underscore (replace with space)
+
+	// Dashes - replace with spoken equivalents
+	"\u2014", " - ", // Em dash
+	"\u2013", " - ", // En dash
+	"\u2015", " - ", // Horizontal bar
+	"\u2012", " - ", // Figure dash
+	"\u2212", "-", // Minus sign
+
+	// Quotes - remove to avoid SSML escaping issues with TTS engines
+	"\u201C", "", // Left double quote "
+	"\u201D", "", // Right double quote "
+	"\u201E", "", // Double low-9 quote „
+	"\u2018", "", // Left single quote '
+	"\u2019", "", // Right single quote '
+	"\u201A", "", // Single low-9 quote ‚
+	"\u00AB", "", // Left guillemet «
+	"\u00BB", "", // Right guillemet »
+	"\u2039", "", // Single left guillemet ‹
+	"\u203A", "", // Single right guillemet ›
+	`"`, "", // ASCII double quote
+	"'", "", // ASCII single quote
+	"`", "", // Backtick
+
+	// Ellipsis
+	"\u2026", "...", // Horizontal ellipsis …
+
+	// Spaces - normalize to regular space
+	"\u00A0", " ", // Non-breaking space
+	"\u2002", " ", // En space
+	"\u2003", " ", // Em space
+	"\u2004", " ", // Three-per-em space
+	"\u2005", " ", // Four-per-em space (from &#8197;)
+	"\u2006", " ", // Six-per-em space
+	"\u2007", " ", // Figure space
+	"\u2008", " ", // Punctuation space
+	"\u2009", " ", // Thin space
+	"\u200A", " ", // Hair space
+	"\u200B", "", // Zero-width space
+	"\u200C", "", // Zero-width non-joiner
+	"\u200D", "", // Zero-width joiner
+	"\uFEFF", "", // BOM / zero-width no-break space
+
+	// Bullets and markers
+	"\u2022", "-", // Bullet •
+	"\u2023", "-", // Triangular bullet ‣
+	"\u2043", "-", // Hyphen bullet ⁃
+	"\u25E6", "-", // White bullet ◦
+	"\u00B7", ".", // Middle dot ·
+
+	// Daggers and reference marks
+	"\u2020", "", // Dagger †
+	"\u2021", "", // Double dagger ‡
+	"\u00B6", "", // Pilcrow ¶
+
+	// Legal/trademark symbols - expand to words
+	"\u00A9", "(c)", // Copyright ©
+	"\u00AE", "(R)", // Registered ®
+	"\u2122", "(TM)", // Trademark ™
+
+	// Section sign
+	"\u00A7", "Section ", // Section sign §
+
+	// Math symbols - expand to words for better TTS
+	"\u00B0", " degrees ", // Degree °
+	"\u00B1", " plus or minus ", // Plus-minus ±
+	"\u00D7", " times ", // Multiplication ×
+	"\u00F7", " divided by ", // Division ÷
+	"\u2248", " approximately ", // Almost equal ≈
+	"\u2260", " not equal to ", // Not equal ≠
+	"\u2264", " less than or equal ", // Less than or equal ≤
+	"\u2265", " greater than or equal ", // Greater than or equal ≥
+	"\u221E", " infinity ", // Infinity ∞
+
+	// Fractions - expand to words
+	"\u00BC", " one quarter ", // ¼
+	"\u00BD", " one half ", // ½
+	"\u00BE", " three quarters ", // ¾
+	"\u2153", " one third ", // ⅓
+	"\u2154", " two thirds ", // ⅔
+
+	// Superscript numbers
+	"\u00B9", "1", // ¹
+	"\u00B2", "2", // ²
+	"\u00B3", "3", // ³
+	"\u2070", "0", // ⁰
+	"\u2074", "4", // ⁴
+	"\u2075", "5", // ⁵
+	"\u2076", "6", // ⁶
+	"\u2077", "7", // ⁷
+	"\u2078", "8", // ⁸
+	"\u2079", "9", // ⁹
+
+	// Subscript numbers
+	"\u2080", "0", // ₀
+	"\u2081", "1", // ₁
+	"\u2082", "2", // ₂
+	"\u2083", "3", // ₃
+	"\u2084", "4", // ₄
+	"\u2085", "5", // ₅
+	"\u2086", "6", // ₆
+	"\u2087", "7", // ₇
+	"\u2088", "8", // ₈
+	"\u2089", "9", // ₉
+
+	// Prime marks (feet/inches, minutes/seconds) - remove to avoid SSML issues
+	"\u2032", "", // ′ Prime (feet, minutes)
+	"\u2033", "", // ″ Double prime (inches, seconds)
+	"\u2034", "", // ‴ Triple prime
+
+	// Additional spaces
+	"\u202F", " ", // Narrow no-break space
+	"\u205F", " ", // Medium mathematical space
+	"\u3000", " ", // Ideographic space (CJK)
+
+	// Soft hyphen (invisible, can cause issues)
+	"\u00AD", "", // Soft hyphen - remove
+
+	// Ordinal indicators
+	"\u00BA", "o", // º Masculine ordinal
+	"\u00AA", "a", // ª Feminine ordinal
+
+	// Numero sign
+	"\u2116", "No.", // № Numero sign
+
+	// Per mille and per ten thousand
+	"\u2030", " per mille ", // ‰
+	"\u2031", " per ten thousand ", // ‱
+
+	// Common arrows - expand to words
+	"\u2192", " to ", // → Right arrow
+	"\u2190", " from ", // ← Left arrow
+	"\u2194", " to ", // ↔ Left-right arrow
+
+	// Reference marks
+	"\u203B", "*", // ※ Reference mark
+	"\u2042", "***", // ⁂ Asterism
+
+	// Currency (keep symbol but ensure TTS can handle)
+	"\u20AC", " euros ", // €
+	"\u00A3", " pounds ", // £
+	"\u00A5", " yen ", // ¥
+	"\u00A2", " cents ", // ¢
+
+	// Other common symbols
+	"\u2713", " check ", // ✓ Check mark
+	"\u2717", " x ", // ✗ Ballot X
+	"\u2605", " star ", // ★ Black star
+	"\u2606", " star ", // ☆ White star
+)
+
 // TextForTTS sanitizes text for TTS processing by normalizing problematic
 // Unicode characters while preserving all readable text from any language.
 // This should be applied during parsing stage so sanitized text is visible
@@ -68,180 +240,8 @@ func isLatin(r rune) bool {
 func TextForTTS(text string) string {
 	// Replace common problematic Unicode characters with TTS-friendly equivalents
 	// These are characters that often cause TTS engines to mispronounce or error
-	replacements := map[string]string{
-		// ASCII special characters that cause TTS engines to crash
-		// These often appear in censored text, broken formatting, or encoding artifacts
-		"$":  "",  // Dollar sign
-		"%":  "",  // Percent sign
-		"#":  "",  // Hash/pound sign
-		"^":  "",  // Caret
-		"*":  "",  // Asterisk (often used for censoring)
-		"@":  "",  // At sign
-		"~":  "",  // Tilde
-		"|":  "",  // Pipe
-		"\\": "",  // Backslash
-		"/":  "",  // Forward slash
-		"<":  "",  // Less than
-		">":  "",  // Greater than
-		"{":  "",  // Left brace
-		"}":  "",  // Right brace
-		"[":  "",  // Left bracket
-		"]":  "",  // Right bracket
-		"_":  " ", // Underscore (replace with space)
-
-		// Dashes - replace with spoken equivalents
-		"\u2014": " - ", // Em dash
-		"\u2013": " - ", // En dash
-		"\u2015": " - ", // Horizontal bar
-		"\u2012": " - ", // Figure dash
-		"\u2212": "-",   // Minus sign
-
-		// Quotes - remove to avoid SSML escaping issues with TTS engines
-		"\u201C": "", // Left double quote "
-		"\u201D": "", // Right double quote "
-		"\u201E": "", // Double low-9 quote „
-		"\u2018": "", // Left single quote '
-		"\u2019": "", // Right single quote '
-		"\u201A": "", // Single low-9 quote ‚
-		"\u00AB": "", // Left guillemet «
-		"\u00BB": "", // Right guillemet »
-		"\u2039": "", // Single left guillemet ‹
-		"\u203A": "", // Single right guillemet ›
-		`"`:      "", // ASCII double quote
-		"'":      "", // ASCII single quote
-		"`":      "", // Backtick
-
-		// Ellipsis
-		"\u2026": "...", // Horizontal ellipsis …
-
-		// Spaces - normalize to regular space
-		"\u00A0": " ", // Non-breaking space
-		"\u2002": " ", // En space
-		"\u2003": " ", // Em space
-		"\u2004": " ", // Three-per-em space
-		"\u2005": " ", // Four-per-em space (from &#8197;)
-		"\u2006": " ", // Six-per-em space
-		"\u2007": " ", // Figure space
-		"\u2008": " ", // Punctuation space
-		"\u2009": " ", // Thin space
-		"\u200A": " ", // Hair space
-		"\u200B": "",  // Zero-width space
-		"\u200C": "",  // Zero-width non-joiner
-		"\u200D": "",  // Zero-width joiner
-		"\uFEFF": "",  // BOM / zero-width no-break space
-
-		// Bullets and markers
-		"\u2022": "-", // Bullet •
-		"\u2023": "-", // Triangular bullet ‣
-		"\u2043": "-", // Hyphen bullet ⁃
-		"\u25E6": "-", // White bullet ◦
-		"\u00B7": ".", // Middle dot ·
-
-		// Daggers and reference marks
-		"\u2020": "", // Dagger †
-		"\u2021": "", // Double dagger ‡
-		"\u00B6": "", // Pilcrow ¶
-
-		// Legal/trademark symbols - expand to words
-		"\u00A9": "(c)",  // Copyright ©
-		"\u00AE": "(R)",  // Registered ®
-		"\u2122": "(TM)", // Trademark ™
-
-		// Section sign
-		"\u00A7": "Section ", // Section sign §
-
-		// Math symbols - expand to words for better TTS
-		"\u00B0": " degrees ",               // Degree °
-		"\u00B1": " plus or minus ",         // Plus-minus ±
-		"\u00D7": " times ",                 // Multiplication ×
-		"\u00F7": " divided by ",            // Division ÷
-		"\u2248": " approximately ",         // Almost equal ≈
-		"\u2260": " not equal to ",          // Not equal ≠
-		"\u2264": " less than or equal ",    // Less than or equal ≤
-		"\u2265": " greater than or equal ", // Greater than or equal ≥
-		"\u221E": " infinity ",              // Infinity ∞
-
-		// Fractions - expand to words
-		"\u00BC": " one quarter ",    // ¼
-		"\u00BD": " one half ",       // ½
-		"\u00BE": " three quarters ", // ¾
-		"\u2153": " one third ",      // ⅓
-		"\u2154": " two thirds ",     // ⅔
-
-		// Superscript numbers
-		"\u00B9": "1", // ¹
-		"\u00B2": "2", // ²
-		"\u00B3": "3", // ³
-		"\u2070": "0", // ⁰
-		"\u2074": "4", // ⁴
-		"\u2075": "5", // ⁵
-		"\u2076": "6", // ⁶
-		"\u2077": "7", // ⁷
-		"\u2078": "8", // ⁸
-		"\u2079": "9", // ⁹
-
-		// Subscript numbers
-		"\u2080": "0", // ₀
-		"\u2081": "1", // ₁
-		"\u2082": "2", // ₂
-		"\u2083": "3", // ₃
-		"\u2084": "4", // ₄
-		"\u2085": "5", // ₅
-		"\u2086": "6", // ₆
-		"\u2087": "7", // ₇
-		"\u2088": "8", // ₈
-		"\u2089": "9", // ₉
-
-		// Prime marks (feet/inches, minutes/seconds) - remove to avoid SSML issues
-		"\u2032": "", // ′ Prime (feet, minutes)
-		"\u2033": "", // ″ Double prime (inches, seconds)
-		"\u2034": "", // ‴ Triple prime
-
-		// Additional spaces
-		"\u202F": " ", // Narrow no-break space
-		"\u205F": " ", // Medium mathematical space
-		"\u3000": " ", // Ideographic space (CJK)
-
-		// Soft hyphen (invisible, can cause issues)
-		"\u00AD": "", // Soft hyphen - remove
-
-		// Ordinal indicators
-		"\u00BA": "o", // º Masculine ordinal
-		"\u00AA": "a", // ª Feminine ordinal
-
-		// Numero sign
-		"\u2116": "No.", // № Numero sign
-
-		// Per mille and per ten thousand
-		"\u2030": " per mille ",        // ‰
-		"\u2031": " per ten thousand ", // ‱
-
-		// Common arrows - expand to words
-		"\u2192": " to ",   // → Right arrow
-		"\u2190": " from ", // ← Left arrow
-		"\u2194": " to ",   // ↔ Left-right arrow
-
-		// Reference marks
-		"\u203B": "*",   // ※ Reference mark
-		"\u2042": "***", // ⁂ Asterism
-
-		// Currency (keep symbol but ensure TTS can handle)
-		"\u20AC": " euros ",  // €
-		"\u00A3": " pounds ", // £
-		"\u00A5": " yen ",    // ¥
-		"\u00A2": " cents ",  // ¢
-
-		// Other common symbols
-		"\u2713": " check ", // ✓ Check mark
-		"\u2717": " x ",     // ✗ Ballot X
-		"\u2605": " star ",  // ★ Black star
-		"\u2606": " star ",  // ☆ White star
-	}
-
-	result := text
-	for old, new := range replacements {
-		result = strings.ReplaceAll(result, old, new)
-	}
+	// Using pre-built strings.Replacer for efficient single-pass replacement
+	result := ttsReplacer.Replace(text)
 
 	// Replace multiple consecutive periods with ellipsis-like pause
 	multiPeriod := regexp.MustCompile(`\.{4,}`)
