@@ -136,6 +136,185 @@ biblio-audiobook-builder-tts/
 
 ---
 
+## Code Quality & Architecture Improvements
+
+### Overall Assessment
+
+**Strengths:**
+- ✅ Clean package structure with clear separation of concerns
+- ✅ Good test coverage for critical components (sanitize, normalize, TTS providers)
+- ✅ Well-documented domain logic (pronunciation rules, grammar patterns)
+- ✅ Consistent error handling patterns
+- ✅ Good use of interfaces for provider abstraction
+
+**Areas for Improvement:**
+
+### 1. Architecture & Design Patterns
+
+**Error Handling Standardization**
+- Consider implementing custom error types for different failure categories
+- Add error wrapping with context using `fmt.Errorf("context: %w", err)`
+- Implement structured error responses for API endpoints
+- Add error recovery strategies for transient failures (retry logic)
+
+**Dependency Injection**
+- Some packages have tight coupling to concrete implementations
+- Consider using dependency injection containers or wire for larger components
+- Make database/storage dependencies more explicit through interfaces
+
+**Configuration Management**
+- Centralize configuration validation
+- Add configuration schema documentation
+- Consider using structured config with validation tags
+- Implement hot-reload for non-critical config changes
+
+### 2. Code Organization
+
+**Package Responsibilities**
+- `internal/controller/` - Consider splitting into smaller, focused controllers
+- `internal/tts/` - Large provider files (400+ lines) could benefit from extraction
+  - Separate API client logic from TTS orchestration
+  - Extract common provider patterns into shared utilities
+- `internal/sanitize/` and `internal/normalize/` - Well-structured, good example
+
+**File Size Management**
+- Several files exceed 400 lines (tts/adapter.go, tts/azure_provider.go, etc.)
+- Consider extracting helper functions or creating sub-packages
+- Break down large functions into smaller, testable units
+
+### 3. Testing Improvements
+
+**Test Coverage Gaps**
+- Add integration tests for end-to-end conversion pipeline
+- Add performance benchmarks for text processing (sanitize/normalize)
+- Add stress tests for concurrent job processing
+- Consider property-based testing for text normalization edge cases
+
+**Test Organization**
+- Good use of table-driven tests (keep this pattern)
+- Consider adding test helpers for common setup/teardown
+- Add golden file tests for complex text transformations
+- Mock external dependencies (TTS providers, storage) more consistently
+
+### 4. Performance Optimizations
+
+**Text Processing Pipeline**
+- ✅ Already optimized: Character replacements use `strings.NewReplacer()`
+- ✅ Already optimized: Regex patterns are pre-compiled
+- Consider: Parallel processing for large documents (chapter-level parallelism)
+- Consider: Caching for repeated text patterns (pronunciation dictionary lookups)
+
+**Memory Management**
+- Profile memory usage during large audiobook conversions
+- Consider streaming processing for very large files
+- Implement buffer pooling for audio processing
+- Add memory limits and backpressure for job queue
+
+**Concurrency**
+- Review goroutine lifecycle management
+- Add context cancellation for long-running operations
+- Implement graceful shutdown for in-progress jobs
+- Consider worker pool pattern for TTS requests
+
+### 5. Observability & Monitoring
+
+**Logging Improvements**
+- Standardize log levels (debug, info, warn, error)
+- Add structured logging with consistent field names
+- Include correlation IDs for request tracing
+- Add performance metrics logging (processing time, queue depth)
+
+**Metrics & Instrumentation**
+- Add Prometheus metrics for:
+  - Job queue depth and processing time
+  - TTS provider latency and error rates
+  - Text processing pipeline stages
+  - Audio file generation metrics
+- Add health check endpoints with dependency status
+- Implement distributed tracing (OpenTelemetry)
+
+**Debugging Tools**
+- Add debug endpoints for inspecting job state
+- Implement dry-run mode for testing text processing
+- Add verbose logging mode for troubleshooting
+- Create diagnostic tools for provider connectivity
+
+### 6. Security Enhancements
+
+**Input Validation**
+- Add comprehensive input sanitization for file uploads
+- Validate file sizes and types before processing
+- Implement rate limiting for API endpoints
+- Add request size limits
+
+**Authentication & Authorization**
+- Review Biblio Auth integration security
+- Implement API key rotation mechanism
+- Add audit logging for sensitive operations
+- Consider implementing RBAC for multi-tenant scenarios
+
+**Data Protection**
+- Encrypt sensitive configuration (API keys, credentials)
+- Implement secure file storage with access controls
+- Add data retention policies
+- Consider PII handling in uploaded content
+
+### 7. Documentation Improvements
+
+**Code Documentation**
+- Add package-level documentation for all packages
+- Document complex algorithms (especially in normalize/)
+- Add examples for public APIs
+- Document thread-safety guarantees
+
+**API Documentation**
+- Generate OpenAPI/Swagger specs from code
+- Add request/response examples
+- Document error codes and recovery strategies
+- Create API versioning strategy
+
+**Operational Documentation**
+- Add runbooks for common operational tasks
+- Document deployment procedures
+- Create troubleshooting guides
+- Add performance tuning guidelines
+
+### 8. Specific Technical Debt
+
+**Known Issues to Address**
+- Double/triple spaces after text processing (acceptable but could be cleaned)
+- Potential race conditions in job state management (needs review)
+- Provider-specific error handling could be more consistent
+- File naming conventions could be more flexible (configurable formats)
+
+**Refactoring Opportunities**
+- Extract common TTS provider patterns into base implementation
+- Consolidate duplicate sanitization logic
+- Simplify complex conditional logic in number normalization
+- Consider using generics for common patterns (Go 1.18+)
+
+### 9. Future Architecture Considerations
+
+**Scalability**
+- Consider microservices architecture for independent scaling
+- Implement distributed job queue (Redis, RabbitMQ)
+- Add horizontal scaling support for workers
+- Consider serverless functions for text processing
+
+**Extensibility**
+- Plugin system for custom TTS providers
+- Extensible text processing pipeline (middleware pattern)
+- Custom audio post-processing hooks
+- Webhook support for job completion notifications
+
+**Cloud-Native Features**
+- Kubernetes deployment manifests
+- Health checks and readiness probes
+- Resource limits and autoscaling
+- Service mesh integration
+
+---
+
 ### Future Enhancements
 
 - Deeper observability of conversion pipeline stages
