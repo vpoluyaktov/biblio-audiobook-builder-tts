@@ -27,16 +27,6 @@ func NewTTSController(dispatcher *mq.Dispatcher, service tts.Service) *TTSContro
 	return c
 }
 
-func (c *TTSController) checkMQ() {
-	m, err := c.mq.GetMessage(mq.TTSController)
-	if err != nil {
-		return
-	}
-	if m != nil {
-		c.dispatchMessage(m)
-	}
-}
-
 func (c *TTSController) dispatchMessage(m *mq.Message) {
 	c.metrics.IncrementCounter("messages_received")
 	
