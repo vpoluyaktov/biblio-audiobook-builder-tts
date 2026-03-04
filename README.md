@@ -10,7 +10,7 @@ Biblio Audiobook Builder TTS is a server-based application that converts e-books
 
 - **Web Interface**: Upload books, monitor progress, download audiobooks
 - **Drop-and-Forget**: Start conversion, close browser, reconnect later
-- **Multiple TTS Engines**: Local (eSpeak), cloud (Google, OpenAI), self-hosted (Silero, OpenVoice)
+- **Multiple TTS Engines**: Local (eSpeak), cloud (Google, OpenAI), self-hosted (Silero, OpenVoice, Piper)
 - **EPUB and FB2 Support**: Parse and convert popular e-book formats
 - **M4B Output**: Audiobooks with chapter markers, metadata, and cover art
 - **OPDS Integration**: Browse and convert books from Biblio Catalog
@@ -26,6 +26,8 @@ The recommended way to run Audiobook Builder TTS is as part of the [BiblioHub](h
 git clone https://github.com/vpoluyaktov/biblio-hub.git
 git clone https://github.com/vpoluyaktov/biblio-audiobook-builder-tts.git
 git clone https://github.com/vpoluyaktov/biblio-tts-server-silero.git
+git clone https://github.com/vpoluyaktov/biblio-tts-server-openvoice.git
+git clone https://github.com/vpoluyaktov/biblio-tts-server-piper.git
 git clone https://github.com/vpoluyaktov/biblio-ebooks-catalog.git
 
 # Start the stack

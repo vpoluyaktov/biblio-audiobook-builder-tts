@@ -56,6 +56,7 @@ biblio-audiobook-builder-tts/
 - ✅ Multi-provider TTS orchestration and provider-level behavior controls are available
 - ✅ Job lifecycle management and user-facing progress workflows are in place
 - ✅ Integrated with BiblioHub routing and related platform services
+- ✅ Piper TTS provider integration (fast neural TTS with 40+ languages and hundreds of voices)
 
 ## Development Priorities
 
@@ -79,18 +80,19 @@ biblio-audiobook-builder-tts/
 
 **Top Candidates (Ranked by Quality/Performance):**
 
-#### 1. **Piper TTS** ⭐⭐⭐⭐⭐
+#### 1. **Piper TTS** ⭐⭐⭐⭐⭐ ✅ **INTEGRATED**
 - **Quality**: Excellent (neural, natural-sounding)
 - **Speed**: Very fast on CPU (real-time or faster)
 - **SSML**: Limited (basic breaks, some prosody via phonemes)
-- **Voices**: 50+ English voices (US, GB, various styles)
+- **Voices**: 50+ English voices (US, GB, various styles), 40+ languages total
 - **Deployment**: Single binary, minimal dependencies
 - **License**: MIT
 - **Links**:
   - GitHub: https://github.com/rhasspy/piper
   - Samples: https://rhasspy.github.io/piper-samples/
   - Models: https://huggingface.co/rhasspy/piper-voices
-- **Notes**: Best balance of quality/speed for CPU. Uses VITS architecture. Excellent for audiobook production.
+  - BiblioHub Server: https://github.com/vpoluyaktov/biblio-tts-server-piper
+- **Notes**: Best balance of quality/speed for CPU. Uses VITS architecture. Excellent for audiobook production. **Now integrated as a provider in ABB-TTS.**
 
 #### 2. **Coqui TTS (XTTS v2)** ⭐⭐⭐⭐
 - **Quality**: Excellent (state-of-the-art neural)

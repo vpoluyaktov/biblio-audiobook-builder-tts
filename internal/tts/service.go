@@ -26,19 +26,19 @@ type Service interface {
 
 // ProviderInfo contains runtime information about a provider
 type ProviderInfo struct {
-	ID                          string `json:"id"`
-	Name                        string `json:"name"`
-	Type                        string `json:"type"`
-	Enabled                     bool   `json:"enabled"`
-	Available                   bool   `json:"available"`
-	TTSWorkers                  int    `json:"tts_workers"`
-	NormalizeNumbers            bool   `json:"normalize_numbers"`
-	Transliteration bool   `json:"transliteration"`
-	SSMLSupport                 bool   `json:"ssml_support"`
-	StressEnabled               bool   `json:"stress_enabled"`
-	IsDefault                   bool   `json:"is_default"`
-	VoiceCount                  int    `json:"voice_count"`
-	Error                       string `json:"error,omitempty"`
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	Type             string `json:"type"`
+	Enabled          bool   `json:"enabled"`
+	Available        bool   `json:"available"`
+	TTSWorkers       int    `json:"tts_workers"`
+	NormalizeNumbers bool   `json:"normalize_numbers"`
+	Transliteration  bool   `json:"transliteration"`
+	SSMLSupport      bool   `json:"ssml_support"`
+	StressEnabled    bool   `json:"stress_enabled"`
+	IsDefault        bool   `json:"is_default"`
+	VoiceCount       int    `json:"voice_count"`
+	Error            string `json:"error,omitempty"`
 }
 
 // ConversionOptions contains settings for TTS conversion
@@ -162,6 +162,12 @@ func (s *service) initializeProviderFromDB(dbProv *storage.TTSProvider) {
 		if dbProv.URL != "" {
 			s.providers["openvoice"] = NewOpenVoiceProvider(dbProv.URL)
 			logger.Debug("Initialized OpenVoice TTS provider with URL: %s", dbProv.URL)
+		}
+
+	case "piper":
+		if dbProv.URL != "" {
+			s.providers["piper"] = NewPiperProvider(dbProv.URL)
+			logger.Debug("Initialized Piper TTS provider with URL: %s", dbProv.URL)
 		}
 	}
 }
@@ -348,17 +354,17 @@ func (s *service) GetAllProviderInfos() []*ProviderInfo {
 		if err == nil {
 			for _, dbProv := range dbProviders {
 				info := &ProviderInfo{
-					ID:                     dbProv.ID,
-					Name:                   dbProv.Name,
-					Type:                   dbProv.Type,
-					Enabled:                dbProv.Enabled,
-					TTSWorkers:             dbProv.TTSWorkers,
-					NormalizeNumbers:       dbProv.NormalizeNumbers,
-					Transliteration: dbProv.Transliteration,
-					SSMLSupport:            dbProv.SSMLSupport,
-					StressEnabled:          dbProv.StressEnabled,
-					IsDefault:              dbProv.IsDefault,
-					Available:              false,
+					ID:               dbProv.ID,
+					Name:             dbProv.Name,
+					Type:             dbProv.Type,
+					Enabled:          dbProv.Enabled,
+					TTSWorkers:       dbProv.TTSWorkers,
+					NormalizeNumbers: dbProv.NormalizeNumbers,
+					Transliteration:  dbProv.Transliteration,
+					SSMLSupport:      dbProv.SSMLSupport,
+					StressEnabled:    dbProv.StressEnabled,
+					IsDefault:        dbProv.IsDefault,
+					Available:        false,
 				}
 
 				// Check if provider is actually available
