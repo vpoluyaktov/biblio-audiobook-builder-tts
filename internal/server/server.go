@@ -1390,27 +1390,61 @@ func (s *Server) testOpenVoiceConnection(url string) map[string]interface{} {
 		}
 	}
 
-	// Fetch voices to get count
+	// Try to get voice count
 	voicesResp, err := client.Get(url + "/api/voices")
-	if err != nil {
-		return map[string]interface{}{
-			"success":     true,
-			"voice_count": 0,
-		}
-	}
-	defer voicesResp.Body.Close()
-
-	var voicesMap map[string]interface{}
-	if err := json.NewDecoder(voicesResp.Body).Decode(&voicesMap); err != nil {
-		return map[string]interface{}{
-			"success":     true,
-			"voice_count": 0,
+	if err == nil && voicesResp.StatusCode == http.StatusOK {
+		defer voicesResp.Body.Close()
+		var voices map[string]interface{}
+		if err := json.NewDecoder(voicesResp.Body).Decode(&voices); err == nil {
+			return map[string]interface{}{
+				"success":     true,
+				"voice_count": len(voices),
+				"message":     fmt.Sprintf("Connected successfully. %d voices available.", len(voices)),
+			}
 		}
 	}
 
 	return map[string]interface{}{
-		"success":     true,
-		"voice_count": len(voicesMap),
+		"success": true,
+		"message": "Connected successfully",
+	}
+}
+
+func (s *Server) testPiperConnection(url string) map[string]interface{} {
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(url + "/health")
+	if err != nil {
+		return map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Connection failed: %v", err),
+		}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Server returned status %d", resp.StatusCode),
+		}
+	}
+
+	// Try to get voice count
+	voicesResp, err := client.Get(url + "/api/voices")
+	if err == nil && voicesResp.StatusCode == http.StatusOK {
+		defer voicesResp.Body.Close()
+		var voices map[string]interface{}
+		if err := json.NewDecoder(voicesResp.Body).Decode(&voices); err == nil {
+			return map[string]interface{}{
+				"success":     true,
+				"voice_count": len(voices),
+				"message":     fmt.Sprintf("Connected successfully. %d voices available.", len(voices)),
+			}
+		}
+	}
+
+	return map[string]interface{}{
+		"success": true,
+		"message": "Connected successfully",
 	}
 }
 
