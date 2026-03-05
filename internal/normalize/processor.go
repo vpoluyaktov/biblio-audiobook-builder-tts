@@ -158,28 +158,22 @@ func (p *Processor) detectContext(text string, numStart, numEnd int, lang string
 }
 
 // extractWordBefore extracts the word immediately before the given position.
+// pos is a byte position in the text string.
 func (p *Processor) extractWordBefore(text string, pos int) string {
 	if pos <= 0 {
 		return ""
 	}
 
-	// Convert to runes for proper UTF-8 handling
-	runes := []rune(text)
+	// Extract substring before position and convert to runes
+	beforeText := text[:pos]
+	runes := []rune(beforeText)
 
-	// Find the rune position corresponding to byte position
-	bytePos := 0
-	runePos := 0
-	for runePos < len(runes) && bytePos < pos {
-		bytePos += len(string(runes[runePos]))
-		runePos++
-	}
-
-	if runePos <= 0 {
+	if len(runes) == 0 {
 		return ""
 	}
 
 	// Skip whitespace backwards
-	end := runePos
+	end := len(runes)
 	for end > 0 && unicode.IsSpace(runes[end-1]) {
 		end--
 	}
@@ -202,28 +196,22 @@ func (p *Processor) extractWordBefore(text string, pos int) string {
 }
 
 // extractWordAfter extracts the word immediately after the given position.
+// pos is a byte position in the text string.
 func (p *Processor) extractWordAfter(text string, pos int) string {
 	if pos >= len(text) {
 		return ""
 	}
 
-	// Convert to runes for proper UTF-8 handling
-	runes := []rune(text)
+	// Extract substring after position and convert to runes
+	afterText := text[pos:]
+	runes := []rune(afterText)
 
-	// Find the rune position corresponding to byte position
-	bytePos := 0
-	runePos := 0
-	for runePos < len(runes) && bytePos < pos {
-		bytePos += len(string(runes[runePos]))
-		runePos++
-	}
-
-	if runePos >= len(runes) {
+	if len(runes) == 0 {
 		return ""
 	}
 
 	// Skip whitespace forwards
-	start := runePos
+	start := 0
 	for start < len(runes) && unicode.IsSpace(runes[start]) {
 		start++
 	}

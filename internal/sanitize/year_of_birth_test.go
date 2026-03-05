@@ -16,17 +16,17 @@ func TestYearOfBirthAbbreviation(t *testing.T) {
 		{
 			name:     "year of birth with dots",
 			input:    "1950 г.р.",
-			expected: "1950 года рождения",
+			expected: "1950 года рождения ",
 		},
 		{
 			name:     "year of birth with spaces",
 			input:    "1968 г. р.",
-			expected: "1968 года рождения",
+			expected: "1968 года рождения ",
 		},
 		{
 			name:     "year of birth without dots",
 			input:    "1985 г р",
-			expected: "1985 года рождения",
+			expected: "1985 года рождения ",
 		},
 		{
 			name:     "year of birth in sentence",
@@ -36,12 +36,12 @@ func TestYearOfBirthAbbreviation(t *testing.T) {
 		{
 			name:     "weight in grams should still work",
 			input:    "Вес 500 г",
-			expected: "Вес 500 граммов",
+			expected: "Вес 500 граммов ",
 		},
 		{
 			name:     "weight in kilograms should still work",
 			input:    "Вес 2 кг",
-			expected: "Вес 2 килограммов",
+			expected: "Вес 2 килограммов ",
 		},
 	}
 

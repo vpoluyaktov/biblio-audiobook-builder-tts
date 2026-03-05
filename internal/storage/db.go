@@ -1383,6 +1383,25 @@ func (db *DB) InitializeDefaultProviders() error {
 			CreatedAt:        now,
 			UpdatedAt:        now,
 		},
+		{
+			ID:               "piper",
+			Name:             "Piper TTS",
+			Type:             "self-hosted",
+			Enabled:          false,
+			URL:              "",
+			APIKey:           "",
+			Region:           "",
+			TTSWorkers:       3,
+			MaxChunkSize:     2000,
+			NormalizeNumbers: true,
+			Transliteration:  false,
+			SSMLSupport:      false,
+			SampleRate:       22050,
+			IsDefault:        false,
+			DisplayOrder:     8,
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		},
 	}
 
 	for _, provider := range defaults {

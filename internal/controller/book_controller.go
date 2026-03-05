@@ -60,9 +60,3 @@ func (c *BookController) parseBook(cmd *dto.ParseBookCommand, replyTo string) {
 
 	c.mq.SendMessage(mq.BookController, replyTo, result, mq.PriorityNormal)
 }
-
-// checkMQ implements the controller interface
-func (c *BookController) checkMQ() {
-	// This is a no-op as we use the dispatcher's RegisterHandler mechanism
-	// instead of polling for messages
-}

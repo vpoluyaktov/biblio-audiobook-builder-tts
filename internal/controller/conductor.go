@@ -1,41 +1,34 @@
 package controller
 
 import (
-	"time"
-
 	"biblio-audiobook-builder-tts/internal/mq"
 )
 
-type controller interface {
-	checkMQ()
-}
-
+// Conductor manages controller lifecycle
+// Controllers register themselves with the dispatcher using RegisterHandler
+// so no polling is needed - the conductor just keeps track of controllers
 type Conductor struct {
 	dispatcher  *mq.Dispatcher
-	controllers []controller
+	controllers []interface{}
 }
 
 func NewConductor(dispatcher *mq.Dispatcher) *Conductor {
 	c := &Conductor{
 		dispatcher:  dispatcher,
-		controllers: make([]controller, 0),
+		controllers: make([]interface{}, 0),
 	}
 	return c
 }
 
-func (c *Conductor) AddController(ctrl controller) {
+// AddController registers a controller with the conductor
+// The controller should have already registered its message handlers with the dispatcher
+func (c *Conductor) AddController(ctrl interface{}) {
 	c.controllers = append(c.controllers, ctrl)
 }
 
-func (c *Conductor) startEventListener() {
-	for {
-		for _, p := range c.controllers {
-			p.checkMQ()
-		}
-		time.Sleep(mq.PullFrequency)
-	}
-}
-
+// Run starts the conductor (currently a no-op since controllers use event-driven handlers)
+// Kept for API compatibility and future extensions
 func (c *Conductor) Run() {
-	go c.startEventListener()
+	// Controllers use RegisterHandler mechanism, so no polling loop needed
+	// This method is kept for API compatibility
 }

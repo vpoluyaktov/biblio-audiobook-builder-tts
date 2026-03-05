@@ -1584,7 +1584,7 @@ class App {
         const regionGroup = document.getElementById('provider-edit-region-group');
         
         // Self-hosted providers need URL
-        if (['opentts', 'rhvoice', 'silero', 'openvoice'].includes(provider.id)) {
+        if (['opentts', 'rhvoice', 'silero', 'openvoice', 'piper'].includes(provider.id)) {
             urlGroup.style.display = 'block';
             apikeyGroup.style.display = 'none';
             regionGroup.style.display = 'none';
@@ -1638,7 +1638,7 @@ class App {
         };
         
         // Add URL or API key based on provider type
-        if (['opentts', 'rhvoice', 'silero', 'openvoice'].includes(providerId)) {
+        if (['opentts', 'rhvoice', 'silero', 'openvoice', 'piper'].includes(providerId)) {
             updateData.url = document.getElementById('provider-edit-url').value;
         } else if (['google', 'openai'].includes(providerId)) {
             updateData.api_key = document.getElementById('provider-edit-apikey').value;
@@ -1678,7 +1678,7 @@ class App {
         
         // Build test data from current form values
         const testData = {};
-        if (['opentts', 'rhvoice', 'silero', 'openvoice'].includes(providerId)) {
+        if (['opentts', 'rhvoice', 'silero', 'openvoice', 'piper'].includes(providerId)) {
             testData.url = document.getElementById('provider-edit-url').value;
         } else if (['google', 'openai'].includes(providerId)) {
             testData.api_key = document.getElementById('provider-edit-apikey').value;

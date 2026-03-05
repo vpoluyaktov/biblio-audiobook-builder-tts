@@ -90,6 +90,26 @@ func NewAdapter(provider Provider, chunkerConfig *ChunkerConfig) *Adapter {
 // chunkIndex is 0-based, totalChunks is the total number of chunks
 type ProgressCallback func(chunkIndex, totalChunks int, chunkText string)
 
+// shouldSkipChunk checks if a chunk should be skipped based on content and language
+func shouldSkipChunk(chunk string, lang string, chunkIndex int, totalChunks int) bool {
+	chunk = strings.TrimSpace(chunk)
+	if chunk == "" {
+		logger.Debug("Skipping empty chunk %d/%d", chunkIndex+1, totalChunks)
+		return true
+	}
+
+	// Use language-aware check if language is specified
+	if lang != "" && !sanitize.HasSpeakableContentForLanguage(chunk, lang) {
+		logger.Debug("Skipping chunk %d/%d with no speakable content for language '%s': '%s'", chunkIndex+1, totalChunks, lang, chunk)
+		return true
+	} else if lang == "" && !sanitize.HasSpeakableContent(chunk) {
+		logger.Debug("Skipping chunk %d/%d with no speakable content: '%s'", chunkIndex+1, totalChunks, chunk)
+		return true
+	}
+
+	return false
+}
+
 // ConvertToSpeech converts text to speech, handling chunking automatically
 // Returns concatenated audio data from all chunks
 func (a *Adapter) ConvertToSpeech(text string, voice string, options *ConversionOptions, progressCb ProgressCallback) (io.Reader, error) {
@@ -131,23 +151,14 @@ func (a *Adapter) ConvertToSpeech(text string, voice string, options *Conversion
 		}
 
 		// Skip empty chunks or chunks with no speakable content for the target language
-		chunk = strings.TrimSpace(chunk)
-		if chunk == "" {
-			logger.Debug("Skipping empty chunk %d/%d", i+1, len(chunks))
-			continue
-		}
-		// Use language-aware check if language is specified
 		lang := ""
 		if options != nil {
 			lang = options.Language
 		}
-		if lang != "" && !sanitize.HasSpeakableContentForLanguage(chunk, lang) {
-			logger.Debug("Skipping chunk %d/%d with no speakable content for language '%s': '%s'", i+1, len(chunks), lang, chunk)
-			continue
-		} else if lang == "" && !sanitize.HasSpeakableContent(chunk) {
-			logger.Debug("Skipping chunk %d/%d with no speakable content: '%s'", i+1, len(chunks), chunk)
+		if shouldSkipChunk(chunk, lang, i, len(chunks)) {
 			continue
 		}
+		chunk = strings.TrimSpace(chunk)
 
 		// Wrap chunk in <speak> tags if SSML is supported
 		// Note: breaks are already in the text from pre-processing
@@ -241,23 +252,14 @@ func (a *Adapter) ConvertToSpeechWithChunks(text string, voice string, options *
 		}
 
 		// Skip empty chunks or chunks with no speakable content for the target language
-		chunk = strings.TrimSpace(chunk)
-		if chunk == "" {
-			logger.Debug("Skipping empty chunk %d/%d", i+1, len(chunks))
-			continue
-		}
-		// Use language-aware check if language is specified
 		lang := ""
 		if options != nil {
 			lang = options.Language
 		}
-		if lang != "" && !sanitize.HasSpeakableContentForLanguage(chunk, lang) {
-			logger.Debug("Skipping chunk %d/%d with no speakable content for language '%s': '%s'", i+1, len(chunks), lang, chunk)
-			continue
-		} else if lang == "" && !sanitize.HasSpeakableContent(chunk) {
-			logger.Debug("Skipping chunk %d/%d with no speakable content: '%s'", i+1, len(chunks), chunk)
+		if shouldSkipChunk(chunk, lang, i, len(chunks)) {
 			continue
 		}
+		chunk = strings.TrimSpace(chunk)
 
 		// Wrap chunk in <speak> tags if SSML is supported
 		// Note: breaks are already in the text from pre-processing
