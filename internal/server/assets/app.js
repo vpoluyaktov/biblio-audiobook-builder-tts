@@ -1678,7 +1678,7 @@ class App {
         
         // Build test data from current form values
         const testData = {};
-        if (['opentts', 'rhvoice', 'silero', 'openvoice'].includes(providerId)) {
+        if (['opentts', 'rhvoice', 'silero', 'openvoice', 'piper'].includes(providerId)) {
             testData.url = document.getElementById('provider-edit-url').value;
         } else if (['google', 'openai'].includes(providerId)) {
             testData.api_key = document.getElementById('provider-edit-apikey').value;
