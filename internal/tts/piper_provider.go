@@ -89,19 +89,19 @@ func (p *PiperProvider) loadVoices() error {
 		return fmt.Errorf("failed to fetch voices: status %d", resp.StatusCode)
 	}
 
-	// Piper returns voices as a map (same format as Silero/OpenVoice)
-	var voicesMap map[string]piperVoice
-	if err := json.NewDecoder(resp.Body).Decode(&voicesMap); err != nil {
+	// Piper returns voices as an array
+	var voicesArray []piperVoice
+	if err := json.NewDecoder(resp.Body).Decode(&voicesArray); err != nil {
 		return fmt.Errorf("failed to decode voices: %w", err)
 	}
 
-	p.voices = make([]Voice, 0, len(voicesMap))
+	p.voices = make([]Voice, 0, len(voicesArray))
 	p.voicesMap = make(map[string]piperVoice)
 
-	for fullID, v := range voicesMap {
-		p.voicesMap[fullID] = v
+	for _, v := range voicesArray {
+		p.voicesMap[v.ID] = v
 		voice := Voice{
-			ID:       fullID, // e.g., "piper:en_US-lessac-medium#default"
+			ID:       v.ID, // e.g., "piper:en_US-lessac-medium#default"
 			Name:     formatPiperVoiceName(v.Name, v.ModelID),
 			Language: v.Language,
 			Gender:   v.Gender,
