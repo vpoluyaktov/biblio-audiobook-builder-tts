@@ -57,6 +57,7 @@ biblio-audiobook-builder-tts/
 - ✅ Job lifecycle management and user-facing progress workflows are in place
 - ✅ Integrated with BiblioHub routing and related platform services
 - ✅ Piper TTS provider integration (fast neural TTS with 40+ languages and hundreds of voices)
+- ✅ OPDS 2.0 (JSON) support for modern OPDS feeds (Internet Archive, etc.)
 
 ## Development Priorities
 
@@ -413,6 +414,25 @@ biblio-audiobook-builder-tts/
 - Service mesh integration
 
 ---
+
+### Recent Enhancements
+
+#### OPDS 2.0 Support (Feature Branch: `feature/opds-2.0-support`)
+
+**Issue**: Internet Archive OPDS feed (https://archive.org/services/opds) was failing in Settings -> OPDS Sources because it uses OPDS 2.0 (JSON format) instead of OPDS 1.x (Atom/XML format).
+
+**Implementation**:
+- Added OPDS 2.0 JSON parsing support in `internal/opds/opds2.go`
+- Updated `ParseCatalog` to auto-detect format (JSON vs XML) and route to appropriate parser
+- Preserved template URL placeholders (e.g., `{?query}`) for search functionality
+- Added comprehensive test coverage for OPDS 2.0 parsing
+- Supports both feed-level and grouped publications
+- Handles flexible author/subject formats (string, object, array)
+
+**Status**: ✅ Implemented and tested
+- OPDS client now supports both OPDS 1.x (XML/Atom) and OPDS 2.0 (JSON) formats
+- Internet Archive and other modern OPDS feeds now work correctly
+- Backward compatible with existing OPDS 1.x feeds
 
 ### Future Enhancements
 
