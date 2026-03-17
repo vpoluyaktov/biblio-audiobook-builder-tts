@@ -184,7 +184,7 @@ func (c *Client) FetchCatalog(catalogURL string) (*CatalogResponse, error) {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("Accept", "application/atom+xml, application/xml, text/xml")
+	req.Header.Set("Accept", "application/opds+json, application/atom+xml, application/xml, text/xml")
 	req.Header.Set("User-Agent", "BiblioHub Audiobook Builder OPDS Client/1.0")
 
 	// Add Basic Auth if credentials are set
@@ -210,8 +210,14 @@ func (c *Client) FetchCatalog(catalogURL string) (*CatalogResponse, error) {
 	return c.ParseCatalog(body, catalogURL)
 }
 
-// ParseCatalog parses OPDS XML into a CatalogResponse
+// ParseCatalog parses OPDS feed (XML or JSON) into a CatalogResponse
 func (c *Client) ParseCatalog(data []byte, baseURL string) (*CatalogResponse, error) {
+	// Detect format: OPDS 2.0 (JSON) or OPDS 1.x (XML)
+	if isOPDS2(data) {
+		return c.ParseOPDS2Catalog(data, baseURL)
+	}
+
+	// Parse as OPDS 1.x (Atom/XML)
 	var feed Feed
 	if err := xml.Unmarshal(data, &feed); err != nil {
 		return nil, fmt.Errorf("failed to parse OPDS feed: %w", err)
