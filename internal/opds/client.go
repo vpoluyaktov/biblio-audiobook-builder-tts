@@ -21,7 +21,7 @@ type Client struct {
 func NewClient() *Client {
 	return &Client{
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: 120 * time.Second, // Increased timeout for large feeds (e.g., Internet Archive)
 		},
 	}
 }
@@ -30,7 +30,7 @@ func NewClient() *Client {
 func NewClientWithAuth(username, password string) *Client {
 	return &Client{
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: 120 * time.Second, // Increased timeout for large feeds (e.g., Internet Archive)
 		},
 		username: username,
 		password: password,

@@ -149,6 +149,10 @@ func (c *Client) ParseOPDS2Catalog(data []byte, baseURL string) (*CatalogRespons
 		response.Entries = append(response.Entries, entry)
 	}
 
+	// Limit publications to prevent timeout on massive feeds (e.g., Internet Archive with 1.6M items)
+	const maxPublications = 200
+	publicationCount := 0
+
 	// Process groups
 	for _, group := range feed.Groups {
 		// Add group navigation if present
@@ -162,17 +166,37 @@ func (c *Client) ParseOPDS2Catalog(data []byte, baseURL string) (*CatalogRespons
 			response.Entries = append(response.Entries, entry)
 		}
 
-		// Add group publications
-		for _, pub := range group.Publications {
+		// Add group publications (with limit)
+		for i, pub := range group.Publications {
+			if publicationCount >= maxPublications {
+				break
+			}
 			entry := c.convertOPDS2Publication(pub, base)
 			response.Entries = append(response.Entries, entry)
+			publicationCount++
+
+			// Log warning if we're truncating a large feed
+			if i == len(group.Publications)-1 && len(group.Publications) > maxPublications {
+				fmt.Printf("Warning: Truncated %d publications to %d items for performance\n",
+					len(group.Publications), maxPublications)
+			}
+		}
+
+		if publicationCount >= maxPublications {
+			break
 		}
 	}
 
-	// Process feed-level publications
+	// Process feed-level publications (with limit)
 	for _, pub := range feed.Publications {
+		if publicationCount >= maxPublications {
+			fmt.Printf("Warning: Truncated feed with %d total publications to %d items for performance\n",
+				len(feed.Publications), maxPublications)
+			break
+		}
 		entry := c.convertOPDS2Publication(pub, base)
 		response.Entries = append(response.Entries, entry)
+		publicationCount++
 	}
 
 	return response, nil
