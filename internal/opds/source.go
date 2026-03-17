@@ -35,14 +35,6 @@ func DefaultSources() []Source {
 			Enabled:     true,
 		},
 		{
-			ID:          "internet-archive",
-			Name:        "Internet Archive",
-			URL:         "https://archive.org/services/opds",
-			Description: "Millions of free ebooks from Internet Archive.",
-			IsDefault:   true,
-			Enabled:     true,
-		},
-		{
 			ID:          "gallica",
 			Name:        "Gallica (French)",
 			URL:         "https://gallica.bnf.fr/opds",
