@@ -277,28 +277,3 @@ func (c *Client) convertOPDS2Publication(pub OPDS2Publication, base *url.URL) Ca
 
 	return entry
 }
-
-// isOPDS2 checks if the data is OPDS 2.0 (JSON) format
-func isOPDS2(data []byte) bool {
-	// Trim whitespace
-	trimmed := strings.TrimSpace(string(data))
-
-	// Check if it starts with { (JSON)
-	if !strings.HasPrefix(trimmed, "{") {
-		return false
-	}
-
-	// Try to parse as JSON and check for OPDS 2.0 structure
-	var test map[string]interface{}
-	if err := json.Unmarshal(data, &test); err != nil {
-		return false
-	}
-
-	// OPDS 2.0 feeds typically have "metadata" or "navigation" or "publications" fields
-	_, hasMetadata := test["metadata"]
-	_, hasNavigation := test["navigation"]
-	_, hasPublications := test["publications"]
-	_, hasGroups := test["groups"]
-
-	return hasMetadata || hasNavigation || hasPublications || hasGroups
-}
