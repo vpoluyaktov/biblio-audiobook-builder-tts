@@ -38,7 +38,7 @@ func DefaultSources() []Source {
 			ID:          "internet-archive",
 			Name:        "Internet Archive",
 			URL:         "https://archive.org/services/opds",
-			Description: "Millions of free books, movies, music, and more from Internet Archive.",
+			Description: "Millions of free ebooks from Internet Archive.",
 			IsDefault:   true,
 			Enabled:     true,
 		},
