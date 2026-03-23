@@ -2,7 +2,9 @@
 
 > Part of the [BiblioHub](https://github.com/vpoluyaktov/biblio-hub) application suite
 
-![Biblio Audiobook Builder TTS](docs/images/abb-tts-screenshot.png)
+<img width="1728" height="842" alt="Screenshot 2026-03-22 at 23 00 50" src="https://github.com/user-attachments/assets/57f07096-a5bd-462b-be8a-64896a21b314" />
+<img width="1189" height="858" alt="Screenshot 2026-03-22 at 23 01 43" src="https://github.com/user-attachments/assets/fc2942ef-3c15-482b-a622-5366e0e9a3da" />
+
 
 Server-based application that converts e-books (EPUB, FB2) into audiobooks using text-to-speech technology. Provides a web interface for uploading books, monitoring conversion progress, and downloading completed audiobooks. Written in Go with a vanilla JavaScript frontend.
 
