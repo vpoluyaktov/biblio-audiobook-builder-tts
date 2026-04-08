@@ -158,6 +158,67 @@ func TestFindRomanNumerals(t *testing.T) {
 	}
 }
 
+func TestProcessRomanNumeralsRussian(t *testing.T) {
+	nounDB := NewNounDatabase()
+	converter := GetOrDefault("ru")
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Глава III - ordinal feminine",
+			input:    "Глава III",
+			expected: "Глава третья",
+		},
+		{
+			name:     "Часть I - ordinal feminine",
+			input:    "Часть I",
+			expected: "Часть первая",
+		},
+		{
+			name:     "Том IV - ordinal masculine",
+			input:    "Том IV",
+			expected: "Том четвёртый",
+		},
+		{
+			name:     "Раздел II - ordinal masculine",
+			input:    "Раздел II",
+			expected: "Раздел второй",
+		},
+		{
+			name:     "Действие V - ordinal neuter",
+			input:    "Действие V",
+			expected: "Действие пятое",
+		},
+		{
+			name:     "Roman before noun: III Глава - ordinal feminine",
+			input:    "III Глава",
+			expected: "третья Глава",
+		},
+		{
+			name:     "No context noun - not converted",
+			input:    "Текст III здесь",
+			expected: "Текст III здесь",
+		},
+		{
+			name:     "Multiple Roman numerals with context",
+			input:    "Часть I и Глава III",
+			expected: "Часть первая и Глава третья",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ProcessRomanNumerals(tt.input, "ru", converter, nounDB)
+			if result != tt.expected {
+				t.Errorf("ProcessRomanNumerals(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestDetermineRomanPosition(t *testing.T) {
 	nounDB := NewNounDatabase()
 
