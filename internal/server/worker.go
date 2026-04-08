@@ -470,13 +470,11 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 	// Apply only rules for the book's language, using SSML replacements if provider supports it
 	content = w.sanitizer.SanitizeWithOptions(content, lang, useSSML)
 
-	// Step 2: Apply Latin-to-Russian transliteration if enabled (for Russian text only)
-	if transliterationEnabled && lang == "ru" {
-		content = w.sanitizer.ConvertLatinToRussian(content)
-		logger.Debug("Applied Latin-to-Russian transliteration for provider %s", job.Provider)
-	}
-
-	// Step 3: Apply number normalization if provider needs it
+	// Step 2: Apply number normalization if provider needs it
+	// IMPORTANT: This must run BEFORE Latin-to-Russian transliteration because
+	// Roman numerals (I, II, III, IV, etc.) are Latin characters that the
+	// transliterator would convert letter-by-letter (e.g., "III" → "ай ай ай")
+	// before the normalizer could process them (e.g., "Глава III" → "Глава третья").
 	if needsNormalization {
 		lang := job.Language
 		if lang == "" {
@@ -484,6 +482,13 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		}
 		content = w.normalizer.Process(content, lang)
 		logger.Debug("Applied number normalization for provider %s (lang: %s)", job.Provider, lang)
+	}
+
+	// Step 3: Apply Latin-to-Russian transliteration if enabled (for Russian text only)
+	// Runs after normalization so Roman numerals are already converted to Cyrillic words.
+	if transliterationEnabled && lang == "ru" {
+		content = w.sanitizer.ConvertLatinToRussian(content)
+		logger.Debug("Applied Latin-to-Russian transliteration for provider %s", job.Provider)
 	}
 
 	// Step 4: Apply stress marking for Russian text if enabled for this provider
