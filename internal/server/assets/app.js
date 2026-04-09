@@ -198,6 +198,7 @@ function showSetupDialog() {
 
 // localStorage key for TTS settings
 const TTS_SETTINGS_KEY = 'biblio_audiobook_builder_tts_settings';
+const OPDS_STATE_KEY = 'biblio_audiobook_builder_opds_state';
 
 class App {
     constructor() {
@@ -257,6 +258,31 @@ class App {
             this.savedTTSSettings = settings;
         } catch (e) {
             console.error('Failed to save TTS settings to localStorage:', e);
+        }
+    }
+
+    // Save OPDS browser state to localStorage
+    saveOpdsState() {
+        try {
+            const state = {
+                sourceId: this.opdsSourceSelect?.value || '',
+                searchType: this.opdsSearchType?.value || '',
+                searchText: this.opdsSearchInput?.value || ''
+            };
+            localStorage.setItem(OPDS_STATE_KEY, JSON.stringify(state));
+        } catch (e) {
+            console.error('Failed to save OPDS state:', e);
+        }
+    }
+
+    // Load OPDS browser state from localStorage
+    loadOpdsState() {
+        try {
+            const saved = localStorage.getItem(OPDS_STATE_KEY);
+            return saved ? JSON.parse(saved) : {};
+        } catch (e) {
+            console.error('Failed to load OPDS state:', e);
+            return {};
         }
     }
 
@@ -497,6 +523,9 @@ class App {
         if (this.opdsBrowseBtn) {
             this.opdsBrowseBtn.addEventListener('click', () => this.browseOPDS());
         }
+        if (this.opdsSourceSelect) {
+            this.opdsSourceSelect.addEventListener('change', () => this.saveOpdsState());
+        }
         if (this.opdsSearchBtn) {
             this.opdsSearchBtn.addEventListener('click', () => this.searchOPDS());
         }
@@ -504,6 +533,13 @@ class App {
             this.opdsSearchInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') this.searchOPDS();
             });
+            this.opdsSearchInput.addEventListener('input', () => this.saveOpdsState());
+        }
+
+        // Restore saved search text
+        const savedOpdsState = this.loadOpdsState();
+        if (savedOpdsState.searchText && this.opdsSearchInput) {
+            this.opdsSearchInput.value = savedOpdsState.searchText;
         }
         // OPDS Sources (in Settings tab)
         if (this.addOpdsSourceBtn) {
@@ -1980,6 +2016,13 @@ class App {
             .filter(s => s.enabled)
             .map(s => `<option value="${s.id}" data-url="${s.url}">${this.escapeHtml(s.name)}${s.username ? ' 🔒' : ''}</option>`)
             .join('');
+
+        // Restore last selected source
+        const savedState = this.loadOpdsState();
+        if (savedState.sourceId) {
+            const option = this.opdsSourceSelect.querySelector(`option[value="${savedState.sourceId}"]`);
+            if (option) this.opdsSourceSelect.value = savedState.sourceId;
+        }
     }
 
     getCurrentSourceId() {
@@ -2346,9 +2389,19 @@ class App {
             this.opdsSearchType.appendChild(option);
         }
 
-        // Update placeholder based on selected type
+        // Restore saved search type if available for this catalog
+        const savedState = this.loadOpdsState();
+        if (savedState.searchType) {
+            const option = this.opdsSearchType.querySelector(`option[value="${savedState.searchType}"]`);
+            if (option) this.opdsSearchType.value = savedState.searchType;
+        }
+
+        // Update placeholder based on selected type and save on change
         this.updateSearchPlaceholder();
-        this.opdsSearchType.addEventListener('change', () => this.updateSearchPlaceholder());
+        this.opdsSearchType.addEventListener('change', () => {
+            this.updateSearchPlaceholder();
+            this.saveOpdsState();
+        });
     }
 
     updateSearchPlaceholder() {
