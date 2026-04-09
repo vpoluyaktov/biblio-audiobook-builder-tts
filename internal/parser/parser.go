@@ -11,6 +11,7 @@ type Book struct {
 	Series         string
 	SeriesNumber   string
 	Description    string
+	Genre          string            // comma-separated genre string
 	Chapters       []Chapter
 	CoverImage     []byte
 	CoverImageName string

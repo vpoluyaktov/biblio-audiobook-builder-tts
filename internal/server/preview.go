@@ -19,6 +19,7 @@ type Preview struct {
 	BookTitle                  string                  `json:"book_title"`
 	BookAuthor                 string                  `json:"book_author"`
 	Description                string                  `json:"description"`
+	Genre                      string                  `json:"genre,omitempty"` // genre from ebook metadata
 	CoverImageURL              string                  `json:"cover_image_url,omitempty"`
 	Chapters                   []ChapterPreview        `json:"chapters"`
 	TotalChapters              int                     `json:"total_chapters"`
@@ -305,6 +306,7 @@ func (ps *PreviewStore) CreatePreview(book *parser.Book, fileName string) *Previ
 		BookTitle:                  book.Title,
 		BookAuthor:                 book.Author,
 		Description:                book.Description,
+		Genre:                      book.Genre,
 		Chapters:                   chapters,
 		TotalChapters:              len(chapters),
 		TotalWords:                 totalWords,

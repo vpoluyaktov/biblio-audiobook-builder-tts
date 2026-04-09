@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 
 	"github.com/vpoluyaktov/biblio-ebook-parser/cover"
 	_ "github.com/vpoluyaktov/biblio-ebook-parser/formats" // Register parsers
@@ -61,6 +62,11 @@ func ParseBook(filePath string) (*Book, error) {
 		Description:  plaintextBook.Description,
 		Chapters:     make([]Chapter, len(plaintextBook.Chapters)),
 		Metadata:     plaintextBook.Metadata,
+	}
+
+	// Add genre from upstream parser metadata
+	if len(book.Metadata.Genres) > 0 {
+		result.Genre = joinGenres(book.Metadata.Genres)
 	}
 
 	// Copy cover image from metadata
@@ -162,6 +168,11 @@ func ParseFile(filePath string) (*Book, error) {
 		book.SeriesNumber = fmt.Sprintf("%d", unifiedBook.Metadata.SeriesIndex)
 	}
 
+	// Set genre from upstream metadata
+	if len(unifiedBook.Metadata.Genres) > 0 {
+		book.Genre = joinGenres(unifiedBook.Metadata.Genres)
+	}
+
 	// Generate placeholder cover if book has no cover
 	if len(book.CoverImage) == 0 {
 		placeholderCover, err := cover.GeneratePlaceholder(book.Title, book.Author)
@@ -240,6 +251,11 @@ func ParseReader(reader io.Reader, format string) (*Book, error) {
 		book.SeriesNumber = fmt.Sprintf("%d", unifiedBook.Metadata.SeriesIndex)
 	}
 
+	// Set genre from upstream metadata
+	if len(unifiedBook.Metadata.Genres) > 0 {
+		book.Genre = joinGenres(unifiedBook.Metadata.Genres)
+	}
+
 	// Generate placeholder cover if book has no cover
 	if len(book.CoverImage) == 0 {
 		placeholderCover, err := cover.GeneratePlaceholder(book.Title, book.Author)
@@ -260,4 +276,27 @@ func ParseReader(reader io.Reader, format string) (*Book, error) {
 	}
 
 	return book, nil
+}
+
+// joinGenres deduplicates, trims, and joins genre strings.
+// Returns at most 5 genres joined by ", ".
+func joinGenres(genres []string) string {
+	seen := make(map[string]bool)
+	var result []string
+	for _, g := range genres {
+		trimmed := strings.TrimFunc(g, unicode.IsSpace)
+		if trimmed == "" {
+			continue
+		}
+		lower := strings.ToLower(trimmed)
+		if seen[lower] {
+			continue
+		}
+		seen[lower] = true
+		result = append(result, trimmed)
+		if len(result) == 5 {
+			break
+		}
+	}
+	return strings.Join(result, ", ")
 }

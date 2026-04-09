@@ -440,12 +440,13 @@ func (s *Server) handleOPDSDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		URL      string `json:"url"`
-		Title    string `json:"title"`
-		Format   string `json:"format"`
-		Author   string `json:"author"`
-		SourceID string `json:"source_id"`
-		CoverURL string `json:"cover_url"`
+		URL        string   `json:"url"`
+		Title      string   `json:"title"`
+		Format     string   `json:"format"`
+		Author     string   `json:"author"`
+		SourceID   string   `json:"source_id"`
+		CoverURL   string   `json:"cover_url"`
+		Categories []string `json:"categories"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -526,6 +527,11 @@ func (s *Server) handleOPDSDownload(w http.ResponseWriter, r *http.Request) {
 
 	// Store the temp path in the preview for later use
 	preview.FilePath = tempPath
+
+	// Override genre with OPDS categories if provided (OPDS categories take priority)
+	if len(req.Categories) > 0 {
+		preview.Genre = joinOPDSCategories(req.Categories)
+	}
 
 	// Override cover URL with OPDS cover URL if provided
 	if req.CoverURL != "" {
@@ -619,8 +625,8 @@ func (s *Server) handleOPDSConvert(w http.ResponseWriter, r *http.Request) {
 		useSentencePauses = *req.UseSentencePauses
 	}
 
-	// Create job
-	job := NewJob(preview.FileName, preview.FilePath, provider, voice, language, speed, pitch, useSentencePauses)
+	// Create job (pass genre from preview, which may have been set from OPDS categories)
+	job := NewJob(preview.FileName, preview.FilePath, provider, voice, language, preview.Genre, speed, pitch, useSentencePauses)
 
 	// Save to database
 	if s.db != nil {
@@ -714,4 +720,27 @@ type OPDSPreviewWithPath struct {
 func init() {
 	// Register a unique ID generator for OPDS sources
 	_ = uuid.New()
+}
+
+// joinOPDSCategories deduplicates, trims, and joins OPDS category strings.
+// Returns at most 5 categories joined by ", ".
+func joinOPDSCategories(categories []string) string {
+	seen := make(map[string]bool)
+	var result []string
+	for _, c := range categories {
+		trimmed := strings.TrimSpace(c)
+		if trimmed == "" {
+			continue
+		}
+		lower := strings.ToLower(trimmed)
+		if seen[lower] {
+			continue
+		}
+		seen[lower] = true
+		result = append(result, trimmed)
+		if len(result) == 5 {
+			break
+		}
+	}
+	return strings.Join(result, ", ")
 }
