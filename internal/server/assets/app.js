@@ -293,8 +293,6 @@ class App {
         this.speedValue = document.getElementById('speed-value');
         this.pitchInput = document.getElementById('pitch');
         this.pitchValue = document.getElementById('pitch-value');
-        this.previewBtn = document.getElementById('preview-btn');
-
         // Preview section elements
         this.previewSection = document.getElementById('preview-section');
         this.closePreviewBtn = document.getElementById('close-preview');
@@ -426,9 +424,6 @@ class App {
             this.pitchValue.textContent = this.pitchInput.value + 'x';
             this.saveTTSSettings();
         });
-
-        // Preview button (upload + preview in one step)
-        this.previewBtn.addEventListener('click', () => this.previewFile());
 
         // Preview section events
         this.closePreviewBtn.addEventListener('click', () => this.closePreview());
@@ -861,8 +856,9 @@ class App {
         this.fileSizeEl.textContent = this.formatFileSize(file.size);
         this.selectedFileEl.classList.add('visible');
         this.dropZone.style.display = 'none';
-        this.previewBtn.style.display = '';
-        this.previewBtn.disabled = false;
+
+        // Automatically upload and show preview
+        this.uploadAndPreview();
     }
 
     clearSelectedFile() {
@@ -871,35 +867,34 @@ class App {
         this.fileInput.value = '';
         this.selectedFileEl.classList.remove('visible');
         this.dropZone.style.display = '';
-        this.previewBtn.style.display = 'none';
         this.closePreview();
     }
 
-    // Upload file and show preview
-    async previewFile() {
+    // Upload file and show preview automatically after file selection
+    async uploadAndPreview() {
         if (!this.selectedFile) return;
 
         const formData = new FormData();
         formData.append('file', this.selectedFile);
 
-        this.previewBtn.disabled = true;
-        this.previewBtn.innerHTML = '<span class="spinner">⏳</span> Uploading file...';
+        // Show progress in the file size area
+        this.fileSizeEl.textContent = 'Uploading...';
 
         try {
             const preview = await this.uploadWithProgress(formData, (stage, progress) => {
                 if (stage === 'uploading') {
-                    this.previewBtn.innerHTML = `<span class="spinner">⏳</span> Uploading... ${progress}%`;
+                    this.fileSizeEl.textContent = `Uploading... ${progress}%`;
                 } else if (stage === 'parsing') {
-                    this.previewBtn.innerHTML = '<span class="spinner">⏳</span> Parsing book...';
+                    this.fileSizeEl.textContent = 'Parsing book...';
                 }
             });
 
+            this.fileSizeEl.textContent = this.formatFileSize(this.selectedFile.size);
             this.currentPreview = preview;
             this.showPreview(preview);
         } catch (e) {
-            this.showToast('Preview failed: ' + e.message, 'error');
-            this.previewBtn.disabled = false;
-            this.previewBtn.innerHTML = '📤 Upload & Preview';
+            this.fileSizeEl.textContent = this.formatFileSize(this.selectedFile.size);
+            this.showToast('Upload failed: ' + e.message, 'error');
         }
     }
 
@@ -984,16 +979,10 @@ class App {
         this.previewSection.scrollIntoView({ behavior: 'smooth' });
         this.updateCostEstimate();
 
-        // Hide Upload & Preview button — the only action now is "Start Conversion" inside the preview section
-        this.previewBtn.style.display = 'none';
     }
 
     closePreview() {
         this.previewSection.style.display = 'none';
-        // Show Upload & Preview button only if a file is still loaded
-        this.previewBtn.style.display = this.selectedFile ? '' : 'none';
-        this.previewBtn.innerHTML = '📤 Upload & Preview';
-        this.previewBtn.disabled = false;
     }
 
     async updateCostEstimate() {
