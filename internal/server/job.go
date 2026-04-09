@@ -59,6 +59,7 @@ type JobDTO struct {
 	Pitch              float64          `json:"pitch"`
 	BookTitle          string           `json:"book_title"`
 	BookAuthor         string           `json:"book_author"`
+	BookGenre          string           `json:"book_genre,omitempty"`
 	OutputPath         string           `json:"output_path,omitempty"`
 	M4BFile            string           `json:"m4b_file,omitempty"`
 	M4BFiles           []string         `json:"m4b_files,omitempty"`
@@ -96,6 +97,7 @@ type Job struct {
 	// Book metadata (populated after parsing)
 	BookTitle  string `json:"book_title"`
 	BookAuthor string `json:"book_author"`
+	BookGenre  string `json:"book_genre,omitempty"`
 
 	// Output
 	OutputPath     string          `json:"output_path,omitempty"`
@@ -118,7 +120,7 @@ type Job struct {
 }
 
 // NewJob creates a new conversion job
-func NewJob(fileName, filePath, provider, voice, language string, speed, pitch float64, useSentencePauses bool) *Job {
+func NewJob(fileName, filePath, provider, voice, language, genre string, speed, pitch float64, useSentencePauses bool) *Job {
 	return &Job{
 		ID:                 uuid.New().String(),
 		FileName:           fileName,
@@ -129,6 +131,7 @@ func NewJob(fileName, filePath, provider, voice, language string, speed, pitch f
 		Provider:           provider,
 		Voice:              voice,
 		Language:           language,
+		BookGenre:          genre,
 		Speed:              speed,
 		Pitch:              pitch,
 		UseSentencePauses:  useSentencePauses,
@@ -223,6 +226,10 @@ func (j *Job) SetBook(book *parser.Book) {
 		j.BookTitle = book.Title
 		j.BookAuthor = book.Author
 		j.TotalChapters = len(book.Chapters)
+		// Fill genre from parsed book if not already set by OPDS
+		if j.BookGenre == "" && book.Genre != "" {
+			j.BookGenre = book.Genre
+		}
 	}
 }
 
@@ -283,6 +290,7 @@ func (j *Job) Clone() JobDTO {
 		Pitch:              j.Pitch,
 		BookTitle:          j.BookTitle,
 		BookAuthor:         j.BookAuthor,
+		BookGenre:          j.BookGenre,
 		OutputPath:         j.OutputPath,
 		M4BFile:            j.M4BFile,
 		CreatedAt:          j.CreatedAt,

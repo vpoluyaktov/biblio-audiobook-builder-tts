@@ -834,13 +834,26 @@ func (w *Worker) buildM4B(job *Job, book *parser.Book, chapterFiles []string) (s
 	// Prepare M4B options (sample rate is auto-detected from source files)
 	gapDuration := time.Duration(w.cfg.ChapterGapSeconds * float64(time.Second))
 	logger.Info("Building M4B with chapter gap: %v (ChapterGapSeconds=%.2f)", gapDuration, w.cfg.ChapterGapSeconds)
+
+	// Resolve genre with three-tier fallback:
+	// 1. job.BookGenre (from OPDS categories or previous SetBook call)
+	// 2. book.Genre (from ebook file metadata)
+	// 3. "Audiobook" (hardcoded default)
+	genre := job.BookGenre
+	if genre == "" && book.Genre != "" {
+		genre = book.Genre
+	}
+	if genre == "" {
+		genre = "Audiobook"
+	}
+
 	options := audio.M4BOptions{
 		Title:           book.Title,
 		Author:          book.Author,
 		Album:           book.Title,
 		Series:          book.Series,
 		SeriesNumber:    book.SeriesNumber,
-		Genre:           "Audiobook",
+		Genre:           genre,
 		Description:     book.Description,
 		GapBetweenChaps: gapDuration,
 	}

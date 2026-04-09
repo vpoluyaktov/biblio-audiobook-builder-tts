@@ -146,6 +146,7 @@ func jobToStorageJob(job *Job) *storage.Job {
 		Pitch:              job.Pitch,
 		BookTitle:          job.BookTitle,
 		BookAuthor:         job.BookAuthor,
+		BookGenre:          job.BookGenre,
 		OutputPath:         job.OutputPath,
 		M4BFile:            job.M4BFile,
 		M4BFiles:           job.M4BFiles,
@@ -182,6 +183,7 @@ func storageJobToJob(dbJob *storage.Job) *Job {
 		Pitch:              dbJob.Pitch,
 		BookTitle:          dbJob.BookTitle,
 		BookAuthor:         dbJob.BookAuthor,
+		BookGenre:          dbJob.BookGenre,
 		OutputPath:         dbJob.OutputPath,
 		M4BFile:            dbJob.M4BFile,
 		M4BFiles:           dbJob.M4BFiles,
@@ -737,8 +739,8 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create job
-	job := NewJob(header.Filename, tempPath, provider, voice, language, speed, pitch, useSentencePauses)
+	// Create job (genre will be populated from ebook metadata via SetBook)
+	job := NewJob(header.Filename, tempPath, provider, voice, language, "", speed, pitch, useSentencePauses)
 
 	// Save to database
 	if s.db != nil {

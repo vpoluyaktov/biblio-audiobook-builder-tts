@@ -84,6 +84,7 @@ type Job struct {
 	Pitch              float64          `json:"pitch"`
 	BookTitle          string           `json:"book_title"`
 	BookAuthor         string           `json:"book_author"`
+	BookGenre          string           `json:"book_genre"`
 	OutputPath         string           `json:"output_path"`
 	M4BFile            string           `json:"m4b_file"`
 	M4BFiles           []string         `json:"m4b_files"`
@@ -295,6 +296,9 @@ func (db *DB) migrate() error {
 
 	// Add transliteration column if it doesn't exist (migration for existing DBs)
 	db.conn.Exec("ALTER TABLE providers ADD COLUMN transliteration BOOLEAN DEFAULT 0")
+
+	// Add book_genre column if it doesn't exist (migration for existing DBs)
+	db.conn.Exec("ALTER TABLE jobs ADD COLUMN book_genre TEXT DEFAULT ''")
 
 	return nil
 }
@@ -531,11 +535,11 @@ func (db *DB) CreateJob(job *Job) error {
 
 	_, err := db.conn.Exec(`
 		INSERT INTO jobs (id, status, file_name, file_path, provider, voice, language, speed, pitch,
-			book_title, book_author, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
+			book_title, book_author, book_genre, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
 			current_chapter, total_chapters, current_chapter_num, worker_progress, num_workers, error, created_at, started_at, completed_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, job.ID, job.Status, job.FileName, job.FilePath, job.Provider, job.Voice, job.Language,
-		job.Speed, job.Pitch, job.BookTitle, job.BookAuthor, job.OutputPath,
+		job.Speed, job.Pitch, job.BookTitle, job.BookAuthor, job.BookGenre, job.OutputPath,
 		job.M4BFile, string(m4bFilesJSON), job.ConversionProgress, job.BuildProgress, job.CurrentChapter,
 		job.TotalChapters, job.CurrentChapterNum, string(workerProgressJSON), job.NumWorkers, job.Error, job.CreatedAt,
 		job.StartedAt, job.CompletedAt)
@@ -553,12 +557,12 @@ func (db *DB) UpdateJob(job *Job) error {
 
 	_, err := db.conn.Exec(`
 		UPDATE jobs SET status = ?, file_name = ?, file_path = ?, provider = ?, voice = ?, language = ?,
-			speed = ?, pitch = ?, book_title = ?, book_author = ?, output_path = ?,
+			speed = ?, pitch = ?, book_title = ?, book_author = ?, book_genre = ?, output_path = ?,
 			m4b_file = ?, m4b_files = ?, conversion_progress = ?, build_progress = ?, current_chapter = ?,
 			total_chapters = ?, current_chapter_num = ?, worker_progress = ?, num_workers = ?, error = ?, started_at = ?, completed_at = ?
 		WHERE id = ?
 	`, job.Status, job.FileName, job.FilePath, job.Provider, job.Voice, job.Language,
-		job.Speed, job.Pitch, job.BookTitle, job.BookAuthor, job.OutputPath,
+		job.Speed, job.Pitch, job.BookTitle, job.BookAuthor, job.BookGenre, job.OutputPath,
 		job.M4BFile, string(m4bFilesJSON), job.ConversionProgress, job.BuildProgress, job.CurrentChapter,
 		job.TotalChapters, job.CurrentChapterNum, string(workerProgressJSON), job.NumWorkers, job.Error, job.StartedAt,
 		job.CompletedAt, job.ID)
@@ -577,18 +581,22 @@ func (db *DB) GetJob(id string) (*Job, error) {
 	var startedAt, completedAt sql.NullTime
 
 	var language sql.NullString
+	var bookGenre sql.NullString
 	err := db.conn.QueryRow(`
 		SELECT id, status, file_name, file_path, provider, voice, language, speed, pitch,
-			book_title, book_author, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
+			book_title, book_author, book_genre, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
 			current_chapter, total_chapters, current_chapter_num, worker_progress, num_workers, error, created_at, started_at, completed_at
 		FROM jobs WHERE id = ?
 	`, id).Scan(&job.ID, &job.Status, &job.FileName, &job.FilePath, &job.Provider,
-		&job.Voice, &language, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor,
+		&job.Voice, &language, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor, &bookGenre,
 		&job.OutputPath, &job.M4BFile, &m4bFilesJSON, &job.ConversionProgress, &job.BuildProgress,
 		&job.CurrentChapter, &job.TotalChapters, &job.CurrentChapterNum,
 		&workerProgressJSON, &job.NumWorkers, &job.Error, &job.CreatedAt, &startedAt, &completedAt)
 	if language.Valid {
 		job.Language = language.String
+	}
+	if bookGenre.Valid {
+		job.BookGenre = bookGenre.String
 	}
 
 	if err == sql.ErrNoRows {
@@ -620,7 +628,7 @@ func (db *DB) ListJobs(status string, limit int) ([]*Job, error) {
 
 	query := `
 		SELECT id, status, file_name, file_path, provider, voice, language, speed, pitch,
-			book_title, book_author, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
+			book_title, book_author, book_genre, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
 			current_chapter, total_chapters, current_chapter_num, worker_progress, num_workers, error, created_at, started_at, completed_at
 		FROM jobs
 	`
@@ -651,9 +659,10 @@ func (db *DB) ListJobs(status string, limit int) ([]*Job, error) {
 		var workerProgressJSON sql.NullString
 		var startedAt, completedAt sql.NullTime
 		var language sql.NullString
+		var bookGenre sql.NullString
 
 		err := rows.Scan(&job.ID, &job.Status, &job.FileName, &job.FilePath, &job.Provider,
-			&job.Voice, &language, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor,
+			&job.Voice, &language, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor, &bookGenre,
 			&job.OutputPath, &job.M4BFile, &m4bFilesJSON, &job.ConversionProgress, &job.BuildProgress,
 			&job.CurrentChapter, &job.TotalChapters, &job.CurrentChapterNum,
 			&workerProgressJSON, &job.NumWorkers, &job.Error, &job.CreatedAt, &startedAt, &completedAt)
@@ -663,6 +672,9 @@ func (db *DB) ListJobs(status string, limit int) ([]*Job, error) {
 
 		if language.Valid {
 			job.Language = language.String
+		}
+		if bookGenre.Valid {
+			job.BookGenre = bookGenre.String
 		}
 		if startedAt.Valid {
 			job.StartedAt = &startedAt.Time
@@ -699,21 +711,25 @@ func (db *DB) GetPendingJob() (*Job, error) {
 	var m4bFilesJSON string
 	var startedAt, completedAt sql.NullTime
 	var language sql.NullString
+	var bookGenre sql.NullString
 
 	err := db.conn.QueryRow(`
 		SELECT id, status, file_name, file_path, provider, voice, language, speed, pitch,
-			book_title, book_author, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
+			book_title, book_author, book_genre, output_path, m4b_file, m4b_files, conversion_progress, build_progress,
 			current_chapter, total_chapters, current_chapter_num, error, created_at, started_at, completed_at
 		FROM jobs WHERE status = 'pending'
 		ORDER BY created_at ASC
 		LIMIT 1
 	`).Scan(&job.ID, &job.Status, &job.FileName, &job.FilePath, &job.Provider,
-		&job.Voice, &language, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor,
+		&job.Voice, &language, &job.Speed, &job.Pitch, &job.BookTitle, &job.BookAuthor, &bookGenre,
 		&job.OutputPath, &job.M4BFile, &m4bFilesJSON, &job.ConversionProgress, &job.BuildProgress,
 		&job.CurrentChapter, &job.TotalChapters, &job.CurrentChapterNum,
 		&job.Error, &job.CreatedAt, &startedAt, &completedAt)
 	if language.Valid {
 		job.Language = language.String
+	}
+	if bookGenre.Valid {
+		job.BookGenre = bookGenre.String
 	}
 
 	if err == sql.ErrNoRows {
