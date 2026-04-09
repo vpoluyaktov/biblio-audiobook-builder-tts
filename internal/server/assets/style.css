@@ -1496,6 +1496,36 @@ h1 .icon {
     opacity: 0.45;
 }
 
+/* Format picker popup (inline on OPDS grid entries) */
+.format-picker-popup {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    z-index: 10;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.format-picker-title {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.format-picker-btn {
+    padding: 0.35rem 0.75rem !important;
+    font-size: 0.8rem !important;
+    min-width: auto !important;
+    flex: none !important;
+}
+
 /* OPDS Sources Modal */
 .opds-sources-list {
     padding: 1.5rem;

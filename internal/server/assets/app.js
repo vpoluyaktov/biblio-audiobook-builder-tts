@@ -294,7 +294,6 @@ class App {
         this.pitchInput = document.getElementById('pitch');
         this.pitchValue = document.getElementById('pitch-value');
         this.previewBtn = document.getElementById('preview-btn');
-        this.uploadBtn = document.getElementById('upload-btn');
 
         // Preview section elements
         this.previewSection = document.getElementById('preview-section');
@@ -379,19 +378,6 @@ class App {
         // OPDS search state
         this.currentSearchInfo = null;
 
-        // OPDS Book Modal
-        this.opdsBookModal = document.getElementById('opds-book-modal');
-        this.opdsBookTitle = document.getElementById('opds-book-title');
-        this.opdsBookCover = document.getElementById('opds-book-cover');
-        this.opdsBookAuthor = document.getElementById('opds-book-author');
-        this.opdsBookSummary = document.getElementById('opds-book-summary');
-        this.opdsBookLanguage = document.getElementById('opds-book-language');
-        this.opdsBookPublisher = document.getElementById('opds-book-publisher');
-        this.opdsBookCategories = document.getElementById('opds-book-categories');
-        this.opdsDownloadOptions = document.getElementById('opds-download-options');
-        this.opdsBookClose = document.getElementById('opds-book-close');
-        this.opdsBookCancel = document.getElementById('opds-book-cancel');
-
         // OPDS Sources (in Settings tab)
         this.opdsSourcesTbody = document.getElementById('opds-sources-tbody');
         this.addOpdsSourceBtn = document.getElementById('add-opds-source-btn');
@@ -441,9 +427,8 @@ class App {
             this.saveTTSSettings();
         });
 
-        // Preview and Upload buttons
+        // Preview button (upload + preview in one step)
         this.previewBtn.addEventListener('click', () => this.previewFile());
-        this.uploadBtn.addEventListener('click', () => this.uploadFile());
 
         // Preview section events
         this.closePreviewBtn.addEventListener('click', () => this.closePreview());
@@ -525,17 +510,6 @@ class App {
                 if (e.key === 'Enter') this.searchOPDS();
             });
         }
-        // OPDS Book Modal events
-        if (this.opdsBookClose) {
-            this.opdsBookClose.addEventListener('click', () => this.closeBookModal());
-        }
-        if (this.opdsBookCancel) {
-            this.opdsBookCancel.addEventListener('click', () => this.closeBookModal());
-        }
-        if (this.opdsBookModal) {
-            this.opdsBookModal.querySelector('.modal-overlay').addEventListener('click', () => this.closeBookModal());
-        }
-
         // OPDS Sources (in Settings tab)
         if (this.addOpdsSourceBtn) {
             this.addOpdsSourceBtn.addEventListener('click', () => this.openOpdsSourceModal());
@@ -888,7 +862,7 @@ class App {
         this.selectedFileEl.classList.add('visible');
         this.dropZone.style.display = 'none';
         this.previewBtn.disabled = false;
-        this.uploadBtn.disabled = false;
+        this.previewBtn.style.display = '';
     }
 
     clearSelectedFile() {
@@ -898,13 +872,11 @@ class App {
         this.selectedFileEl.classList.remove('visible');
         this.dropZone.style.display = '';
         this.previewBtn.disabled = true;
-        this.uploadBtn.disabled = true;
         this.previewBtn.style.display = '';
-        this.uploadBtn.style.display = '';
         this.closePreview();
     }
 
-    // Preview functionality
+    // Upload file and show preview
     async previewFile() {
         if (!this.selectedFile) return;
 
@@ -912,13 +884,9 @@ class App {
         formData.append('file', this.selectedFile);
 
         this.previewBtn.disabled = true;
-        this.uploadBtn.disabled = true;
-        
-        // Stage 1: Uploading
         this.previewBtn.innerHTML = '<span class="spinner">⏳</span> Uploading file...';
 
         try {
-            // Use XMLHttpRequest for upload progress
             const preview = await this.uploadWithProgress(formData, (stage, progress) => {
                 if (stage === 'uploading') {
                     this.previewBtn.innerHTML = `<span class="spinner">⏳</span> Uploading... ${progress}%`;
@@ -931,10 +899,8 @@ class App {
             this.showPreview(preview);
         } catch (e) {
             this.showToast('Preview failed: ' + e.message, 'error');
-        } finally {
             this.previewBtn.disabled = false;
-            this.uploadBtn.disabled = !this.selectedFile;
-            this.previewBtn.innerHTML = '👁️ Preview Book';
+            this.previewBtn.innerHTML = '📤 Upload & Preview';
         }
     }
 
@@ -1019,19 +985,16 @@ class App {
         this.previewSection.scrollIntoView({ behavior: 'smooth' });
         this.updateCostEstimate();
 
-        // Hide Preview/Start buttons while preview is open — use "Confirm & Start" in preview section
+        // Hide Upload & Preview button — the only action now is "Start Conversion" inside the preview section
         this.previewBtn.style.display = 'none';
-        this.uploadBtn.style.display = 'none';
     }
 
     closePreview() {
         this.previewSection.style.display = 'none';
-        // Restore Preview/Start buttons; enable only if a file is loaded
+        // Restore the Upload & Preview button
         this.previewBtn.style.display = '';
-        this.uploadBtn.style.display = '';
-        const hasFile = !!this.selectedFile;
-        this.previewBtn.disabled = !hasFile;
-        this.uploadBtn.disabled = !hasFile;
+        this.previewBtn.innerHTML = '📤 Upload & Preview';
+        this.previewBtn.disabled = !this.selectedFile;
     }
 
     async updateCostEstimate() {
@@ -1078,41 +1041,33 @@ class App {
 
     async confirmConvert() {
         if (!this.selectedFile && !this.currentPreview?.id) return;
-        
-        this.closePreview();
-        
-        // If we have a preview ID (from OPDS download), use the convert API
-        if (this.currentPreview?.id && !this.selectedFile) {
-            await this.convertOPDSBook();
-        } else {
-            await this.uploadFile();
-        }
-    }
-
-    async convertOPDSBook() {
-        if (!this.currentPreview?.id) return;
 
         this.confirmConvertBtn.disabled = true;
         this.confirmConvertBtn.innerHTML = '<span class="spinner">⏳</span> Starting...';
 
         try {
-            const response = await fetch(apiUrl('/api/opds/convert'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    preview_id: this.currentPreview.id,
-                    provider: this.providerSelect.value,
-                    voice: this.voiceSelect.value,
-                    language: this.languageSelect.value,
-                    speed: parseFloat(this.speedInput.value),
-                    pitch: parseFloat(this.pitchInput.value),
-                    use_sentence_pauses: true
-                })
-            });
-
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || 'Conversion failed');
+            if (this.currentPreview?.id && !this.selectedFile) {
+                // OPDS path: book already on server, use convert API
+                const response = await fetch(apiUrl('/api/opds/convert'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        preview_id: this.currentPreview.id,
+                        provider: this.providerSelect.value,
+                        voice: this.voiceSelect.value,
+                        language: this.languageSelect.value,
+                        speed: parseFloat(this.speedInput.value),
+                        pitch: parseFloat(this.pitchInput.value),
+                        use_sentence_pauses: true
+                    })
+                });
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.error || 'Conversion failed');
+                }
+            } else {
+                // File upload path: upload file with TTS settings for conversion
+                await this.uploadFile();
             }
 
             this.showToast('Conversion job started!', 'success');
@@ -1121,7 +1076,7 @@ class App {
             this.showToast('Conversion failed: ' + e.message, 'error');
         } finally {
             this.confirmConvertBtn.disabled = false;
-            this.confirmConvertBtn.innerHTML = '✅ Confirm & Start Conversion';
+            this.confirmConvertBtn.innerHTML = '📤 Start Conversion';
         }
     }
 
@@ -1137,7 +1092,7 @@ class App {
         return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     }
 
-    // Upload
+    // Upload file for conversion (called by confirmConvert)
     async uploadFile() {
         if (!this.selectedFile) return;
 
@@ -1150,28 +1105,13 @@ class App {
         formData.append('pitch', this.pitchInput.value);
         formData.append('use_sentence_pauses', true);
 
-        this.uploadBtn.disabled = true;
-        this.previewBtn.disabled = true;
-
-        try {
-            // Use XMLHttpRequest for upload progress
-            await this.uploadFileWithProgress(formData, (stage, progress) => {
-                if (stage === 'uploading') {
-                    this.uploadBtn.innerHTML = `<span class="spinner">⏳</span> Uploading... ${progress}%`;
-                } else if (stage === 'processing') {
-                    this.uploadBtn.innerHTML = '<span class="spinner">⏳</span> Processing...';
-                }
-            });
-
-            this.showToast('Conversion job started!', 'success');
-            this.clearSelectedFile();
-        } catch (e) {
-            this.showToast('Upload failed: ' + e.message, 'error');
-        } finally {
-            this.uploadBtn.disabled = !this.selectedFile;
-            this.previewBtn.disabled = !this.selectedFile;
-            this.uploadBtn.innerHTML = '📤 Start Conversion';
-        }
+        await this.uploadFileWithProgress(formData, (stage, progress) => {
+            if (stage === 'uploading') {
+                this.confirmConvertBtn.innerHTML = `<span class="spinner">⏳</span> Uploading... ${progress}%`;
+            } else if (stage === 'processing') {
+                this.confirmConvertBtn.innerHTML = '<span class="spinner">⏳</span> Processing...';
+            }
+        });
     }
 
     // Upload file for conversion with progress tracking
@@ -2226,9 +2166,64 @@ class App {
 
     showBookDetailsByIndex(index) {
         const entry = this.currentOPDSEntries[index];
-        if (entry) {
-            this.showBookDetails(entry);
+        if (!entry) return;
+
+        const supportedFormats = ['epub', 'fb2'];
+        const supported = (entry.download_links || []).filter(dl => supportedFormats.includes(dl.format));
+
+        if (supported.length === 0) {
+            this.showToast('No supported format (EPUB or FB2) available for this book', 'error');
+            return;
         }
+
+        // Store book info for the download call
+        this.currentOPDSBook = entry;
+
+        if (supported.length === 1) {
+            // Single supported format — download directly
+            this.downloadAndConvert(supported[0].url, supported[0].format);
+        } else {
+            // Multiple supported formats — let user pick
+            this.showFormatPicker(entry, supported, index);
+        }
+    }
+
+    showFormatPicker(entry, formats, index) {
+        // Remove any existing picker
+        document.querySelectorAll('.format-picker-popup').forEach(el => el.remove());
+
+        const entryEl = this.opdsContent.querySelectorAll('.opds-entry')[index];
+        if (!entryEl) return;
+
+        const picker = document.createElement('div');
+        picker.className = 'format-picker-popup';
+        picker.innerHTML = `
+            <div class="format-picker-title">Choose format:</div>
+            ${formats.map(dl =>
+                `<button class="btn btn-primary format-picker-btn" data-url="${this.escapeHtml(dl.url)}" data-format="${dl.format}">${dl.format.toUpperCase()}</button>`
+            ).join('')}
+        `;
+
+        // Close when clicking outside
+        const closeHandler = (e) => {
+            if (!picker.contains(e.target)) {
+                picker.remove();
+                document.removeEventListener('click', closeHandler, true);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeHandler, true), 0);
+
+        picker.querySelectorAll('.format-picker-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                picker.remove();
+                document.removeEventListener('click', closeHandler, true);
+                this.downloadAndConvert(btn.dataset.url, btn.dataset.format);
+            });
+        });
+
+        entryEl.style.position = 'relative';
+        entryEl.appendChild(picker);
     }
 
     navigateOPDS(url, title) {
@@ -2392,90 +2387,7 @@ class App {
         }
     }
 
-    // Book Details Modal
-    showBookDetails(entry) {
-        this.currentOPDSBook = entry;
-
-        // Set title
-        this.opdsBookTitle.textContent = entry.title || 'Unknown Title';
-
-        // Set cover
-        const coverUrl = entry.cover_url || entry.thumbnail_url;
-        const sourceIdParam = this.currentOPDSSourceId ? `&source_id=${encodeURIComponent(this.currentOPDSSourceId)}` : '';
-        if (coverUrl) {
-            this.opdsBookCover.innerHTML = `<img src="${apiUrl('/api/opds/proxy')}?url=${encodeURIComponent(coverUrl)}${sourceIdParam}" alt="Cover" onerror="this.parentElement.innerHTML='<span class=\'no-cover\'>No Cover</span>'">`;
-        } else {
-            this.opdsBookCover.innerHTML = '<span class="no-cover">No Cover</span>';
-        }
-
-        // Set author
-        this.opdsBookAuthor.textContent = entry.authors && entry.authors.length > 0 
-            ? 'by ' + entry.authors.join(', ')
-            : '';
-
-        // Set summary
-        this.opdsBookSummary.textContent = entry.summary || 'No description available';
-
-        // Set meta
-        this.opdsBookLanguage.textContent = entry.language ? `Language: ${entry.language}` : '';
-        this.opdsBookPublisher.textContent = entry.publisher ? `Publisher: ${entry.publisher}` : '';
-
-        // Set categories
-        if (entry.categories && entry.categories.length > 0) {
-            this.opdsBookCategories.innerHTML = entry.categories
-                .map(cat => `<span class="opds-book-category">${this.escapeHtml(cat)}</span>`)
-                .join('');
-        } else {
-            this.opdsBookCategories.innerHTML = '';
-        }
-
-        // Set download options
-        this.renderDownloadOptions(entry.download_links);
-
-        // Show modal
-        this.opdsBookModal.classList.add('active');
-    }
-
-    renderDownloadOptions(downloadLinks) {
-        if (!downloadLinks || downloadLinks.length === 0) {
-            this.opdsDownloadOptions.innerHTML = '<p>No download options available</p>';
-            return;
-        }
-
-        const supportedFormats = ['epub', 'fb2'];
-
-        // Show supported formats first, then unsupported (no button)
-        const sorted = [...downloadLinks].sort((a, b) => {
-            const aOk = supportedFormats.includes(a.format) ? 0 : 1;
-            const bOk = supportedFormats.includes(b.format) ? 0 : 1;
-            return aOk - bOk;
-        });
-
-        this.opdsDownloadOptions.innerHTML = sorted.map(dl => {
-            const isSupported = supportedFormats.includes(dl.format);
-            if (isSupported) {
-                return `
-                <div class="download-option">
-                    <div class="download-option-info">
-                        <span class="download-option-format">${dl.format.toUpperCase()}</span>
-                        <span class="download-option-title">${dl.title || dl.type || 'Download'}</span>
-                    </div>
-                    <button class="btn btn-primary" onclick="app.downloadAndConvert('${this.escapeHtml(dl.url)}', '${dl.format}')">📥 Convert to Audiobook</button>
-                </div>`;
-            } else {
-                return `
-                <div class="download-option download-option-unsupported">
-                    <div class="download-option-info">
-                        <span class="download-option-format unsupported">${dl.format.toUpperCase()}</span>
-                        <span class="download-option-title">${dl.title || dl.type || 'Download'}</span>
-                    </div>
-                </div>`;
-            }
-        }).join('');
-    }
-
     async downloadAndConvert(url, format) {
-        this.closeBookModal();
         this.showToast('Downloading book...', 'info');
 
         try {
@@ -2498,28 +2410,22 @@ class App {
             }
 
             const preview = await response.json();
-            
+
             // Switch to upload tab and show preview
             this.switchMainTab('upload');
             this.currentPreview = preview;
-            this.showPreview(preview);
-            
+
             // Set the file info
             this.fileNameEl.textContent = preview.file_name;
             this.fileSizeEl.textContent = 'from OPDS catalog';
             this.selectedFileEl.classList.add('visible');
             this.dropZone.style.display = 'none';
-            // Preview/Start buttons are hidden by showPreview(); confirm button is in preview section
 
-            this.showToast('Book downloaded! Review and start conversion.', 'success');
+            this.showPreview(preview);
+            this.showToast('Book downloaded! Configure TTS settings and start conversion.', 'success');
         } catch (e) {
             this.showToast('Download failed: ' + e.message, 'error');
         }
-    }
-
-    closeBookModal() {
-        this.opdsBookModal.classList.remove('active');
-        this.currentOPDSBook = null;
     }
 
     // OPDS Sources Management
