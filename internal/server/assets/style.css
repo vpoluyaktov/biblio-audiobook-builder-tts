@@ -1492,6 +1492,10 @@ h1 .icon {
     color: var(--text-secondary);
 }
 
+.download-option-unsupported {
+    opacity: 0.45;
+}
+
 /* OPDS Sources Modal */
 .opds-sources-list {
     padding: 1.5rem;

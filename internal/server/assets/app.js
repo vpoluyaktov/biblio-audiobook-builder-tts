@@ -886,6 +886,7 @@ class App {
         this.fileNameEl.textContent = file.name;
         this.fileSizeEl.textContent = this.formatFileSize(file.size);
         this.selectedFileEl.classList.add('visible');
+        this.dropZone.style.display = 'none';
         this.previewBtn.disabled = false;
         this.uploadBtn.disabled = false;
     }
@@ -895,8 +896,11 @@ class App {
         this.currentPreview = null;
         this.fileInput.value = '';
         this.selectedFileEl.classList.remove('visible');
+        this.dropZone.style.display = '';
         this.previewBtn.disabled = true;
         this.uploadBtn.disabled = true;
+        this.previewBtn.style.display = '';
+        this.uploadBtn.style.display = '';
         this.closePreview();
     }
 
@@ -1014,10 +1018,20 @@ class App {
         this.previewSection.style.display = 'block';
         this.previewSection.scrollIntoView({ behavior: 'smooth' });
         this.updateCostEstimate();
+
+        // Hide Preview/Start buttons while preview is open — use "Confirm & Start" in preview section
+        this.previewBtn.style.display = 'none';
+        this.uploadBtn.style.display = 'none';
     }
 
     closePreview() {
         this.previewSection.style.display = 'none';
+        // Restore Preview/Start buttons; enable only if a file is loaded
+        this.previewBtn.style.display = '';
+        this.uploadBtn.style.display = '';
+        const hasFile = !!this.selectedFile;
+        this.previewBtn.disabled = !hasFile;
+        this.uploadBtn.disabled = !hasFile;
     }
 
     async updateCostEstimate() {
@@ -2429,23 +2443,34 @@ class App {
         }
 
         const supportedFormats = ['epub', 'fb2'];
-        
-        this.opdsDownloadOptions.innerHTML = downloadLinks.map(dl => {
-            const isSupported = supportedFormats.includes(dl.format);
-            const formatClass = isSupported ? '' : 'unsupported';
-            const buttonHtml = isSupported 
-                ? `<button class="btn btn-primary" onclick="app.downloadAndConvert('${this.escapeHtml(dl.url)}', '${dl.format}')">📥 Convert to Audiobook</button>`
-                : `<span class="btn btn-secondary" disabled>Not Supported</span>`;
 
-            return `
+        // Show supported formats first, then unsupported (no button)
+        const sorted = [...downloadLinks].sort((a, b) => {
+            const aOk = supportedFormats.includes(a.format) ? 0 : 1;
+            const bOk = supportedFormats.includes(b.format) ? 0 : 1;
+            return aOk - bOk;
+        });
+
+        this.opdsDownloadOptions.innerHTML = sorted.map(dl => {
+            const isSupported = supportedFormats.includes(dl.format);
+            if (isSupported) {
+                return `
                 <div class="download-option">
                     <div class="download-option-info">
-                        <span class="download-option-format ${formatClass}">${dl.format.toUpperCase()}</span>
+                        <span class="download-option-format">${dl.format.toUpperCase()}</span>
                         <span class="download-option-title">${dl.title || dl.type || 'Download'}</span>
                     </div>
-                    ${buttonHtml}
-                </div>
-            `;
+                    <button class="btn btn-primary" onclick="app.downloadAndConvert('${this.escapeHtml(dl.url)}', '${dl.format}')">📥 Convert to Audiobook</button>
+                </div>`;
+            } else {
+                return `
+                <div class="download-option download-option-unsupported">
+                    <div class="download-option-info">
+                        <span class="download-option-format unsupported">${dl.format.toUpperCase()}</span>
+                        <span class="download-option-title">${dl.title || dl.type || 'Download'}</span>
+                    </div>
+                </div>`;
+            }
         }).join('');
     }
 
@@ -2481,10 +2506,10 @@ class App {
             
             // Set the file info
             this.fileNameEl.textContent = preview.file_name;
-            this.fileSizeEl.textContent = '';
+            this.fileSizeEl.textContent = 'from OPDS catalog';
             this.selectedFileEl.classList.add('visible');
-            this.previewBtn.disabled = true; // Already have preview
-            this.uploadBtn.disabled = true; // Use confirm button in preview
+            this.dropZone.style.display = 'none';
+            // Preview/Start buttons are hidden by showPreview(); confirm button is in preview section
 
             this.showToast('Book downloaded! Review and start conversion.', 'success');
         } catch (e) {
