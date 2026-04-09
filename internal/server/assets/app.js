@@ -861,8 +861,8 @@ class App {
         this.fileSizeEl.textContent = this.formatFileSize(file.size);
         this.selectedFileEl.classList.add('visible');
         this.dropZone.style.display = 'none';
-        this.previewBtn.disabled = false;
         this.previewBtn.style.display = '';
+        this.previewBtn.disabled = false;
     }
 
     clearSelectedFile() {
@@ -871,8 +871,7 @@ class App {
         this.fileInput.value = '';
         this.selectedFileEl.classList.remove('visible');
         this.dropZone.style.display = '';
-        this.previewBtn.disabled = true;
-        this.previewBtn.style.display = '';
+        this.previewBtn.style.display = 'none';
         this.closePreview();
     }
 
@@ -991,10 +990,10 @@ class App {
 
     closePreview() {
         this.previewSection.style.display = 'none';
-        // Restore the Upload & Preview button
-        this.previewBtn.style.display = '';
+        // Show Upload & Preview button only if a file is still loaded
+        this.previewBtn.style.display = this.selectedFile ? '' : 'none';
         this.previewBtn.innerHTML = '📤 Upload & Preview';
-        this.previewBtn.disabled = !this.selectedFile;
+        this.previewBtn.disabled = false;
     }
 
     async updateCostEstimate() {
