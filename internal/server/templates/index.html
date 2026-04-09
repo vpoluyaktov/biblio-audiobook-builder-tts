@@ -103,12 +103,6 @@
                     <button class="btn btn-secondary" id="test-voice-btn" title="Test how the selected voice sounds">
                         🔊 Test Voice
                     </button>
-                    <button class="btn btn-secondary" id="preview-btn" disabled>
-                        👁️ Preview Book
-                    </button>
-                    <button class="btn btn-primary" id="upload-btn" disabled>
-                        📤 Start Conversion
-                    </button>
                 </div>
             </div>
         </section>
@@ -157,38 +151,6 @@
             </div>
         </section>
 
-        <!-- OPDS Book Preview Modal -->
-        <div class="modal" id="opds-book-modal">
-            <div class="modal-overlay"></div>
-            <div class="modal-content opds-book-modal">
-                <div class="modal-header">
-                    <h2 id="opds-book-title">Book Title</h2>
-                    <button class="modal-close" id="opds-book-close">×</button>
-                </div>
-                <div class="opds-book-content">
-                    <div class="opds-book-cover" id="opds-book-cover">
-                        <span class="no-cover">No Cover</span>
-                    </div>
-                    <div class="opds-book-info">
-                        <p class="opds-book-author" id="opds-book-author"></p>
-                        <p class="opds-book-summary" id="opds-book-summary"></p>
-                        <div class="opds-book-meta">
-                            <span id="opds-book-language"></span>
-                            <span id="opds-book-publisher"></span>
-                        </div>
-                        <div class="opds-book-categories" id="opds-book-categories"></div>
-                    </div>
-                </div>
-                <div class="opds-book-downloads">
-                    <h4>📥 Download Options</h4>
-                    <div class="download-options" id="opds-download-options"></div>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" id="opds-book-cancel">Cancel</button>
-                </div>
-            </div>
-        </div>
-
         <!-- Preview Section (hidden by default) -->
         <section class="preview-section" id="preview-section" style="display: none;">
             <div class="preview-header">
@@ -234,7 +196,7 @@
                 </div>
                 <div class="preview-actions">
                     <button class="btn btn-primary" id="confirm-convert">
-                        ✅ Confirm & Start Conversion
+                        📤 Start Conversion
                     </button>
                 </div>
             </div>
