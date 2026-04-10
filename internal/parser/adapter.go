@@ -64,9 +64,12 @@ func ParseBook(filePath string) (*Book, error) {
 		Metadata:     plaintextBook.Metadata,
 	}
 
+	// Propagate language from upstream parser metadata
+	result.Language = book.Metadata.Language
+
 	// Add genre from upstream parser metadata
 	if len(book.Metadata.Genres) > 0 {
-		result.Genre = joinGenres(book.Metadata.Genres)
+		result.Genre = joinGenres(book.Metadata.Genres, book.Metadata.Language)
 	}
 
 	// Copy cover image from metadata
@@ -153,6 +156,7 @@ func ParseFile(filePath string) (*Book, error) {
 		Title:          unifiedBook.Metadata.Title,
 		Description:    unifiedBook.Metadata.Description,
 		Series:         unifiedBook.Metadata.Series,
+		Language:       unifiedBook.Metadata.Language,
 		CoverImage:     unifiedBook.Metadata.CoverData,
 		CoverImageType: unifiedBook.Metadata.CoverType,
 		Chapters:       make([]Chapter, len(plaintextContent.Chapters)),
@@ -170,7 +174,7 @@ func ParseFile(filePath string) (*Book, error) {
 
 	// Set genre from upstream metadata
 	if len(unifiedBook.Metadata.Genres) > 0 {
-		book.Genre = joinGenres(unifiedBook.Metadata.Genres)
+		book.Genre = joinGenres(unifiedBook.Metadata.Genres, unifiedBook.Metadata.Language)
 	}
 
 	// Generate placeholder cover if book has no cover
@@ -236,6 +240,7 @@ func ParseReader(reader io.Reader, format string) (*Book, error) {
 		Title:          unifiedBook.Metadata.Title,
 		Description:    unifiedBook.Metadata.Description,
 		Series:         unifiedBook.Metadata.Series,
+		Language:       unifiedBook.Metadata.Language,
 		CoverImage:     unifiedBook.Metadata.CoverData,
 		CoverImageType: unifiedBook.Metadata.CoverType,
 		Chapters:       make([]Chapter, len(plaintextContent.Chapters)),
@@ -253,7 +258,7 @@ func ParseReader(reader io.Reader, format string) (*Book, error) {
 
 	// Set genre from upstream metadata
 	if len(unifiedBook.Metadata.Genres) > 0 {
-		book.Genre = joinGenres(unifiedBook.Metadata.Genres)
+		book.Genre = joinGenres(unifiedBook.Metadata.Genres, unifiedBook.Metadata.Language)
 	}
 
 	// Generate placeholder cover if book has no cover
@@ -278,9 +283,11 @@ func ParseReader(reader io.Reader, format string) (*Book, error) {
 	return book, nil
 }
 
-// joinGenres deduplicates, trims, and joins genre strings.
-// Returns at most 5 genres joined by ", ".
-func joinGenres(genres []string) string {
+// joinGenres deduplicates, trims, and joins genre strings, translating FB2
+// codes to human-readable names using the given language. Deduplication is
+// performed on the lowercased raw code before mapping. Returns at most 5
+// genres joined by ", ".
+func joinGenres(genres []string, language string) string {
 	seen := make(map[string]bool)
 	var result []string
 	for _, g := range genres {
@@ -293,7 +300,7 @@ func joinGenres(genres []string) string {
 			continue
 		}
 		seen[lower] = true
-		result = append(result, trimmed)
+		result = append(result, MapGenreName(trimmed, language))
 		if len(result) == 5 {
 			break
 		}
