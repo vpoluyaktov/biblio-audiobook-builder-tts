@@ -32,11 +32,11 @@ func TestJoinGenres(t *testing.T) {
 			input:    []string{"Science Fiction & Fantasy"},
 			expected: "Science Fiction & Fantasy",
 		},
-		// TC11: Exactly 5 genres — all joined
+		// TC11: Exactly 5 genres — all joined with "; "
 		{
 			name:     "exactly 5 genres",
 			input:    []string{"Fiction", "Adventure", "Romance", "Mystery", "Thriller"},
-			expected: "Fiction, Adventure, Romance, Mystery, Thriller",
+			expected: "Fiction; Adventure; Romance; Mystery; Thriller",
 		},
 		// TC12: Case-insensitive dedup keeps first occurrence casing
 		{
@@ -48,23 +48,23 @@ func TestJoinGenres(t *testing.T) {
 		{
 			name:     "duplicates with unique entries",
 			input:    []string{"Fiction", "fiction", "Fantasy", "Fiction"},
-			expected: "Fiction, Fantasy",
+			expected: "Fiction; Fantasy",
 		},
 		// TC5 (adapter level): Whitespace-only entries filtered
 		{
 			name:     "whitespace entries filtered",
 			input:    []string{"Fiction", "  ", "", "Adventure"},
-			expected: "Fiction, Adventure",
+			expected: "Fiction; Adventure",
 		},
 		// TC6 (adapter level): More than 5 genres truncated to first 5
 		{
 			name:     "more than 5 genres truncated",
 			input:    []string{"Genre1", "Genre2", "Genre3", "Genre4", "Genre5", "Genre6", "Genre7", "Genre8"},
-			expected: "Genre1, Genre2, Genre3, Genre4, Genre5",
+			expected: "Genre1; Genre2; Genre3; Genre4; Genre5",
 		},
-		// TC7 (adapter level): Single genre — no trailing comma
+		// TC7 (adapter level): Single genre — no trailing separator
 		{
-			name:     "single genre no trailing comma",
+			name:     "single genre no trailing separator",
 			input:    []string{"Audiobook"},
 			expected: "Audiobook",
 		},
@@ -72,13 +72,13 @@ func TestJoinGenres(t *testing.T) {
 		{
 			name:     "whitespace trimmed from entries",
 			input:    []string{"  Fiction  ", " Adventure "},
-			expected: "Fiction, Adventure",
+			expected: "Fiction; Adventure",
 		},
 		// Additional: genres with slashes and parens preserved
 		{
 			name:     "genres with special chars preserved",
 			input:    []string{"Non-Fiction/Reference", "History (Ancient)"},
-			expected: "Non-Fiction/Reference, History (Ancient)",
+			expected: "Non-Fiction/Reference; History (Ancient)",
 		},
 	}
 
@@ -107,9 +107,9 @@ func TestJoinGenres_Exactly5AfterDedup(t *testing.T) {
 	// 8 inputs, 3 are case-insensitive dups of earlier entries — yields 5 unique
 	input := []string{
 		"Action",
-		"action",  // dup of Action
+		"action",   // dup of Action
 		"Drama",
-		"DRAMA",   // dup of Drama
+		"DRAMA",    // dup of Drama
 		"Comedy",
 		"Thriller",
 		"Horror",
@@ -117,7 +117,7 @@ func TestJoinGenres_Exactly5AfterDedup(t *testing.T) {
 	}
 	// After dedup: Action, Drama, Comedy, Thriller, Horror, Romance (6 unique)
 	// After cap 5: Action, Drama, Comedy, Thriller, Horror
-	expected := "Action, Drama, Comedy, Thriller, Horror"
+	expected := "Action; Drama; Comedy; Thriller; Horror"
 	result := joinGenres(input, "en")
 	if result != expected {
 		t.Errorf("joinGenres dedup+cap: got %q, want %q", result, expected)
@@ -130,9 +130,9 @@ func TestBook_GenreField(t *testing.T) {
 	book := &Book{
 		Title:  "Test",
 		Author: "Author",
-		Genre:  "Fiction, Adventure",
+		Genre:  "Fiction; Adventure",
 	}
-	if book.Genre != "Fiction, Adventure" {
+	if book.Genre != "Fiction; Adventure" {
 		t.Errorf("Book.Genre field not available or not set correctly: got %q", book.Genre)
 	}
 }

@@ -210,7 +210,7 @@ func TestJoinGenresLanguageAware(t *testing.T) {
 			name:     "known and unknown mixed russian",
 			genres:   []string{"det_espionage", "unknown_xyz"},
 			language: "ru",
-			expected: "Шпионский детектив, unknown_xyz",
+			expected: "Шпионский детектив; unknown_xyz",
 		},
 		// TC16: Duplicate codes deduplicated (English)
 		{
@@ -224,7 +224,7 @@ func TestJoinGenresLanguageAware(t *testing.T) {
 			name:     "max 5 genres enforced",
 			genres:   []string{"a", "b", "c", "d", "e", "f"},
 			language: "en",
-			expected: "a, b, c, d, e",
+			expected: "a; b; c; d; e",
 		},
 		// TC18: Case-insensitive dedup on raw code
 		{
@@ -259,21 +259,21 @@ func TestJoinGenresLanguageAware(t *testing.T) {
 			name:     "multiple known genres russian",
 			genres:   []string{"det_espionage", "sf_fantasy"},
 			language: "ru",
-			expected: "Шпионский детектив, Фэнтези",
+			expected: "Шпионский детектив; Фэнтези",
 		},
 		// Extra: Multiple known genres in English
 		{
 			name:     "multiple known genres english",
 			genres:   []string{"det_espionage", "sf_fantasy"},
 			language: "en",
-			expected: "Espionage, Fantasy",
+			expected: "Espionage; Fantasy",
 		},
 		// Extra: 5 or more known FB2 codes — exactly 5 selected from longer list
 		{
 			name:     "exactly 5 from 6 known codes english",
 			genres:   []string{"det_espionage", "sf_fantasy", "prose_classic", "poetry", "thriller", "humor"},
 			language: "en",
-			expected: "Espionage, Fantasy, Classic Prose, Poetry, Thriller",
+			expected: "Espionage; Fantasy; Classic Prose; Poetry; Thriller",
 		},
 		// Extra: Language fallback — French uses English names
 		{

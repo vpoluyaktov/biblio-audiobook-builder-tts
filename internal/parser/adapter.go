@@ -286,7 +286,8 @@ func ParseReader(reader io.Reader, format string) (*Book, error) {
 // joinGenres deduplicates, trims, and joins genre strings, translating FB2
 // codes to human-readable names using the given language. Deduplication is
 // performed on the lowercased raw code before mapping. Returns at most 5
-// genres joined by ", ".
+// genres joined by "; " (semicolon-space), which Audiobookshelf recognizes
+// as a multi-genre separator.
 func joinGenres(genres []string, language string) string {
 	seen := make(map[string]bool)
 	var result []string
@@ -305,5 +306,5 @@ func joinGenres(genres []string, language string) string {
 			break
 		}
 	}
-	return strings.Join(result, ", ")
+	return strings.Join(result, "; ")
 }
