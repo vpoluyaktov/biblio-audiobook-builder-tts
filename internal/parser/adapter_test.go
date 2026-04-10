@@ -5,6 +5,9 @@ import (
 )
 
 // TestJoinGenres tests the joinGenres helper function (test cases 8-12 from spec).
+// The language parameter is set to "en" throughout because these tests use plain
+// human-readable strings (not FB2 codes), so no translation occurs and the
+// existing assertions remain valid.
 func TestJoinGenres(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -81,9 +84,10 @@ func TestJoinGenres(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := joinGenres(tt.input)
+			// Use "en" so that unknown strings (plain English) pass through unchanged.
+			result := joinGenres(tt.input, "en")
 			if result != tt.expected {
-				t.Errorf("joinGenres(%v) = %q, want %q", tt.input, result, tt.expected)
+				t.Errorf("joinGenres(%v, \"en\") = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
 	}
@@ -91,9 +95,9 @@ func TestJoinGenres(t *testing.T) {
 
 // TestJoinGenres_NilSlice ensures joinGenres handles a nil input gracefully.
 func TestJoinGenres_NilSlice(t *testing.T) {
-	result := joinGenres(nil)
+	result := joinGenres(nil, "en")
 	if result != "" {
-		t.Errorf("joinGenres(nil) = %q, want %q", result, "")
+		t.Errorf("joinGenres(nil, \"en\") = %q, want %q", result, "")
 	}
 }
 
@@ -103,9 +107,9 @@ func TestJoinGenres_Exactly5AfterDedup(t *testing.T) {
 	// 8 inputs, 3 are case-insensitive dups of earlier entries — yields 5 unique
 	input := []string{
 		"Action",
-		"action",   // dup of Action
+		"action",  // dup of Action
 		"Drama",
-		"DRAMA",    // dup of Drama
+		"DRAMA",   // dup of Drama
 		"Comedy",
 		"Thriller",
 		"Horror",
@@ -114,7 +118,7 @@ func TestJoinGenres_Exactly5AfterDedup(t *testing.T) {
 	// After dedup: Action, Drama, Comedy, Thriller, Horror, Romance (6 unique)
 	// After cap 5: Action, Drama, Comedy, Thriller, Horror
 	expected := "Action, Drama, Comedy, Thriller, Horror"
-	result := joinGenres(input)
+	result := joinGenres(input, "en")
 	if result != expected {
 		t.Errorf("joinGenres dedup+cap: got %q, want %q", result, expected)
 	}
