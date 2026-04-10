@@ -12,6 +12,7 @@ type Book struct {
 	SeriesNumber   string
 	Description    string
 	Genre          string            // comma-separated genre string
+	Language       string            // ISO 639-1 language code from ebook metadata
 	Chapters       []Chapter
 	CoverImage     []byte
 	CoverImageName string
