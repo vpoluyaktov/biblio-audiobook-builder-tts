@@ -37,6 +37,7 @@ type Config struct {
 	DashBreakDurationMs     int     `mapstructure:"dash_break_duration_ms"`    // Duration of dash break in ms (default 250)
 	ParenthesesBreakMs      int     `mapstructure:"parentheses_break_ms"`      // Duration of break around parenthetical text in ms (default 250)
 	ColonBreakMs            int     `mapstructure:"colon_break_ms"`            // Duration of break replacing ':' in ms (default 250)
+	CommaBreakMs            int     `mapstructure:"comma_break_ms"`            // Duration of break after ',' in ms (default 0, disabled)
 	TitleBreakMs            int     `mapstructure:"title_break_ms"`            // SSML break duration after titles (default 500ms)
 	UseDefaultPronunciation bool    `mapstructure:"use_default_pronunciation"` // Use built-in pronunciation rules
 	MaxFileSizeMB           int     `mapstructure:"max_file_size_mb"`          // Max M4B file size before splitting
@@ -96,6 +97,7 @@ func Load(configFile string) (*Config, error) {
 	viper.SetDefault("dash_break_duration_ms", 250)     // 250ms pause for dashes
 	viper.SetDefault("parentheses_break_ms", 250)       // 250ms pause around parenthetical text
 	viper.SetDefault("colon_break_ms", 250)             // 250ms pause replacing colons
+	viper.SetDefault("comma_break_ms", 0)               // No extra pause after commas
 	viper.SetDefault("title_break_ms", 500)             // 500ms pause after titles
 	viper.SetDefault("pronunciation_dict_file", "")     // Custom pronunciation dictionary
 	viper.SetDefault("use_default_pronunciation", true) // Use built-in pronunciation rules
@@ -204,6 +206,11 @@ func LoadFromDB(dbConfig map[string]interface{}) *Config {
 		cfg.ColonBreakMs = int(v)
 	} else if v, ok := dbConfig["colon_break_ms"].(int); ok {
 		cfg.ColonBreakMs = v
+	}
+	if v, ok := dbConfig["comma_break_ms"].(float64); ok {
+		cfg.CommaBreakMs = int(v)
+	} else if v, ok := dbConfig["comma_break_ms"].(int); ok {
+		cfg.CommaBreakMs = v
 	}
 	if v, ok := dbConfig["title_break_ms"].(float64); ok {
 		cfg.TitleBreakMs = int(v)

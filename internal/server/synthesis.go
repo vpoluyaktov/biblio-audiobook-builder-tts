@@ -102,6 +102,7 @@ func (w *Worker) conversionOptions(provider, voice, language string, speed, pitc
 		DashBreakDurationMs:   w.cfg.DashBreakDurationMs,
 		ParenthesesBreakMs:    w.cfg.ParenthesesBreakMs,
 		ColonBreakMs:          w.cfg.ColonBreakMs,
+		CommaBreakMs:          w.cfg.CommaBreakMs,
 		TitleBreakMs:          w.cfg.TitleBreakMs,
 	}
 }

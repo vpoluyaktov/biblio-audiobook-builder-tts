@@ -28,6 +28,7 @@ type SettingsRequest struct {
 	DashBreakDurationMs int     `json:"dash_break_duration_ms"`
 	ParenthesesBreakMs  int     `json:"parentheses_break_ms"`
 	ColonBreakMs        int     `json:"colon_break_ms"`
+	CommaBreakMs        int     `json:"comma_break_ms"`
 	TitleBreakMs        int     `json:"title_break_ms"`
 	ChapterGapSeconds   float64 `json:"chapter_gap_seconds"`
 	PartGapSeconds      float64 `json:"part_gap_seconds"`
@@ -81,6 +82,7 @@ func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
 		DashBreakDurationMs: s.cfg.DashBreakDurationMs,
 		ParenthesesBreakMs:  s.cfg.ParenthesesBreakMs,
 		ColonBreakMs:        s.cfg.ColonBreakMs,
+		CommaBreakMs:        s.cfg.CommaBreakMs,
 		TitleBreakMs:        s.cfg.TitleBreakMs,
 		ChapterGapSeconds:   s.cfg.ChapterGapSeconds,
 		PartGapSeconds:      s.cfg.PartGapSeconds,
@@ -170,6 +172,9 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 	if wasProvided("colon_break_ms") {
 		s.cfg.ColonBreakMs = req.ColonBreakMs
 	}
+	if wasProvided("comma_break_ms") {
+		s.cfg.CommaBreakMs = req.CommaBreakMs
+	}
 	if wasProvided("title_break_ms") {
 		s.cfg.TitleBreakMs = req.TitleBreakMs
 	}
@@ -221,6 +226,7 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 			"dash_break_duration_ms":    {fmt.Sprintf("%d", req.DashBreakDurationMs), wasProvided("dash_break_duration_ms")},
 			"parentheses_break_ms":      {fmt.Sprintf("%d", req.ParenthesesBreakMs), wasProvided("parentheses_break_ms")},
 			"colon_break_ms":            {fmt.Sprintf("%d", req.ColonBreakMs), wasProvided("colon_break_ms")},
+			"comma_break_ms":            {fmt.Sprintf("%d", req.CommaBreakMs), wasProvided("comma_break_ms")},
 			"title_break_ms":            {fmt.Sprintf("%d", req.TitleBreakMs), wasProvided("title_break_ms")},
 			"chapter_gap_seconds":       {fmt.Sprintf("%.2f", req.ChapterGapSeconds), wasProvided("chapter_gap_seconds")},
 			"part_gap_seconds":          {fmt.Sprintf("%.2f", req.PartGapSeconds), wasProvided("part_gap_seconds")},

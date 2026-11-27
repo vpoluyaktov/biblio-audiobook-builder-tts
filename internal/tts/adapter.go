@@ -118,8 +118,8 @@ func (a *Adapter) ConvertToSpeech(text string, voice string, options *Conversion
 	textToChunk := text
 	if options != nil && options.SSMLSupport {
 		textToChunk = ssml.AddSSMLBreaks(text, options.SSMLOptions())
-		logger.Debug("Added SSML breaks to text before chunking (sentence: %dms, paragraph: %dms, title: %dms, dashes: %v, parentheses: %dms, colon: %dms)",
-			options.SentenceBreakMs, options.ParagraphBreakMs, options.TitleBreakMs, options.ConvertDashesToBreaks, options.ParenthesesBreakMs, options.ColonBreakMs)
+		logger.Debug("Added SSML breaks to text before chunking (sentence: %dms, paragraph: %dms, title: %dms, dashes: %v, parentheses: %dms, colon: %dms, comma: %dms)",
+			options.SentenceBreakMs, options.ParagraphBreakMs, options.TitleBreakMs, options.ConvertDashesToBreaks, options.ParenthesesBreakMs, options.ColonBreakMs, options.CommaBreakMs)
 	}
 
 	// Split text into chunks (now with SSML breaks already embedded)
@@ -433,6 +433,7 @@ func (o *ConversionOptions) SSMLOptions() ssml.SSMLOptions {
 		DashBreakDurationMs:   o.DashBreakDurationMs,
 		ParenthesesBreakMs:    o.ParenthesesBreakMs,
 		ColonBreakMs:          o.ColonBreakMs,
+		CommaBreakMs:          o.CommaBreakMs,
 		TitleBreakMs:          o.TitleBreakMs,
 	}
 }

@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -113,6 +114,7 @@ var distinctPauses = map[string]any{
 	"dash_break_duration_ms": 330,
 	"parentheses_break_ms":   440,
 	"colon_break_ms":         550,
+	"comma_break_ms":         770,
 	"title_break_ms":         660,
 	"chapter_gap_seconds":    1.5,
 	"part_gap_seconds":       2.5,
@@ -157,7 +159,7 @@ func TestVoiceTestMatchesConversion(t *testing.T) {
 	if want := strings.Join(book, "|"); got != want {
 		t.Errorf("voice test SSML differs from conversion:\n test: %s\n book: %s", got, want)
 	}
-	for _, ms := range []string{"110", "220", "330", "440", "550"} {
+	for _, ms := range []string{"110", "220", "330", "440", "550", "770"} {
 		if !strings.Contains(got, `<break time="`+ms+`ms"/>`) {
 			t.Errorf("missing %sms break in %s", ms, got)
 		}
@@ -221,14 +223,116 @@ func TestPauseSettingsPersist(t *testing.T) {
 	for name, cfg := range map[string]*config.Config{"running": s.worker.cfg, "restarted": loadSavedConfig(t, db)} {
 		got := []float64{
 			float64(cfg.SentenceBreakMs), float64(cfg.ParagraphBreakMs), float64(cfg.DashBreakDurationMs),
-			float64(cfg.ParenthesesBreakMs), float64(cfg.ColonBreakMs), float64(cfg.TitleBreakMs),
+			float64(cfg.ParenthesesBreakMs), float64(cfg.ColonBreakMs), float64(cfg.CommaBreakMs), float64(cfg.TitleBreakMs),
 			cfg.ChapterGapSeconds, cfg.PartGapSeconds,
 		}
-		want := []float64{110, 220, 330, 440, 550, 660, 1.5, 2.5}
+		want := []float64{110, 220, 330, 440, 550, 770, 660, 1.5, 2.5}
 		for i := range want {
 			if got[i] != want[i] {
 				t.Errorf("%s config: setting %d = %v, want %v", name, i, got[i], want[i])
 			}
+		}
+	}
+}
+
+func TestCommaBreakAfterNumberNormalization(t *testing.T) {
+	s, _, fake := newSynthesisServer(t)
+	provider, err := s.db.GetProvider("silero")
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider.NormalizeNumbers = true
+	if err := s.db.UpdateProvider(provider); err != nil {
+		t.Fatal(err)
+	}
+	s.ttsService.ReloadProviders()
+	postJSON(t, s.saveSettings, map[string]any{"comma_break_ms": 770, "sentence_break_ms": 0, "paragraph_break_ms": 0})
+
+	for _, lang := range []string{"en", "ru"} {
+		text := "It cost 1,000 and 3,14 today."
+		if lang == "ru" {
+			text = "Цена 1,000 и 3,14 сегодня."
+		}
+		postJSON(t, s.handleTestVoice, TestVoiceRequest{Provider: "silero", Voice: "silero:v#s", Language: lang, Text: text})
+		got := strings.Join(fake.sent(), "|")
+		if got == "" || strings.ContainsAny(got[len("<speak>"):], "0123456789") {
+			t.Errorf("%s: numbers not normalized: %q", lang, got)
+		}
+		if strings.Contains(got, `time="770ms"`) {
+			t.Errorf("%s: comma break inside a number: %s", lang, got)
+		}
+	}
+}
+
+func TestNonSSMLProviderGetsNoCommaBreak(t *testing.T) {
+	s, _, fake := newSynthesisServer(t)
+	provider, err := s.db.GetProvider("silero")
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider.SSMLSupport = false
+	if err := s.db.UpdateProvider(provider); err != nil {
+		t.Fatal(err)
+	}
+	s.ttsService.ReloadProviders()
+	postJSON(t, s.saveSettings, distinctPauses)
+
+	testVoice(t, s, "Yes, indeed.")
+	if got := strings.Join(fake.sent(), "|"); got == "" || strings.Contains(got, "break") {
+		t.Errorf("unexpected request for non-SSML provider: %q", got)
+	}
+}
+
+func TestCommaBreakExistingDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+	open := func() *storage.DB {
+		db, err := storage.NewDB(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := db.InitializeDefaults(); err != nil {
+			t.Fatal(err)
+		}
+		return db
+	}
+
+	// A database created before the setting existed has no comma_break_ms row
+	db := open()
+	conn, err := sql.Open("sqlite3", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close() }()
+	if _, err := conn.Exec("DELETE FROM config WHERE key = 'comma_break_ms'"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	db = open()
+	if got := loadSavedConfig(t, db).CommaBreakMs; got != 0 {
+		t.Errorf("CommaBreakMs for existing database = %d, want 0", got)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// A saved value, including a return to zero, survives reopening the database
+	for _, want := range []int{300, 0} {
+		db = open()
+		s := New(":0", loadSavedConfig(t, db), nil)
+		s.db = db
+		postJSON(t, s.saveSettings, map[string]any{"comma_break_ms": want})
+		if err := db.Close(); err != nil {
+			t.Fatal(err)
+		}
+		db = open()
+		if got := loadSavedConfig(t, db).CommaBreakMs; got != want {
+			t.Errorf("CommaBreakMs after reload = %d, want %d", got, want)
+		}
+		if err := db.Close(); err != nil {
+			t.Fatal(err)
 		}
 	}
 }

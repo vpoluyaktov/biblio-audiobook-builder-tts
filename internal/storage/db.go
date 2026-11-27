@@ -46,6 +46,7 @@ type Config struct {
 	DashBreakDurationMs     int     `json:"dash_break_duration_ms"`
 	ParenthesesBreakMs      int     `json:"parentheses_break_ms"`
 	ColonBreakMs            int     `json:"colon_break_ms"`
+	CommaBreakMs            int     `json:"comma_break_ms"`
 	TitleBreakMs            int     `json:"title_break_ms"`
 	UseDefaultPronunciation bool    `json:"use_default_pronunciation"`
 	MaxFileSizeMB           int     `json:"max_file_size_mb"`
@@ -405,6 +406,11 @@ func (db *DB) GetAllConfig() (*Config, error) {
 	if v, ok := configMap["colon_break_ms"]; ok {
 		fmt.Sscanf(v, "%d", &cfg.ColonBreakMs)
 	}
+	if v, ok := configMap["comma_break_ms"]; ok {
+		if _, err := fmt.Sscanf(v, "%d", &cfg.CommaBreakMs); err != nil {
+			logger.Warn("Invalid comma_break_ms value %q: %v", v, err)
+		}
+	}
 	if v, ok := configMap["title_break_ms"]; ok {
 		fmt.Sscanf(v, "%d", &cfg.TitleBreakMs)
 	}
@@ -472,6 +478,7 @@ func (db *DB) SaveAllConfig(cfg *Config) error {
 		"dash_break_duration_ms":    fmt.Sprintf("%d", cfg.DashBreakDurationMs),
 		"parentheses_break_ms":      fmt.Sprintf("%d", cfg.ParenthesesBreakMs),
 		"colon_break_ms":            fmt.Sprintf("%d", cfg.ColonBreakMs),
+		"comma_break_ms":            fmt.Sprintf("%d", cfg.CommaBreakMs),
 		"title_break_ms":            fmt.Sprintf("%d", cfg.TitleBreakMs),
 		"use_default_pronunciation": fmt.Sprintf("%t", cfg.UseDefaultPronunciation),
 		"max_file_size_mb":          fmt.Sprintf("%d", cfg.MaxFileSizeMB),
@@ -512,6 +519,7 @@ func DefaultConfig() *Config {
 		DashBreakDurationMs:     300,
 		ParenthesesBreakMs:      250,
 		ColonBreakMs:            250,
+		CommaBreakMs:            0,
 		TitleBreakMs:            500,
 		UseDefaultPronunciation: true,
 		MaxFileSizeMB:           250,
@@ -1545,6 +1553,7 @@ func (c *Config) ToAppConfig() map[string]interface{} {
 		"dash_break_duration_ms":    c.DashBreakDurationMs,
 		"parentheses_break_ms":      c.ParenthesesBreakMs,
 		"colon_break_ms":            c.ColonBreakMs,
+		"comma_break_ms":            c.CommaBreakMs,
 		"title_break_ms":            c.TitleBreakMs,
 		"use_default_pronunciation": c.UseDefaultPronunciation,
 		"max_file_size_mb":          c.MaxFileSizeMB,
