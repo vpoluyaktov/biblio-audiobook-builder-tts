@@ -94,6 +94,11 @@ h1 .icon {
     gap: 1.5rem;
 }
 
+.voice-settings {
+    display: grid;
+    gap: 1.5rem;
+}
+
 .drop-zone {
     border: 2px dashed var(--border);
     border-radius: 8px;
@@ -1614,40 +1619,22 @@ h1 .icon {
 
 .test-voice-body {
     padding: 1.5rem;
-}
-
-.test-voice-info {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-    padding: 1rem;
-    background: var(--bg-secondary);
-    border-radius: 8px;
-}
-
-.test-voice-detail {
+    overflow-y: auto;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 1rem;
 }
 
-.test-voice-label {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-}
-
-.test-voice-value {
-    font-weight: 500;
-    color: var(--text-primary);
+.test-voice-body .form-group {
+    min-width: 0;
 }
 
 .test-voice-controls {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 1rem;
-    margin-bottom: 1rem;
 }
 
 .test-voice-status {
@@ -1661,10 +1648,6 @@ h1 .icon {
 
 .test-voice-status.error {
     color: var(--error);
-}
-
-.test-voice-player {
-    margin-top: 1rem;
 }
 
 .test-voice-player audio {
