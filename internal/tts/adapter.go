@@ -117,15 +117,7 @@ func (a *Adapter) ConvertToSpeech(text string, voice string, options *Conversion
 	// This ensures breaks are preserved across chunk boundaries
 	textToChunk := text
 	if options != nil && options.SSMLSupport {
-		textToChunk = ssml.AddSSMLBreaks(text, ssml.SSMLOptions{
-			SentenceBreakMs:       options.SentenceBreakMs,
-			ParagraphBreakMs:      options.ParagraphBreakMs,
-			ConvertDashesToBreaks: options.ConvertDashesToBreaks,
-			DashBreakDurationMs:   options.DashBreakDurationMs,
-			ParenthesesBreakMs:    options.ParenthesesBreakMs,
-			ColonBreakMs:          options.ColonBreakMs,
-			TitleBreakMs:          options.TitleBreakMs,
-		})
+		textToChunk = ssml.AddSSMLBreaks(text, options.SSMLOptions())
 		logger.Debug("Added SSML breaks to text before chunking (sentence: %dms, paragraph: %dms, title: %dms, dashes: %v, parentheses: %dms, colon: %dms)",
 			options.SentenceBreakMs, options.ParagraphBreakMs, options.TitleBreakMs, options.ConvertDashesToBreaks, options.ParenthesesBreakMs, options.ColonBreakMs)
 	}
@@ -225,15 +217,7 @@ func (a *Adapter) ConvertToSpeechWithChunks(text string, voice string, options *
 	// SSML-first approach: Add SSML breaks to entire text BEFORE chunking
 	textToChunk := text
 	if options != nil && options.SSMLSupport {
-		textToChunk = ssml.AddSSMLBreaks(text, ssml.SSMLOptions{
-			SentenceBreakMs:       options.SentenceBreakMs,
-			ParagraphBreakMs:      options.ParagraphBreakMs,
-			ConvertDashesToBreaks: options.ConvertDashesToBreaks,
-			DashBreakDurationMs:   options.DashBreakDurationMs,
-			TitleBreakMs:          options.TitleBreakMs,
-		})
-		logger.Debug("Added SSML breaks to text before chunking (sentence: %dms, paragraph: %dms, title: %dms, dashes: %v)",
-			options.SentenceBreakMs, options.ParagraphBreakMs, options.TitleBreakMs, options.ConvertDashesToBreaks)
+		textToChunk = ssml.AddSSMLBreaks(text, options.SSMLOptions())
 	}
 
 	chunks := a.chunker.Chunk(textToChunk)
@@ -438,4 +422,17 @@ func concatenateWAV(buffers [][]byte) io.Reader {
 	}
 
 	return bytes.NewReader(result)
+}
+
+// SSMLOptions returns the pause settings used to add SSML breaks to the text
+func (o *ConversionOptions) SSMLOptions() ssml.SSMLOptions {
+	return ssml.SSMLOptions{
+		SentenceBreakMs:       o.SentenceBreakMs,
+		ParagraphBreakMs:      o.ParagraphBreakMs,
+		ConvertDashesToBreaks: o.ConvertDashesToBreaks,
+		DashBreakDurationMs:   o.DashBreakDurationMs,
+		ParenthesesBreakMs:    o.ParenthesesBreakMs,
+		ColonBreakMs:          o.ColonBreakMs,
+		TitleBreakMs:          o.TitleBreakMs,
+	}
 }

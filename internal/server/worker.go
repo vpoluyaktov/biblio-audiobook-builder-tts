@@ -18,7 +18,6 @@ import (
 	"biblio-audiobook-builder-tts/internal/normalize"
 	"biblio-audiobook-builder-tts/internal/parser"
 	"biblio-audiobook-builder-tts/internal/sanitize"
-	"biblio-audiobook-builder-tts/internal/ssml"
 	"biblio-audiobook-builder-tts/internal/storage"
 	"biblio-audiobook-builder-tts/internal/stress"
 	"biblio-audiobook-builder-tts/internal/tts"
@@ -124,14 +123,18 @@ func (w *Worker) loadPronunciationRulesFromDB() error {
 		return fmt.Errorf("failed to get pronunciation rules: %w", err)
 	}
 
-	// Clear existing database rules (keep default and file-based rules)
-	// We need to reload only the database rules, so we'll clear all and reload everything
-	dict := w.sanitizer.GetDictionary()
+	w.applyPronunciationRules(w.sanitizer, dbRules)
+	return nil
+}
+
+// applyPronunciationRules replaces the sanitizer's rules with the default and database rules
+func (w *Worker) applyPronunciationRules(sanitizer *sanitize.TextSanitizer, dbRules []storage.PronunciationRule) {
+	dict := sanitizer.GetDictionary()
 	dict.Clear()
 
 	// Reload default rules if enabled
 	if w.cfg.UseDefaultPronunciation {
-		w.sanitizer.LoadDefaultRules()
+		sanitizer.LoadDefaultRules()
 	}
 
 	// Load database rules
@@ -149,7 +152,6 @@ func (w *Worker) loadPronunciationRulesFromDB() error {
 
 	totalRules := dict.RuleCount()
 	logger.Debug("Reloaded pronunciation rules: %d from database, %d total rules", len(dbRules), totalRules)
-	return nil
 }
 
 // processLoop continuously checks for and processes pending jobs
@@ -453,67 +455,8 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		logger.Warn("Failed to reload pronunciation rules from database: %v", err)
 	}
 
-	// Get provider info BEFORE applying pronunciation rules to determine SSML support
-	needsNormalization := true // Default to true for safety
-	transliterationEnabled := false
-	stressEnabled := false
-	useSSML := false
-	if providerInfo := w.ttsService.GetProviderInfo(job.Provider); providerInfo != nil {
-		needsNormalization = providerInfo.NormalizeNumbers
-		transliterationEnabled = providerInfo.Transliteration
-		stressEnabled = providerInfo.StressEnabled
-		useSSML = providerInfo.SSMLSupport
-	}
-
-	// Step 1: Apply text sanitization and pronunciation dictionary rules FIRST
-	// This ensures user-defined pronunciation rules have priority over automatic processing
-	// Apply only rules for the book's language, using SSML replacements if provider supports it
-	content = w.sanitizer.SanitizeWithOptions(content, lang, useSSML)
-
-	// Step 2: Apply number normalization if provider needs it
-	// IMPORTANT: This must run BEFORE Latin-to-Russian transliteration because
-	// Roman numerals (I, II, III, IV, etc.) are Latin characters that the
-	// transliterator would convert letter-by-letter (e.g., "III" → "ай ай ай")
-	// before the normalizer could process them (e.g., "Глава III" → "Глава третья").
-	if needsNormalization {
-		lang := job.Language
-		if lang == "" {
-			lang = "en" // Fallback to English if not set
-		}
-		content = w.normalizer.Process(content, lang)
-		logger.Debug("Applied number normalization for provider %s (lang: %s)", job.Provider, lang)
-	}
-
-	// Step 3: Apply Latin-to-Russian transliteration if enabled (for Russian text only)
-	// Runs after normalization so Roman numerals are already converted to Cyrillic words.
-	if transliterationEnabled && lang == "ru" {
-		content = w.sanitizer.ConvertLatinToRussian(content)
-		logger.Debug("Applied Latin-to-Russian transliteration for provider %s", job.Provider)
-	}
-
-	// Step 4: Apply stress marking for Russian text if enabled for this provider
-	if stressEnabled && w.stressClient != nil && w.stressClient.IsAvailable() {
-		lang := job.Language
-		if lang == "" {
-			lang = "en"
-		}
-		// Only apply stress marking for Russian language
-		// Process sentence by sentence to ensure correct homograph disambiguation
-		if lang == "ru" && w.stressClient.SupportsLanguage(lang) {
-			stressedContent, err := w.stressClient.AddStressToSentences(content, lang)
-			if err != nil {
-				logger.Warn("Failed to add stress markers: %v (continuing without stress)", err)
-			} else {
-				content = stressedContent
-				logger.Debug("Applied stress marking for provider %s (lang: %s)", job.Provider, lang)
-			}
-		}
-	}
-
-	// Detect and mark part separators if enabled
-	if w.separatorDetector != nil {
-		content = w.separatorDetector.DetectAndMark(content)
-	}
+	processing := w.textProcessing(job.Provider)
+	content = w.prepareText(w.sanitizer, content, lang, job.Provider, processing)
 
 	// Note: SSML wrapping is applied per-chunk in the TTS adapter, not here
 	// This allows proper chunking of long chapters before SSML tags are added
@@ -556,33 +499,13 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 		return result
 	}
 
-	// Check if provider supports SSML
-	ssmlSupport := false
-	if providerInfo := w.ttsService.GetProviderInfo(job.Provider); providerInfo != nil {
-		ssmlSupport = providerInfo.SSMLSupport
-	}
+	opts := w.conversionOptions(job.Provider, job.Voice, job.Language, job.Speed, job.Pitch, processing.ssml)
 
-	// Save SSML debug file if SSML is enabled (before chunking)
-	if ssmlSupport {
-		ssmlText := ssml.AddSSMLBreaks(content, ssml.SSMLOptions{
-			SentenceBreakMs:       w.cfg.SentenceBreakMs,
-			ParagraphBreakMs:      w.cfg.ParagraphBreakMs,
-			ConvertDashesToBreaks: w.cfg.ConvertDashesToBreaks,
-			DashBreakDurationMs:   w.cfg.DashBreakDurationMs,
-			ParenthesesBreakMs:    w.cfg.ParenthesesBreakMs,
-			ColonBreakMs:          w.cfg.ColonBreakMs,
-			TitleBreakMs:          w.cfg.TitleBreakMs,
-		})
-		ssmlFileName := fmt.Sprintf("%04d_%s.ssml.txt", index+1, sanitizeFileName(chapter.Title))
-		ssmlFilePath := filepath.Join(outputDir, ssmlFileName)
-		if err := os.WriteFile(ssmlFilePath, []byte(ssmlText), 0644); err != nil {
-			logger.Warn("Failed to save SSML debug file '%s': %v", ssmlFileName, err)
-		}
-	}
+	w.saveSSMLDebugFile(content, opts, outputDir, index, chapter.Title)
 
 	// Check if content has part separators that need silence insertion
 	if normalize.HasPartSeparators(content) {
-		return w.convertChapterWithParts(job, chapter, content, index, outputDir, workerID, ssmlSupport)
+		return w.convertChapterWithParts(job, chapter, content, index, outputDir, workerID, opts)
 	}
 
 	// Progress callback for per-chunk updates
@@ -593,21 +516,7 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 	}
 
 	// Convert chapter with progress tracking
-	reader, err := w.ttsService.ConvertToSpeechWithProgress(content, &tts.ConversionOptions{
-		Voice:                 job.Voice,
-		Provider:              job.Provider,
-		Speed:                 job.Speed,
-		Pitch:                 job.Pitch,
-		Language:              job.Language,
-		SSMLSupport:           ssmlSupport,
-		SentenceBreakMs:       w.cfg.SentenceBreakMs,
-		ParagraphBreakMs:      w.cfg.ParagraphBreakMs,
-		ConvertDashesToBreaks: w.cfg.ConvertDashesToBreaks,
-		DashBreakDurationMs:   w.cfg.DashBreakDurationMs,
-		ParenthesesBreakMs:    w.cfg.ParenthesesBreakMs,
-		ColonBreakMs:          w.cfg.ColonBreakMs,
-		TitleBreakMs:          w.cfg.TitleBreakMs,
-	}, progressCb)
+	reader, err := w.ttsService.ConvertToSpeechWithProgress(content, opts, progressCb)
 	if err != nil {
 		result.Error = fmt.Errorf("TTS conversion failed: %v", err)
 		return result
@@ -639,166 +548,39 @@ func (w *Worker) convertSingleChapter(job *Job, chapter parser.Chapter, index in
 // convertChapterWithParts handles chapters that contain part separators
 // It splits the content, generates TTS for each part, inserts silence between parts,
 // and concatenates the audio files into a single chapter audio file
-func (w *Worker) convertChapterWithParts(job *Job, chapter parser.Chapter, content string, index int, outputDir string, workerID int, ssmlSupport bool) ChapterResult {
+func (w *Worker) convertChapterWithParts(job *Job, chapter parser.Chapter, content string, index int, outputDir string, workerID int, opts *tts.ConversionOptions) ChapterResult {
 	result := ChapterResult{Index: index}
 
-	// Split content at separator markers
-	parts := normalize.SplitByMarker(content)
-	numParts := len(parts)
+	w.saveSSMLDebugFile(content, opts, outputDir, index, chapter.Title)
 
-	logger.Info("Chapter %d (%s) has %d parts separated by scene breaks", index+1, chapter.Title, numParts)
-
-	// Save SSML debug file if SSML is enabled (before chunking)
-	if ssmlSupport {
-		ssmlText := ssml.AddSSMLBreaks(content, ssml.SSMLOptions{
-			SentenceBreakMs:       w.cfg.SentenceBreakMs,
-			ParagraphBreakMs:      w.cfg.ParagraphBreakMs,
-			ConvertDashesToBreaks: w.cfg.ConvertDashesToBreaks,
-			DashBreakDurationMs:   w.cfg.DashBreakDurationMs,
-			TitleBreakMs:          w.cfg.TitleBreakMs,
-		})
-		ssmlFileName := fmt.Sprintf("%04d_%s.ssml.txt", index+1, sanitizeFileName(chapter.Title))
-		ssmlFilePath := filepath.Join(outputDir, ssmlFileName)
-		if err := os.WriteFile(ssmlFilePath, []byte(ssmlText), 0644); err != nil {
-			logger.Warn("Failed to save SSML debug file '%s': %v", ssmlFileName, err)
-		}
-	}
-
-	// Get provider's sample rate for silence generation
-	sampleRate := 48000
-	if providerInfo := w.ttsService.GetProviderInfo(job.Provider); providerInfo != nil {
-		if db, ok := w.db.(*storage.DB); ok {
-			if dbProvider, err := db.GetProvider(providerInfo.ID); err == nil && dbProvider != nil && dbProvider.SampleRate > 0 {
-				sampleRate = dbProvider.SampleRate
-			}
-		}
-	}
-
-	// Determine silence duration between parts
-	partGapSeconds := w.cfg.PartGapSeconds
-	if partGapSeconds <= 0 {
-		partGapSeconds = w.cfg.ChapterGapSeconds // Fall back to chapter gap
-	}
-	if partGapSeconds <= 0 {
-		partGapSeconds = 2.0 // Default 2 seconds
-	}
-
-	// Create temp directory for part files
-	partsDir := filepath.Join(outputDir, fmt.Sprintf("chapter_%04d_parts", index+1))
-	if err := os.MkdirAll(partsDir, 0755); err != nil {
-		result.Error = fmt.Errorf("failed to create parts directory: %v", err)
-		return result
-	}
-	defer os.RemoveAll(partsDir) // Clean up temp parts directory
-
-	// Generate silence file for between parts
-	silenceFile := filepath.Join(partsDir, "silence.wav")
-	partGapDuration := time.Duration(partGapSeconds * float64(time.Second))
-	if err := audio.GenerateSilentWAV(partGapDuration, silenceFile, sampleRate); err != nil {
-		result.Error = fmt.Errorf("failed to generate silence file: %v", err)
-		return result
-	}
-
-	// Process each part and collect audio files
-	var audioFiles []string
-	lang := job.Language
-	if lang == "" {
-		lang = "en"
-	}
-
-	for partIdx, partContent := range parts {
-		// Skip empty parts
-		if strings.TrimSpace(partContent) == "" {
-			continue
-		}
-
-		// Check if part has speakable content
-		if !sanitize.HasSpeakableContentForLanguage(partContent, lang) {
-			logger.Debug("Part %d of chapter %d has no speakable content, skipping", partIdx+1, index+1)
-			continue
-		}
-
-		// Progress callback for this part
-		progressCb := func(chunkIndex, totalChunks int, chunkText string) {
-			// Show progress as "part X of Y, chunk Z of N"
-			overallProgress := partIdx*100/numParts + (chunkIndex+1)*100/(numParts*totalChunks)
-			job.SetWorkerProgress(workerID, index, fmt.Sprintf("%s (part %d/%d)", chapter.Title, partIdx+1, numParts), overallProgress, 100)
-			w.broadcastJobProgress(job)
-		}
-
-		// Convert part to speech
-		reader, err := w.ttsService.ConvertToSpeechWithProgress(partContent, &tts.ConversionOptions{
-			Voice:                 job.Voice,
-			Provider:              job.Provider,
-			Speed:                 job.Speed,
-			Pitch:                 job.Pitch,
-			Language:              job.Language,
-			SSMLSupport:           ssmlSupport,
-			SentenceBreakMs:       w.cfg.SentenceBreakMs,
-			ParagraphBreakMs:      w.cfg.ParagraphBreakMs,
-			ConvertDashesToBreaks: w.cfg.ConvertDashesToBreaks,
-			DashBreakDurationMs:   w.cfg.DashBreakDurationMs,
-			TitleBreakMs:          w.cfg.TitleBreakMs,
-		}, progressCb)
-		if err != nil {
-			result.Error = fmt.Errorf("TTS conversion failed for part %d: %v", partIdx+1, err)
-			return result
-		}
-
-		// Save part audio file
-		partFileName := fmt.Sprintf("part_%02d.wav", partIdx+1)
-		partPath := filepath.Join(partsDir, partFileName)
-
-		partFile, err := os.Create(partPath)
-		if err != nil {
-			result.Error = fmt.Errorf("failed to create part file: %v", err)
-			return result
-		}
-
-		if _, err := partFile.ReadFrom(reader); err != nil {
-			partFile.Close()
-			result.Error = fmt.Errorf("failed to write part audio: %v", err)
-			return result
-		}
-		partFile.Close()
-
-		// Add part audio to list
-		audioFiles = append(audioFiles, partPath)
-
-		// Add silence between parts (not after the last part)
-		if partIdx < numParts-1 {
-			audioFiles = append(audioFiles, silenceFile)
-		}
-	}
-
-	// If no audio files were generated, create a silent placeholder
-	if len(audioFiles) == 0 {
-		chapterFileName := fmt.Sprintf("%04d_%s.wav", index+1, sanitizeFileName(chapter.Title))
-		outputPath := filepath.Join(outputDir, chapterFileName)
-		if err := audio.GenerateSilentWAV(1*time.Second, outputPath, sampleRate); err != nil {
-			result.Error = fmt.Errorf("failed to generate silent audio: %v", err)
-			return result
-		}
-		result.OutputPath = outputPath
-		result.Skipped = true
-		return result
-	}
-
-	// Concatenate all parts into final chapter audio
 	chapterFileName := fmt.Sprintf("%04d_%s.wav", index+1, sanitizeFileName(chapter.Title))
 	outputPath := filepath.Join(outputDir, chapterFileName)
+	partsDir := filepath.Join(outputDir, fmt.Sprintf("chapter_%04d_parts", index+1))
 
-	if err := audio.ConcatWAVFiles(audioFiles, outputPath); err != nil {
-		result.Error = fmt.Errorf("failed to concatenate parts: %v", err)
+	progressCb := func(partIdx, numParts, chunkIndex, totalChunks int) {
+		// Show progress as "part X of Y, chunk Z of N"
+		overallProgress := partIdx*100/numParts + (chunkIndex+1)*100/(numParts*totalChunks)
+		job.SetWorkerProgress(workerID, index, fmt.Sprintf("%s (part %d/%d)", chapter.Title, partIdx+1, numParts), overallProgress, 100)
+		w.broadcastJobProgress(job)
+	}
+
+	hasAudio, err := w.synthesizeParts(content, opts, partsDir, outputPath, progressCb)
+	if err != nil {
+		result.Error = err
+		return result
+	}
+
+	result.OutputPath = outputPath
+	if !hasAudio {
+		result.Skipped = true
 		return result
 	}
 
 	// Mark worker as done with this chapter
 	job.ClearWorkerProgress(workerID)
 
-	logger.Info("Chapter %d (%s) converted with %d parts and silence gaps", index+1, chapter.Title, numParts)
+	logger.Info("Chapter %d (%s) converted with silence gaps between parts", index+1, chapter.Title)
 
-	result.OutputPath = outputPath
 	return result
 }
 

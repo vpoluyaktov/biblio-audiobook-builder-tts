@@ -96,6 +96,40 @@ func ParseBook(filePath string) (*Book, error) {
 	return result, nil
 }
 
+// newTTSRenderer returns the renderer that turns book content into text for conversion
+func newTTSRenderer() *plaintext.Renderer {
+	return plaintext.NewRenderer(plaintext.Config{
+		AddPeriods:    true,
+		InsertMarkers: false,
+		NormalizeText: true,
+	})
+}
+
+// RenderPlainText renders free text the way book content is rendered by ParseFile,
+// treating every non-blank line as a paragraph
+func RenderPlainText(text string) (string, error) {
+	chapter := ebookparser.Chapter{}
+	for _, line := range strings.Split(text, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			chapter.Elements = append(chapter.Elements, &ebookparser.Paragraph{Text: line})
+		}
+	}
+
+	content, err := newTTSRenderer().RenderContent(&ebookparser.Book{
+		Content: ebookparser.Content{Chapters: []ebookparser.Chapter{chapter}},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to render content: %w", err)
+	}
+
+	rendered, ok := content.(*plaintext.Book)
+	if !ok || len(rendered.Chapters) != 1 {
+		return "", fmt.Errorf("unexpected content type")
+	}
+
+	return rendered.Chapters[0].Content, nil
+}
+
 // ParseFile parses an ebook file from a file path
 func ParseFile(filePath string) (*Book, error) {
 	// Determine format from extension
@@ -135,13 +169,7 @@ func ParseFile(filePath string) (*Book, error) {
 	}
 
 	// Render to plain text for TTS
-	renderer := plaintext.NewRenderer(plaintext.Config{
-		AddPeriods:    true,
-		InsertMarkers: false,
-		NormalizeText: true,
-	})
-
-	content, err := renderer.RenderContent(unifiedBook)
+	content, err := newTTSRenderer().RenderContent(unifiedBook)
 	if err != nil {
 		return nil, fmt.Errorf("failed to render content: %w", err)
 	}
@@ -219,13 +247,7 @@ func ParseReader(reader io.Reader, format string) (*Book, error) {
 	}
 
 	// Render to plain text for TTS
-	renderer := plaintext.NewRenderer(plaintext.Config{
-		AddPeriods:    true,
-		InsertMarkers: false,
-		NormalizeText: true,
-	})
-
-	content, err := renderer.RenderContent(unifiedBook)
+	content, err := newTTSRenderer().RenderContent(unifiedBook)
 	if err != nil {
 		return nil, fmt.Errorf("failed to render content: %w", err)
 	}
