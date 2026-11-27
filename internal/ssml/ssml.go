@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 // sentenceEndPattern matches sentence-ending punctuation
@@ -32,6 +33,7 @@ type SSMLOptions struct {
 	DashBreakDurationMs   int  // Duration of break for dashes (default 300ms)
 	ParenthesesBreakMs    int  // Duration of break before/after parenthetical text (0 = disabled)
 	ColonBreakMs          int  // Duration of break replacing colon ':' (0 = use legacy colon-to-space)
+	CommaBreakMs          int  // Duration of break added after a comma (0 = disabled)
 	TitleBreakMs          int  // Duration of break after titles in ms (0 = no breaks)
 
 	// Deprecated: Use SentenceBreakMs and ParagraphBreakMs instead
@@ -80,7 +82,7 @@ func AddSSMLBreaks(text string, opts SSMLOptions) string {
 
 	// Choose the appropriate escape function based on options
 	escapeFunc := escapeXML
-	if opts.ConvertDashesToBreaks || opts.ParenthesesBreakMs > 0 || opts.ColonBreakMs > 0 {
+	if opts.ConvertDashesToBreaks || opts.ParenthesesBreakMs > 0 || opts.ColonBreakMs > 0 || opts.CommaBreakMs > 0 {
 		breakMs := opts.DashBreakDurationMs
 		if breakMs <= 0 {
 			breakMs = 300
@@ -94,7 +96,7 @@ func AddSSMLBreaks(text string, opts SSMLOptions) string {
 			colonBreakMs = 0
 		}
 		escapeFunc = func(t string) string {
-			return escapeXMLWithPauseBreaks(t, opts.ConvertDashesToBreaks, breakMs, parenthesesBreakMs, colonBreakMs)
+			return escapeXMLWithPauseBreaks(t, opts.ConvertDashesToBreaks, breakMs, parenthesesBreakMs, colonBreakMs, opts.CommaBreakMs)
 		}
 	}
 
@@ -182,7 +184,7 @@ func WrapTextInSSMLWithOptions(text string, opts SSMLOptions) string {
 
 	// Choose the appropriate escape function based on options
 	escapeFunc := escapeXML
-	if opts.ConvertDashesToBreaks || opts.ParenthesesBreakMs > 0 || opts.ColonBreakMs > 0 {
+	if opts.ConvertDashesToBreaks || opts.ParenthesesBreakMs > 0 || opts.ColonBreakMs > 0 || opts.CommaBreakMs > 0 {
 		breakMs := opts.DashBreakDurationMs
 		if breakMs <= 0 {
 			breakMs = 300
@@ -196,7 +198,7 @@ func WrapTextInSSMLWithOptions(text string, opts SSMLOptions) string {
 			colonBreakMs = 0
 		}
 		escapeFunc = func(t string) string {
-			return escapeXMLWithPauseBreaks(t, opts.ConvertDashesToBreaks, breakMs, parenthesesBreakMs, colonBreakMs)
+			return escapeXMLWithPauseBreaks(t, opts.ConvertDashesToBreaks, breakMs, parenthesesBreakMs, colonBreakMs, opts.CommaBreakMs)
 		}
 	}
 
@@ -413,6 +415,50 @@ const parenthesesBreakPlaceholder = "\x01PAREN_BREAK\x01"
 // colonBreakPlaceholder is used for colon pauses with independent duration.
 const colonBreakPlaceholder = "\x01COLON_BREAK\x01"
 
+// commaBreakPlaceholder is used for comma pauses with independent duration.
+const commaBreakPlaceholder = "\x01COMMA_BREAK\x01"
+
+var placeholderPattern = regexp.MustCompile("\x01[A-Z_]+\x01")
+
+// markCommaBreaks inserts a break placeholder after commas that separate phrases.
+// The comma is kept so the TTS engine does not treat the phrase as a finished sentence.
+// No break is added inside numbers or other unspaced text, next to another pause or
+// punctuation mark, or at either end of the text.
+func markCommaBreaks(text string) string {
+	// Blank out placeholders, preserving byte offsets, to locate the speakable text
+	spoken := placeholderPattern.ReplaceAllStringFunc(text, func(match string) string {
+		return strings.Repeat(" ", len(match))
+	})
+	isSpeakable := func(r rune) bool { return unicode.IsLetter(r) || unicode.IsDigit(r) }
+	first := strings.IndexFunc(spoken, isSpeakable)
+	last := strings.LastIndexFunc(spoken, isSpeakable)
+
+	var result strings.Builder
+	copied := 0
+	for i, r := range text {
+		if r != ',' || first < 0 || i < first || i > last {
+			continue
+		}
+
+		rest := text[i+1:]
+		next := strings.TrimLeftFunc(rest, unicode.IsSpace)
+		followedBySpace := len(next) < len(rest)
+		if !followedBySpace || next == "" || strings.ContainsRune(".!?…,;:\x01", []rune(next)[0]) {
+			continue
+		}
+		if strings.HasSuffix(strings.TrimRightFunc(text[:i], unicode.IsSpace), "\x01") {
+			continue
+		}
+
+		result.WriteString(text[copied : i+1])
+		result.WriteString(" " + commaBreakPlaceholder)
+		copied = i + 1
+	}
+	result.WriteString(text[copied:])
+
+	return result.String()
+}
+
 // ConvertPausePatterns replaces pause patterns with placeholders.
 // Placeholders are restored after XML escaping.
 func ConvertPausePatterns(text string, convertDashes bool, breakDurationMs, parenthesesBreakMs, colonBreakMs int) string {
@@ -458,7 +504,7 @@ func ConvertDashesToBreaksDefault(text string) string {
 
 // escapeXMLWithPauseBreaks escapes XML but preserves pause pattern-to-break conversions.
 // It first replaces pause patterns with placeholders, escapes XML, then restores break tags.
-func escapeXMLWithPauseBreaks(text string, convertDashes bool, breakDurationMs, parenthesesBreakMs, colonBreakMs int) string {
+func escapeXMLWithPauseBreaks(text string, convertDashes bool, breakDurationMs, parenthesesBreakMs, colonBreakMs, commaBreakMs int) string {
 	if breakDurationMs <= 0 {
 		breakDurationMs = 300
 	}
@@ -471,6 +517,11 @@ func escapeXMLWithPauseBreaks(text string, convertDashes bool, breakDurationMs, 
 
 	// Replace pause patterns with placeholder
 	text = ConvertPausePatterns(text, convertDashes, breakDurationMs, parenthesesBreakMs, colonBreakMs)
+
+	// Commas go last so they can defer to the pauses marked above
+	if commaBreakMs > 0 {
+		text = markCommaBreaks(text)
+	}
 
 	// Escape XML characters
 	text = escapeXML(text)
@@ -487,6 +538,11 @@ func escapeXMLWithPauseBreaks(text string, convertDashes bool, breakDurationMs, 
 	if colonBreakMs > 0 {
 		colonBreakTag := fmt.Sprintf(` <break time="%dms"/> `, colonBreakMs)
 		text = strings.ReplaceAll(text, colonBreakPlaceholder, colonBreakTag)
+	}
+
+	if commaBreakMs > 0 {
+		commaBreakTag := fmt.Sprintf(`<break time="%dms"/>`, commaBreakMs)
+		text = strings.ReplaceAll(text, commaBreakPlaceholder, commaBreakTag)
 	}
 
 	return text

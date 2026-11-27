@@ -7,7 +7,7 @@
     <script>
         window.APP_BASE_PATH = "{{.BasePath}}";
     </script>
-    <link rel="stylesheet" href="{{.BasePath}}/assets/style.css">
+    <link rel="stylesheet" href="{{.BasePath}}/assets/style.css?v=4">
     <link rel="stylesheet" href="{{.BasePath}}/assets/style_pronunciation.css">
 </head>
 <body>
@@ -56,46 +56,50 @@
                     <button class="remove-file" id="remove-file" title="Remove file">×</button>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="provider">TTS Provider</label>
-                        <select id="provider">
-                            <option value="">Loading...</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="language">Language</label>
-                        <select id="language">
-                            <option value="">Select provider first</option>
-                        </select>
-                    </div>
-                </div>
+                <div id="voice-settings-home">
+                    <div class="voice-settings" id="voice-settings">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="provider">TTS Provider</label>
+                                <select id="provider">
+                                    <option value="">Loading...</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="language">Language</label>
+                                <select id="language">
+                                    <option value="">Select provider first</option>
+                                </select>
+                            </div>
+                        </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="model">Model</label>
-                        <select id="model">
-                            <option value="">Select language first</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="voice">Voice</label>
-                        <select id="voice">
-                            <option value="">Select model first</option>
-                        </select>
-                    </div>
-                </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="model">Model</label>
+                                <select id="model">
+                                    <option value="">Select language first</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="voice">Voice</label>
+                                <select id="voice">
+                                    <option value="">Select model first</option>
+                                </select>
+                            </div>
+                        </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="speed">Speed</label>
-                        <input type="range" id="speed" min="0.5" max="2.0" step="0.1" value="1.0">
-                        <span class="range-value" id="speed-value">1.0x</span>
-                    </div>
-                    <div class="form-group">
-                        <label for="pitch">Pitch</label>
-                        <input type="range" id="pitch" min="0.5" max="2.0" step="0.1" value="1.0">
-                        <span class="range-value" id="pitch-value">1.0x</span>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="speed">Speed</label>
+                                <input type="range" id="speed" min="0.5" max="2.0" step="0.1" value="1.0">
+                                <span class="range-value" id="speed-value">1.0x</span>
+                            </div>
+                            <div class="form-group">
+                                <label for="pitch">Pitch</label>
+                                <input type="range" id="pitch" min="0.5" max="2.0" step="0.1" value="1.0">
+                                <span class="range-value" id="pitch-value">1.0x</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -229,24 +233,7 @@
                 <button class="modal-close" id="test-voice-close">×</button>
             </div>
             <div class="test-voice-body">
-                <div class="test-voice-info">
-                    <div class="test-voice-detail">
-                        <span class="test-voice-label">Provider:</span>
-                        <span class="test-voice-value" id="test-voice-provider-display">-</span>
-                    </div>
-                    <div class="test-voice-detail">
-                        <span class="test-voice-label">Voice:</span>
-                        <span class="test-voice-value" id="test-voice-voice-display">-</span>
-                    </div>
-                    <div class="test-voice-detail">
-                        <span class="test-voice-label">Speed:</span>
-                        <span class="test-voice-value" id="test-voice-speed-display">1.0x</span>
-                    </div>
-                    <div class="test-voice-detail">
-                        <span class="test-voice-label">Pitch:</span>
-                        <span class="test-voice-value" id="test-voice-pitch-display">1.0x</span>
-                    </div>
-                </div>
+                <div id="test-voice-settings-slot"></div>
                 <div class="form-group">
                     <label for="test-voice-text">Test Text</label>
                     <textarea id="test-voice-text" rows="3" maxlength="500" placeholder="Hello, this is a test of the text to speech voice. You can change this text to hear how different phrases sound."></textarea>
@@ -395,6 +382,11 @@
                                 <input type="number" id="cfg-colon-break" min="0" max="2000" step="50" value="250">
                                 <small>Replace ':' with SSML break (0 keeps legacy colon-to-space)</small>
                             </div>
+                            <div class="form-group">
+                                <label for="cfg-comma-break">Comma Break (ms)</label>
+                                <input type="number" id="cfg-comma-break" min="0" max="2000" step="50" value="0">
+                                <small>Add an SSML break after ',' (0 disables)</small>
+                            </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
@@ -405,11 +397,11 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="cfg-chapter-gap">Chapter Gap (sec)</label>
-                                <input type="number" id="cfg-chapter-gap" min="0" max="10" value="2">
+                                <input type="number" id="cfg-chapter-gap" min="0" max="10" step="any" value="2">
                             </div>
                             <div class="form-group">
                                 <label for="cfg-part-gap">Part/Scene Gap (sec)</label>
-                                <input type="number" id="cfg-part-gap" min="0" max="10" value="2">
+                                <input type="number" id="cfg-part-gap" min="0" max="10" step="any" value="2">
                             </div>
                         </div>
                     </div>
@@ -758,6 +750,6 @@
         </div>
     </div>
 
-    <script src="{{.BasePath}}/assets/app.js?v=3"></script>
+    <script src="{{.BasePath}}/assets/app.js?v=4"></script>
 </body>
 </html>

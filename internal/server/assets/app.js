@@ -214,6 +214,11 @@ class App {
         this.settings = {};
         this.savedTTSSettings = this.loadTTSSettings();
 
+        this.voiceCascadeId = 0;
+        this.voiceListsLoading = true;
+        this.testVoiceRequest = null;
+        this.testVoiceAudioUrl = null;
+
         // OPDS state
         this.opdsSources = [];
         this.opdsHistory = []; // Navigation history for breadcrumbs
@@ -245,11 +250,19 @@ class App {
             const existingTestText = this.savedTTSSettings?.testVoiceText;
             const testVoiceText = currentTestText || existingTestText || '';
 
-            const settings = {
+            // While lists are loading the selects hold placeholders, so keep the last saved selection
+            const selection = this.voiceListsLoading ? (this.savedTTSSettings || {}) : {
                 provider: this.providerSelect.value,
                 language: this.languageSelect.value,
                 model: this.modelSelect.value,
-                voice: this.voiceSelect.value,
+                voice: this.voiceSelect.value
+            };
+
+            const settings = {
+                provider: selection.provider,
+                language: selection.language,
+                model: selection.model,
+                voice: selection.voice,
                 speed: this.speedInput.value,
                 pitch: this.pitchInput.value,
                 testVoiceText: testVoiceText
@@ -319,6 +332,8 @@ class App {
         this.speedValue = document.getElementById('speed-value');
         this.pitchInput = document.getElementById('pitch');
         this.pitchValue = document.getElementById('pitch-value');
+        this.voiceSettings = document.getElementById('voice-settings');
+        this.voiceSettingsHome = document.getElementById('voice-settings-home');
         // Preview section elements
         this.previewSection = document.getElementById('preview-section');
         this.closePreviewBtn = document.getElementById('close-preview');
@@ -432,22 +447,32 @@ class App {
 
         // Cascading dropdown changes - settings are saved in loadVoices() at the end of cascade
         this.providerSelect.addEventListener('change', async () => {
-            await this.refreshProvider(this.providerSelect.value);
-            this.loadLanguages();
+            const cascadeId = this.startVoiceCascade(this.languageSelect, this.modelSelect, this.voiceSelect);
             this.updateCostEstimate();
+            await this.refreshProvider(this.providerSelect.value);
+            await this.loadLanguages(cascadeId);
         });
-        this.languageSelect.addEventListener('change', () => this.loadModels());
-        this.modelSelect.addEventListener('change', () => this.loadVoices());
+        this.languageSelect.addEventListener('change', () => {
+            this.loadModels(this.startVoiceCascade(this.modelSelect, this.voiceSelect));
+        });
+        this.modelSelect.addEventListener('change', () => {
+            this.loadVoices(this.startVoiceCascade(this.voiceSelect));
+        });
         // Save settings when voice is changed directly (without cascade)
-        this.voiceSelect.addEventListener('change', () => this.saveTTSSettings());
+        this.voiceSelect.addEventListener('change', () => {
+            this.resetTestVoiceResult();
+            this.saveTTSSettings();
+        });
 
         // Range inputs - save to localStorage on change
         this.speedInput.addEventListener('input', () => {
             this.speedValue.textContent = this.speedInput.value + 'x';
+            this.resetTestVoiceResult();
             this.saveTTSSettings();
         });
         this.pitchInput.addEventListener('input', () => {
             this.pitchValue.textContent = this.pitchInput.value + 'x';
+            this.resetTestVoiceResult();
             this.saveTTSSettings();
         });
 
@@ -490,10 +515,7 @@ class App {
         this.testVoiceGenerateBtn = document.getElementById('test-voice-generate-btn');
         this.testVoiceStatus = document.getElementById('test-voice-status');
         this.testVoiceAudio = document.getElementById('test-voice-audio');
-        this.testVoiceProviderDisplay = document.getElementById('test-voice-provider-display');
-        this.testVoiceVoiceDisplay = document.getElementById('test-voice-voice-display');
-        this.testVoiceSpeedDisplay = document.getElementById('test-voice-speed-display');
-        this.testVoicePitchDisplay = document.getElementById('test-voice-pitch-display');
+        this.testVoiceSettingsSlot = document.getElementById('test-voice-settings-slot');
 
         if (this.testVoiceBtn) {
             this.testVoiceBtn.addEventListener('click', () => this.openTestVoiceModal());
@@ -513,6 +535,11 @@ class App {
         if (this.testVoiceText) {
             this.testVoiceText.addEventListener('input', () => this.saveTTSSettings());
         }
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.testVoiceModal.classList.contains('active')) {
+                this.closeTestVoiceModal();
+            }
+        });
 
         // Main tab navigation
         this.mainTabs.forEach(tab => {
@@ -684,10 +711,35 @@ class App {
         }
     }
 
+    // A newer cascade supersedes any in-flight one, so late responses are ignored
+    startVoiceCascade(...dependentSelects) {
+        this.voiceListsLoading = true;
+        dependentSelects.forEach(select => {
+            select.innerHTML = '<option value="">Loading...</option>';
+        });
+        this.resetTestVoiceResult();
+        return ++this.voiceCascadeId;
+    }
+
+    finishVoiceCascade() {
+        this.voiceListsLoading = false;
+        this.updateTestVoiceButton();
+    }
+
+    failVoiceCascade(cascadeId, ...dependentSelects) {
+        if (cascadeId !== this.voiceCascadeId) return;
+        dependentSelects.forEach(select => {
+            select.innerHTML = '<option value="">Failed to load</option>';
+        });
+        this.finishVoiceCascade();
+    }
+
     async loadProviders() {
+        const cascadeId = this.startVoiceCascade(this.languageSelect, this.modelSelect, this.voiceSelect);
         try {
             const response = await fetch(apiUrl('/api/providers'));
             const data = await response.json();
+            if (cascadeId !== this.voiceCascadeId) return;
             this.providers = data.providers || [];
             
             // Filter to only enabled and available providers for the dropdown
@@ -706,17 +758,20 @@ class App {
                 return `<option value="${p.id}" ${p.id === defaultProvider ? 'selected' : ''}>${label}${voiceInfo}</option>`;
             }).join('');
 
-            await this.loadLanguages();
+            await this.loadLanguages(cascadeId);
         } catch (e) {
             console.error('Failed to load providers:', e);
+            this.failVoiceCascade(cascadeId, this.languageSelect, this.modelSelect, this.voiceSelect);
         }
     }
 
-    async loadLanguages() {
+    async loadLanguages(cascadeId) {
+        if (cascadeId !== this.voiceCascadeId) return;
         try {
             const provider = this.providerSelect.value;
             const response = await fetch(apiUrl(`/api/languages?provider=${provider}`));
             const data = await response.json();
+            if (cascadeId !== this.voiceCascadeId) return;
             const languages = data.languages || [];
 
             // Sort languages alphabetically
@@ -726,6 +781,7 @@ class App {
                 this.languageSelect.innerHTML = '<option value="">No languages available</option>';
                 this.modelSelect.innerHTML = '<option value="">Select language first</option>';
                 this.voiceSelect.innerHTML = '<option value="">Select model first</option>';
+                this.finishVoiceCascade();
                 return;
             }
 
@@ -743,18 +799,20 @@ class App {
                 `<option value="${lang}" ${lang === defaultLang ? 'selected' : ''}>${lang}</option>`
             ).join('');
 
-            await this.loadModels();
+            await this.loadModels(cascadeId);
         } catch (e) {
             console.error('Failed to load languages:', e);
+            this.failVoiceCascade(cascadeId, this.languageSelect, this.modelSelect, this.voiceSelect);
         }
     }
 
-    async loadModels() {
+    async loadModels(cascadeId) {
         try {
             const provider = this.providerSelect.value;
             const language = this.languageSelect.value;
             const response = await fetch(apiUrl(`/api/models?provider=${provider}&language=${language}`));
             const data = await response.json();
+            if (cascadeId !== this.voiceCascadeId) return;
             const models = data.models || [];
 
             // Sort models by quality (custom order)
@@ -771,6 +829,7 @@ class App {
             if (models.length === 0) {
                 this.modelSelect.innerHTML = '<option value="">No models available</option>';
                 this.voiceSelect.innerHTML = '<option value="">Select model first</option>';
+                this.finishVoiceCascade();
                 return;
             }
 
@@ -785,13 +844,14 @@ class App {
                 `<option value="${model}" ${model === defaultModel ? 'selected' : ''}>${model}</option>`
             ).join('');
 
-            await this.loadVoices();
+            await this.loadVoices(cascadeId);
         } catch (e) {
             console.error('Failed to load models:', e);
+            this.failVoiceCascade(cascadeId, this.modelSelect, this.voiceSelect);
         }
     }
 
-    async loadVoices() {
+    async loadVoices(cascadeId) {
         try {
             const provider = this.providerSelect.value;
             const language = this.languageSelect.value;
@@ -799,10 +859,12 @@ class App {
             
             const response = await fetch(apiUrl(`/api/voices?provider=${provider}&language=${language}&model=${model}`));
             const data = await response.json();
+            if (cascadeId !== this.voiceCascadeId) return;
             this.voices = data.voices || [];
 
             if (this.voices.length === 0) {
                 this.voiceSelect.innerHTML = '<option value="">No voices available</option>';
+                this.finishVoiceCascade();
                 return;
             }
 
@@ -827,9 +889,11 @@ class App {
             ).join('');
             
             // Save settings after all dropdowns are populated
+            this.finishVoiceCascade();
             this.saveTTSSettings();
         } catch (e) {
             console.error('Failed to load voices:', e);
+            this.failVoiceCascade(cascadeId, this.voiceSelect);
         }
     }
 
@@ -1038,6 +1102,7 @@ class App {
         try {
             const response = await fetch(apiUrl(`/api/pricing?provider=${provider}&chars=${chars}`));
             const data = await response.json();
+            if (provider !== this.providerSelect.value) return;
 
             if (!data.models || data.models.length === 0) {
                 // Local provider (free)
@@ -1065,6 +1130,10 @@ class App {
 
     async confirmConvert() {
         if (!this.selectedFile && !this.currentPreview?.id) return;
+        if (this.voiceListsLoading || !this.voiceSelect.value) {
+            this.showToast('Please wait for voices to load and select a voice', 'error');
+            return;
+        }
 
         this.confirmConvertBtn.disabled = true;
         this.confirmConvertBtn.innerHTML = '<span class="spinner">⏳</span> Starting...';
@@ -1463,14 +1532,15 @@ class App {
         document.getElementById('cfg-pronunciation-dict').value = s.pronunciation_dict_file || '';
         
         // TTS tab - Pauses & Gaps
-        document.getElementById('cfg-sentence-break').value = s.sentence_break_ms || 300;
-        document.getElementById('cfg-paragraph-break').value = s.paragraph_break_ms || 350;
-        document.getElementById('cfg-dash-break-duration').value = s.dash_break_duration_ms || 250;
-        document.getElementById('cfg-parentheses-break').value = s.parentheses_break_ms || 250;
-        document.getElementById('cfg-colon-break').value = s.colon_break_ms || 250;
-        document.getElementById('cfg-title-break').value = s.title_break_ms || 500;
-        document.getElementById('cfg-chapter-gap').value = s.chapter_gap_seconds || 2;
-        document.getElementById('cfg-part-gap').value = s.part_gap_seconds || 2;
+        document.getElementById('cfg-sentence-break').value = s.sentence_break_ms ?? 300;
+        document.getElementById('cfg-paragraph-break').value = s.paragraph_break_ms ?? 350;
+        document.getElementById('cfg-dash-break-duration').value = s.dash_break_duration_ms ?? 250;
+        document.getElementById('cfg-parentheses-break').value = s.parentheses_break_ms ?? 250;
+        document.getElementById('cfg-colon-break').value = s.colon_break_ms ?? 250;
+        document.getElementById('cfg-comma-break').value = s.comma_break_ms ?? 0;
+        document.getElementById('cfg-title-break').value = s.title_break_ms ?? 500;
+        document.getElementById('cfg-chapter-gap').value = s.chapter_gap_seconds ?? 2;
+        document.getElementById('cfg-part-gap').value = s.part_gap_seconds ?? 2;
         
         // Output tab
         document.getElementById('cfg-max-file-size').value = s.max_file_size_mb || 250;
@@ -1706,9 +1776,10 @@ class App {
             dash_break_duration_ms: parseInt(document.getElementById('cfg-dash-break-duration').value),
             parentheses_break_ms: parseInt(document.getElementById('cfg-parentheses-break').value),
             colon_break_ms: parseInt(document.getElementById('cfg-colon-break').value),
+            comma_break_ms: parseInt(document.getElementById('cfg-comma-break').value),
             title_break_ms: parseInt(document.getElementById('cfg-title-break').value),
-            chapter_gap_seconds: parseInt(document.getElementById('cfg-chapter-gap').value),
-            part_gap_seconds: parseInt(document.getElementById('cfg-part-gap').value),
+            chapter_gap_seconds: parseFloat(document.getElementById('cfg-chapter-gap').value),
+            part_gap_seconds: parseFloat(document.getElementById('cfg-part-gap').value),
             
             // Output
             max_file_size_mb: parseInt(document.getElementById('cfg-max-file-size').value),
@@ -1888,44 +1959,59 @@ class App {
 
     // Test Voice Modal Methods
     openTestVoiceModal() {
-        const provider = this.providerSelect.value;
-        const voice = this.voiceSelect.value;
-        const voiceName = this.voiceSelect.options[this.voiceSelect.selectedIndex]?.text || voice;
-        const speed = this.speedInput.value;
-        const pitch = this.pitchInput.value;
-
-        if (!provider || !voice) {
-            this.showToast('Please select a provider and voice first', 'error');
-            return;
-        }
-
-        // Update display values
-        this.testVoiceProviderDisplay.textContent = provider;
-        this.testVoiceVoiceDisplay.textContent = voiceName;
-        this.testVoiceSpeedDisplay.textContent = speed + 'x';
-        this.testVoicePitchDisplay.textContent = pitch + 'x';
-
         // Restore saved test voice text from localStorage
         const savedText = this.savedTTSSettings?.testVoiceText;
         if (this.testVoiceText && savedText) {
             this.testVoiceText.value = savedText;
         }
 
-        // Reset audio player and status
-        this.testVoiceAudio.src = '';
-        this.testVoiceAudio.style.display = 'none';
-        this.testVoiceStatus.textContent = '';
-        this.testVoiceStatus.className = 'test-voice-status';
+        this.resetTestVoiceResult();
 
-        // Show modal
+        // The dialog borrows the main screen controls, so both always share one state.
+        // The placeholder height keeps the page behind the overlay from jumping.
+        this.voiceSettingsHome.style.minHeight = `${this.voiceSettingsHome.offsetHeight}px`;
+        this.testVoiceSettingsSlot.appendChild(this.voiceSettings);
+
         this.testVoiceModal.classList.add('active');
     }
 
     closeTestVoiceModal() {
         this.testVoiceModal.classList.remove('active');
-        // Stop audio if playing
-        if (this.testVoiceAudio) {
-            this.testVoiceAudio.pause();
+        this.voiceSettingsHome.appendChild(this.voiceSettings);
+        this.voiceSettingsHome.style.minHeight = '';
+        this.resetTestVoiceResult();
+    }
+
+    // Discards generated or in-flight audio that no longer matches the settings
+    resetTestVoiceResult() {
+        this.testVoiceRequest?.abort();
+        this.testVoiceRequest = null;
+
+        this.testVoiceAudio.pause();
+        this.testVoiceAudio.removeAttribute('src');
+        this.testVoiceAudio.load();
+        this.testVoiceAudio.style.display = 'none';
+        if (this.testVoiceAudioUrl) {
+            URL.revokeObjectURL(this.testVoiceAudioUrl);
+            this.testVoiceAudioUrl = null;
+        }
+
+        this.testVoiceStatus.textContent = '';
+        this.testVoiceStatus.className = 'test-voice-status';
+        this.updateTestVoiceButton();
+    }
+
+    updateTestVoiceButton() {
+        const generating = this.testVoiceRequest !== null;
+        this.testVoiceGenerateBtn.disabled = generating || this.voiceListsLoading ||
+            !this.providerSelect.value || !this.voiceSelect.value;
+
+        if (generating) {
+            this.testVoiceGenerateBtn.innerHTML = '<span class="spinner">⏳</span> Generating...';
+        } else if (this.voiceListsLoading) {
+            this.testVoiceGenerateBtn.innerHTML = '<span class="spinner">⏳</span> Loading voices...';
+        } else {
+            this.testVoiceGenerateBtn.innerHTML = '🔊 Generate Audio';
         }
     }
 
@@ -1935,26 +2021,27 @@ class App {
         const text = this.testVoiceText?.value || 'Hello, this is a test of the text to speech voice.';
         const speed = parseFloat(this.speedInput.value || '1.0');
         const pitch = parseFloat(this.pitchInput.value || '1.0');
+        const language = this.languageSelect.value;
 
         // Save test voice text to localStorage
         this.saveTTSSettings();
 
-        if (!provider || !voice) {
+        if (this.voiceListsLoading || !provider || !voice) {
             this.showToast('Please select a provider and voice first', 'error');
             return;
         }
 
-        this.testVoiceGenerateBtn.disabled = true;
-        this.testVoiceGenerateBtn.innerHTML = '<span class="spinner">⏳</span> Generating...';
-        this.testVoiceStatus.textContent = '';
-        this.testVoiceStatus.className = 'test-voice-status';
-        this.testVoiceAudio.style.display = 'none';
+        this.resetTestVoiceResult();
+        const request = new AbortController();
+        this.testVoiceRequest = request;
+        this.updateTestVoiceButton();
 
         try {
             const response = await fetch(apiUrl('/api/test-voice'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ provider, voice, text, speed, pitch })
+                body: JSON.stringify({ provider, voice, language, text, speed, pitch }),
+                signal: request.signal
             });
 
             if (!response.ok) {
@@ -1963,20 +2050,24 @@ class App {
             }
 
             const audioBlob = await response.blob();
-            const audioUrl = URL.createObjectURL(audioBlob);
-            
-            this.testVoiceAudio.src = audioUrl;
+            if (request !== this.testVoiceRequest) return;
+
+            this.testVoiceAudioUrl = URL.createObjectURL(audioBlob);
+            this.testVoiceAudio.src = this.testVoiceAudioUrl;
             this.testVoiceAudio.style.display = 'block';
-            this.testVoiceAudio.play();
-            
+            this.testVoiceAudio.play().catch(e => console.warn('Audio playback did not start:', e));
+
             this.testVoiceStatus.textContent = '✅ Audio generated successfully';
             this.testVoiceStatus.className = 'test-voice-status success';
         } catch (e) {
+            if (request !== this.testVoiceRequest) return;
             this.testVoiceStatus.textContent = '❌ ' + e.message;
             this.testVoiceStatus.className = 'test-voice-status error';
         } finally {
-            this.testVoiceGenerateBtn.disabled = false;
-            this.testVoiceGenerateBtn.innerHTML = '🔊 Generate Audio';
+            if (request === this.testVoiceRequest) {
+                this.testVoiceRequest = null;
+                this.updateTestVoiceButton();
+            }
         }
     }
 

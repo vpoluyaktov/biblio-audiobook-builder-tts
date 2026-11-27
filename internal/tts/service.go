@@ -55,6 +55,7 @@ type ConversionOptions struct {
 	DashBreakDurationMs   int    // Duration of break for dashes in milliseconds (default 300)
 	ParenthesesBreakMs    int    // Duration of break around parenthetical text in milliseconds (default 250)
 	ColonBreakMs          int    // Duration of break replacing ':' in milliseconds (default 250)
+	CommaBreakMs          int    // Duration of break after ',' in milliseconds (0 = disabled)
 	TitleBreakMs          int    // Duration of break after titles in ms (0 = no breaks)
 }
 

@@ -1913,6 +1913,7 @@ type TestVoiceRequest struct {
 	Text     string  `json:"text"`
 	Speed    float64 `json:"speed"`
 	Pitch    float64 `json:"pitch"`
+	Language string  `json:"language"`
 }
 
 // handleTestVoice generates a short audio sample for voice testing
@@ -1956,38 +1957,31 @@ func (s *Server) handleTestVoice(w http.ResponseWriter, r *http.Request) {
 		req.Text = string(runes[:500])
 	}
 
-	// Get the TTS adapter for the provider
-	adapter, err := s.ttsService.GetAdapter(req.Provider)
-	if err != nil {
+	if req.Language == "" {
+		req.Language = "en" // Same default as conversion jobs
+	}
+
+	if _, err := s.ttsService.GetAdapter(req.Provider); err != nil {
 		s.jsonError(w, http.StatusBadRequest, fmt.Sprintf("Provider not available: %v", err))
 		return
 	}
 
-	// Convert text to speech
-	options := &tts.ConversionOptions{
-		Voice:    req.Voice,
-		Provider: req.Provider,
-		Speed:    req.Speed,
-		Pitch:    req.Pitch,
+	if s.worker == nil {
+		s.jsonError(w, http.StatusInternalServerError, "Database not available")
+		return
 	}
 
-	audioReader, err := adapter.ConvertToSpeech(req.Text, req.Voice, options, nil)
+	audioData, err := s.worker.PreviewSpeech(req)
 	if err != nil {
 		logger.Error("TTS conversion failed: %v", err)
 		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("TTS conversion failed: %v", err))
 		return
 	}
 
-	// Read audio data
-	audioData, err := io.ReadAll(audioReader)
-	if err != nil {
-		s.jsonError(w, http.StatusInternalServerError, "Failed to read audio data")
-		return
-	}
-
-	// Determine content type based on provider
+	// Determine content type from the audio, falling back to the provider's format
 	contentType := "audio/wav"
-	if req.Provider == "google" || req.Provider == "openai" || req.Provider == "azure" {
+	isWAV := bytes.HasPrefix(audioData, []byte("RIFF"))
+	if !isWAV && (req.Provider == "google" || req.Provider == "openai" || req.Provider == "azure") {
 		contentType = "audio/mpeg"
 	}
 
